@@ -5,6 +5,8 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +31,12 @@ interface RegisterForm {
 }
 
 export function AuthDialog({ children }: AuthDialogProps) {
+  const [username, setUsername] = useState('')
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+
   const [isOpen, setIsOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,29 +61,37 @@ export function AuthDialog({ children }: AuthDialogProps) {
     }
   });
 
-  const handleLogin = async (data: LoginForm) => {
+  const handleLogin = async () => {
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      setIsOpen(false);
-      loginForm.reset();
-      console.log('Login data:', data);
-    }, 1500);
-  };
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setError(error.message)
+    } else {
+      router.push('/course/new')
+    }
+  }
 
-  const handleRegister = async (data: RegisterForm) => {
+  const handleRegister = async () => {
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      setIsOpen(false);
-      registerForm.reset();
-      console.log('Register data:', data);
-    }, 1500);
-  };
+
+    const { name, email, password } = registerForm.getValues()
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+        },
+      },
+    });
+
+    if (error) {
+      setError(error.message);
+    } else {
+      router.push("/course/new");
+    }
+  }
 
   const validatePasswordMatch = (value: string) => {
     return value === registerForm.watch('password') || 'Passwords do not match';
@@ -109,25 +125,21 @@ export function AuthDialog({ children }: AuthDialogProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
+                <form onSubmit={e => { e.preventDefault(); handleLogin() }} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="nama@example.com"
-                        className="pl-10"
-                        {...loginForm.register('email', {
-                          required: 'Email is required',
-                          pattern: {
-                            value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                            message: 'Invalid email address'
-                          }
-                        })}
-                      />
-                    </div>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="login-email"
+                          type="email"
+                          value={email}
+                          placeholder="nama@example.com"
+                          className="pl-10"
+                          onChange={e => setEmail(e.target.value)}
+                          required
+                        />
+                      </div>
                     {loginForm.formState.errors.email && (
                       <div className="flex items-center gap-2 text-sm text-red-600">
                         <AlertCircle className="h-4 w-4" />
@@ -144,14 +156,10 @@ export function AuthDialog({ children }: AuthDialogProps) {
                         id="login-password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Masukkan password"
+                        value={password}
                         className="pl-10 pr-10"
-                        {...loginForm.register('password', {
-                          required: 'Password is required',
-                          minLength: {
-                            value: 6,
-                            message: 'Password must be at least 6 characters'
-                          }
-                        })}
+                        onChange={e => setPassword(e.target.value)}
+                        required  
                       />
                       <button
                         type="button"
@@ -212,7 +220,7 @@ export function AuthDialog({ children }: AuthDialogProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
+                <form onSubmit={e => { e.preventDefault(); handleRegister() }} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="register-name">Nama Lengkap</Label>
                     <div className="relative">
@@ -222,13 +230,7 @@ export function AuthDialog({ children }: AuthDialogProps) {
                         type="text"
                         placeholder="Masukkan nama lengkap"
                         className="pl-10"
-                        {...registerForm.register('name', {
-                          required: 'Name is required',
-                          minLength: {
-                            value: 2,
-                            message: 'Name must be at least 2 characters'
-                          }
-                        })}
+                        {...registerForm.register('name', { required: 'Nama wajib diisi' })}
                       />
                     </div>
                     {registerForm.formState.errors.name && (
@@ -248,13 +250,7 @@ export function AuthDialog({ children }: AuthDialogProps) {
                         type="email"
                         placeholder="nama@example.com"
                         className="pl-10"
-                        {...registerForm.register('email', {
-                          required: 'Email is required',
-                          pattern: {
-                            value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                            message: 'Invalid email address'
-                          }
-                        })}
+                        {...registerForm.register('email', { required: 'Email wajib diisi' })}
                       />
                     </div>
                     {registerForm.formState.errors.email && (
@@ -274,13 +270,7 @@ export function AuthDialog({ children }: AuthDialogProps) {
                         type={showPassword ? "text" : "password"}
                         placeholder="Buat password"
                         className="pl-10 pr-10"
-                        {...registerForm.register('password', {
-                          required: 'Password is required',
-                          minLength: {
-                            value: 6,
-                            message: 'Password must be at least 6 characters'
-                          }
-                        })}
+                        {...registerForm.register('password', { required: 'Password wajib diisi' })}
                       />
                       <button
                         type="button"
@@ -309,7 +299,8 @@ export function AuthDialog({ children }: AuthDialogProps) {
                         className="pl-10"
                         {...registerForm.register('confirmPassword', {
                           required: 'Please confirm your password',
-                          validate: validatePasswordMatch
+                          validate: (value) =>
+                            value === registerForm.getValues('password') || 'Passwords do not match',
                         })}
                       />
                     </div>
