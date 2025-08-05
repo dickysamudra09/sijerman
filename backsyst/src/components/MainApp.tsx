@@ -9,7 +9,6 @@ import { FAQ } from "@/components/FAQ";
 import { HeroSection } from "@/components/HeroSection";
 import { ClassFilter } from "@/components/ClassFilter";
 import { CourseDetail } from "@/components/CourseDetail";
-import { AuthDialog } from "@/components/AuthDialog";
 import { InteractiveQuiz } from "@/components/InteractiveQuiz";
 import { AIAnalysis } from "@/components/AIAnalysis";
 import { TeacherStudentMode } from "@/components/TeacherStudentMode";
@@ -233,17 +232,13 @@ export default function App() {
               </div>
 
               {/* Auth Buttons */}
-              <AuthDialog>
-                <Button variant="ghost" size="sm">
-                  <User className="h-4 w-4 mr-2" />
-                  {getText("Masuk", "Anmelden")}
-                </Button>
-              </AuthDialog>
-              <AuthDialog>
-                <Button size="sm">
-                  {getText("Daftar Gratis", "Kostenlos registrieren")}
-                </Button>
-              </AuthDialog>
+              <Button variant="ghost" size="sm" onClick={() => window.location.href = '/auth/login'}>
+                <User className="h-4 w-4 mr-2" />
+                {getText("Masuk", "Anmelden")}
+              </Button>
+              <Button size="sm" onClick={() => window.location.href = '/auth/register'}>
+                {getText("Daftar Gratis", "Kostenlos registrieren")}
+              </Button>
             </div>
 
             {/* Mobile Menu */}
@@ -360,17 +355,13 @@ export default function App() {
 
                     {/* Auth Buttons Mobile */}
                     <div className="pt-4 border-t space-y-2">
-                      <AuthDialog>
-                        <Button variant="ghost" className="w-full justify-start">
-                          <User className="h-4 w-4 mr-2" />
-                          {getText("Masuk", "Anmelden")}
-                        </Button>
-                      </AuthDialog>
-                      <AuthDialog>
-                        <Button className="w-full">
-                          {getText("Daftar Gratis", "Kostenlos registrieren")}
-                        </Button>
-                      </AuthDialog>
+                      <Button variant="ghost" className="w-full justify-start" onClick={() => { setIsMobileMenuOpen(false); window.location.href = '/auth/login'; }}>
+                        <User className="h-4 w-4 mr-2" />
+                        {getText("Masuk", "Anmelden")}
+                      </Button>
+                      <Button className="w-full" onClick={() => { setIsMobileMenuOpen(false); window.location.href = '/auth/register'; }}>
+                        {getText("Daftar Gratis", "Kostenlos registrieren")}
+                      </Button>
                     </div>
                   </div>
                 </SheetContent>
