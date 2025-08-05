@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 
 export default function AuthPage() {
   const router = useRouter()
+  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -24,7 +25,15 @@ export default function AuthPage() {
   }
 
   const handleRegister = async () => {
-    const { error } = await supabase.auth.signUp({ email, password })
+    const { error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        data: {
+          username,
+        },
+      },
+     })
     if (error) {
       setError(error.message)
     } else {
