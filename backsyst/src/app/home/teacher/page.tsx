@@ -7,8 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase";
 import {
   Users,
@@ -16,14 +14,7 @@ import {
   Plus,
   Share2,
   Eye,
-  CheckCircle2,
-  Clock,
-  BookOpen,
-  Target,
-  TrendingUp,
-  UserPlus,
   Copy,
-  Send,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -36,22 +27,12 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
-interface Student {
-  id: string;
-  name: string;
-  email: string;
-  progress: number;
-  last_active: string;
-  completed_quizzes: number;
-  average_score: number;
-}
-
 interface ClassRoom {
   id: string;
   name: string;
   code: string;
   description: string;
-  students: Student[];
+  students: any[]; // Placeholder, bisa disesuaikan jika diperlukan
   createdAt: string;
   teacherName?: string;
 }
@@ -62,12 +43,12 @@ interface TeacherModeProps {
 
 export function TeacherMode({ onBack }: TeacherModeProps) {
   const [userName, setUserName] = useState<string>("");
+  const [initialLoading, setInitialLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [classrooms, setClassrooms] = useState<ClassRoom[]>([]);
   const [newClassName, setNewClassName] = useState("");
   const [newClassDescription, setNewClassDescription] = useState("");
   const [joinCode, setJoinCode] = useState("");
-  const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,8 +56,11 @@ export function TeacherMode({ onBack }: TeacherModeProps) {
 
   useEffect(() => {
     const fetchUserData = async () => {
+      
       setIsLoading(true);
+      setInitialLoading(true);
       setError(null);
+      
       console.log("Mengambil data pengguna...");
 
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -85,7 +69,7 @@ export function TeacherMode({ onBack }: TeacherModeProps) {
       if (sessionError || !sessionData.session?.user) {
         setError("Tidak ada sesi ditemukan. Silakan masuk.");
         setIsLoading(false);
-        router.push("/login");
+        router.push("/auth/login");
         return;
       }
 
@@ -115,6 +99,7 @@ export function TeacherMode({ onBack }: TeacherModeProps) {
       }
 
       setIsLoading(false);
+      setInitialLoading(false);
     };
 
     fetchUserData();
@@ -175,7 +160,7 @@ export function TeacherMode({ onBack }: TeacherModeProps) {
           }
 
           const studentIds = registrations.map(reg => reg.student_id);
-          let students: Student[] = [];
+          let students: any[] = [];
           if (studentIds.length > 0) {
             const { data: studentData, error: studentError } = await supabase
               .from("users")
@@ -190,10 +175,6 @@ export function TeacherMode({ onBack }: TeacherModeProps) {
                 id: student.id,
                 name: student.name,
                 email: student.email,
-                progress: 0,
-                last_active: new Date().toISOString(),
-                completed_quizzes: 0,
-                average_score: 0,
               }));
             }
           }
@@ -250,9 +231,9 @@ export function TeacherMode({ onBack }: TeacherModeProps) {
   const copyClassCode = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
-      toast.success("✅ Kode berhasil disalin!");
+      toast.success("Kode berhasil disalin!");
     } catch (err) {
-      toast.error("❌ Gagal menyalin kode.");
+      toast.error("Gagal menyalin kode.");
     }
   };
 
@@ -262,8 +243,8 @@ export function TeacherMode({ onBack }: TeacherModeProps) {
     }
   }, [userId]);
 
-  if (isLoading) {
-    return <div>Memuat...</div>;
+  if (initialLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-background">Memuat...</div>;
   }
 
   if (error) {
@@ -275,7 +256,7 @@ export function TeacherMode({ onBack }: TeacherModeProps) {
           </CardHeader>
           <CardContent>
             <p className="text-red-600">{error}</p>
-            <Button onClick={() => router.push("/login")} className="mt-4">
+            <Button onClick={() => router.push("/auth/login")} className="mt-4">
               Ke Halaman Masuk
             </Button>
           </CardContent>
@@ -308,8 +289,6 @@ export function TeacherMode({ onBack }: TeacherModeProps) {
     }
   };
 
-  const selectedClassData = classrooms.find(c => c.id === selectedClass);
-
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -329,212 +308,120 @@ export function TeacherMode({ onBack }: TeacherModeProps) {
           </Button>
         </div>
 
-        {selectedClass && selectedClassData ? (
-          /* Class Detail View */
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2>{selectedClassData.name}</h2>
-                <p className="text-muted-foreground">{selectedClassData.description}</p>
-              </div>
-              <Button variant="ghost" onClick={() => setSelectedClass(null)}>
-                ← Kembali ke Kelas
-              </Button>
-            </div>
+        <Tabs defaultValue="classes" className="w-full">
+          <TabsList>
+            <TabsTrigger value="classes">Kelas Saya</TabsTrigger>
+            <TabsTrigger value="create">Kelas Baru</TabsTrigger>
+          </TabsList>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">{selectedClassData.students.length}</div>
-                    <p className="text-sm text-muted-foreground">Siswa</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {Math.round(selectedClassData.students.reduce((acc, s) => acc + s.average_score, 0) / (selectedClassData.students.length || 1)) || 0}%
-                    </div>
-                    <p className="text-sm text-muted-foreground">Rata-rata</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{selectedClassData.code}</div>
-                    <p className="text-sm text-muted-foreground">Kode Kelas</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {selectedClassData.students.reduce((acc, s) => acc + s.completed_quizzes, 0)}
-                    </div>
-                    <p className="text-sm text-muted-foreground">Total Kuis</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Kemajuan Siswa</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {selectedClassData.students.map((student) => (
-                    <div key={student.id} className="flex items-center gap-4 p-4 border rounded-lg">
-                      <Avatar>
-                        <AvatarFallback>{student.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <p className="font-medium">{student.name}</p>
-                            <p className="text-sm text-muted-foreground">{student.email}</p>
-                          </div>
-                          <div className="text-right">
-                            <Badge variant={student.average_score >= 80 ? "default" : student.average_score >= 60 ? "secondary" : "destructive"}>
-                              {student.average_score}% Rata-rata
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Kemajuan: {student.progress}%</span>
-                            <span>{student.completed_quizzes} Kuis selesai</span>
-                          </div>
-                          <Progress value={student.progress} className="h-2" />
-                          <p className="text-xs text-muted-foreground">
-                            Terakhir aktif: {new Date(student.last_active).toLocaleDateString('id-ID')}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          /* Class Overview */
-          <Tabs defaultValue="classes" className="w-full">
-            <TabsList>
-              <TabsTrigger value="classes">Kelas Saya</TabsTrigger>
-              <TabsTrigger value="create">Kelas Baru</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="classes" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {classrooms.map((classroom) => (
-                  <Card key={classroom.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
-                        {classroom.name}
-                        <Badge variant="outline">{classroom.students.length} Siswa</Badge>
-                      </CardTitle>
-                      <CardDescription>{classroom.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Kode Kelas:</span>
-                          <div className="flex items-center gap-2">
-                            <code className="bg-muted px-2 py-1 rounded text-sm">{classroom.code}</code>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              onClick={() => copyClassCode(classroom.code)}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
+          <TabsContent value="classes" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {classrooms.map((classroom) => (
+                <Card key={classroom.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      {classroom.name}
+                      <Badge variant="outline">{classroom.students.length} Siswa</Badge>
+                    </CardTitle>
+                    <CardDescription>{classroom.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Kode Kelas:</span>
+                        <div className="flex items-center gap-2">
+                          <code className="bg-muted px-2 py-1 rounded text-sm">{classroom.code}</code>
                           <Button 
                             size="sm" 
-                            className="flex-1"
-                            onClick={() => setSelectedClass(classroom.id)}
+                            variant="ghost" 
+                            onClick={() => copyClassCode(classroom.code)}
                           >
-                            <Eye className="h-4 w-4 mr-2" />
-                            Lihat
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            <Share2 className="h-4 w-4" />
+                            <Copy className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="create" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Plus className="h-5 w-5" />
-                    Buat Kelas Baru
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="block mb-2">Nama Kelas</label>
-                    <Input
-                      placeholder="Contoh: Bahasa Indonesia A2 - Lanjutan"
-                      value={newClassName}
-                      onChange={(e) => setNewClassName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-2">Deskripsi</label>
-                    <Textarea
-                      placeholder="Deskripsi singkat kelas..."
-                      value={newClassDescription}
-                      onChange={(e) => setNewClassDescription(e.target.value)}
-                    />
-                  </div>
-                  <Button onClick={() => setIsModalOpen(true)} disabled={!newClassName.trim()} className="bg-blue-600 text-white hover:bg-blue-700">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Buat Kelas
-                  </Button>
-                  <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Kelas Baru</DialogTitle>
-                        <DialogDescription>
-                          Tambahkan kelas baru untuk memulai sesi belajar Anda
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <Input
-                          placeholder="Nama Kelas"
-                          value={newClassName}
-                          onChange={(e) => setNewClassName(e.target.value)}
-                        />
-                        <Textarea
-                          placeholder="Deskripsi Kelas (Opsional)"
-                          value={newClassDescription}
-                          onChange={(e) => setNewClassDescription(e.target.value)}
-                        />
-                        <Button onClick={createNewClass} disabled={isLoading} className="bg-blue-600 text-white hover:bg-blue-700">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Buat Kelas
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => {
+                            console.log("Navigating to classroom with id:", classroom.id);
+                            router.push(`/home/classrooms/${classroom.id}`);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Lihat
+                        </Button>
+                        <Button size="sm" variant="outline">
+                          <Share2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </DialogContent>
-                  </Dialog>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="create" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Plus className="h-5 w-5" />
+                  Buat Kelas Baru
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="block mb-2">Nama Kelas</label>
+                  <Input
+                    placeholder="Contoh: Bahasa Indonesia A2 - Lanjutan"
+                    value={newClassName}
+                    onChange={(e) => setNewClassName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2">Deskripsi</label>
+                  <Textarea
+                    placeholder="Deskripsi singkat kelas..."
+                    value={newClassDescription}
+                    onChange={(e) => setNewClassDescription(e.target.value)}
+                  />
+                </div>
+                <Button onClick={() => setIsModalOpen(true)} disabled={!newClassName.trim()} className="bg-blue-600 text-white hover:bg-blue-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Buat Kelas
+                </Button>
+                <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Kelas Baru</DialogTitle>
+                      <DialogDescription>
+                        Tambahkan kelas baru untuk memulai sesi belajar Anda
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <Input
+                        placeholder="Nama Kelas"
+                        value={newClassName}
+                        onChange={(e) => setNewClassName(e.target.value)}
+                      />
+                      <Textarea
+                        placeholder="Deskripsi Kelas (Opsional)"
+                        value={newClassDescription}
+                        onChange={(e) => setNewClassDescription(e.target.value)}
+                      />
+                      <Button onClick={createNewClass} disabled={isLoading} className="bg-blue-600 text-white hover:bg-blue-700">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Buat Kelas
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
