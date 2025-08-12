@@ -16,6 +16,7 @@ import {
   Target,
   TrendingUp,
   Plus,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,10 +40,22 @@ interface ClassRoom {
   teacherName?: string;
 }
 
+interface ContentItem {
+  id: string;
+  judul: string;
+  sub_judul: string;
+  jenis_create: string;
+  konten: string;
+  documents: { name: string; url: string }[];
+  deadline: string | null;
+  created_at: string;
+}
+
 export default function ClassroomsPage() {
   const [userName, setUserName] = useState<string>("");
   const [userId, setUserId] = useState<string | null>(null);
   const [classroom, setClassroom] = useState<ClassRoom | null>(null);
+  const [contents, setContents] = useState<ContentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +108,6 @@ export default function ClassroomsPage() {
 
       setUserName(userData.name || "");
 
-      // Fetch classroom data
       const { data: classroomData, error: classroomError } = await supabase
         .from("classrooms")
         .select("id, name, code, description, created_at")
@@ -158,6 +170,20 @@ export default function ClassroomsPage() {
           students,
           createdAt: classroomData.created_at,
         });
+      }
+
+      const { data: contentsData, error: contentsError } = await supabase
+        .from("teacher_create")
+        .select("*")
+        .eq("kelas", classId)
+        .eq("pembuat", userId)
+        .order("created_at", { ascending: false });
+
+      if (contentsError) {
+        console.error("Gagal mengambil konten:", contentsError.message);
+        setError("Gagal mengambil konten: " + contentsError.message);
+      } else {
+        setContents(contentsData || []);
       }
 
       setIsLoading(false);
@@ -272,40 +298,32 @@ export default function ClassroomsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Kemajuan Siswa</CardTitle>
+              <CardTitle>Daftar Konten</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {classroom.students.map((student) => (
-                  <div key={student.id} className="flex items-center gap-4 p-4 border rounded-lg">
-                    <Avatar>
-                      <AvatarFallback>{student.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <p className="font-medium">{student.name}</p>
-                          <p className="text-sm text-muted-foreground">{student.email}</p>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant={student.average_score >= 80 ? "default" : student.average_score >= 60 ? "secondary" : "destructive"}>
-                            {student.average_score}% Rata-rata
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Kemajuan: {student.progress}%</span>
-                          <span>{student.completed_quizzes} Kuis selesai</span>
-                        </div>
-                        <Progress value={student.progress} className="h-2" />
-                        <p className="text-xs text-muted-foreground">
-                          Terakhir aktif: {new Date(student.last_active).toLocaleDateString('id-ID')}
-                        </p>
-                      </div>
+                {contents.map((content) => (
+                  <div key={content.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-semibold">{content.judul}</h3>
+                      <p className="text-sm text-muted-foreground">{content.sub_judul}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {new Date(content.created_at).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}
+                      </p>
+                      <Button 
+                        variant="default" 
+                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={() => router.push(`/home/classrooms/${classId}/${content.id}`)}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Review
+                      </Button>
                     </div>
                   </div>
                 ))}
+                {contents.length === 0 && <p className="text-center text-muted-foreground">Belum ada konten yang dibuat.</p>}
               </div>
             </CardContent>
           </Card>

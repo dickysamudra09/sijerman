@@ -29,6 +29,8 @@ export default function CreateContentPage() {
   const [classId, setClassId] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [fileErrors, setFileErrors] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -54,6 +56,33 @@ export default function CreateContentPage() {
     fetchUserData();
   }, [router, searchParams]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length + selectedFiles.length > 5) {
+      setFileErrors("Maksimal 5 dokumen.");
+      return;
+    }
+
+    let totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+    const newFiles = [];
+    for (const file of files) {
+      if (totalSize + file.size > 12 * 1024 * 1024) {
+        setFileErrors("Total ukuran melebihi 12 MB.");
+        return;
+      }
+      totalSize += file.size;
+      newFiles.push(file);
+    }
+
+    setSelectedFiles([...selectedFiles, ...newFiles]);
+    setFileErrors(null);
+  };
+
+  const removeFile = (index: number) => {
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    setSelectedFiles(newFiles);
+  };
+
   const onSubmit = async (data: CreateFormData) => {
     setIsLoading(true);
     setError(null);
@@ -62,6 +91,27 @@ export default function CreateContentPage() {
       setError("User ID atau Class ID tidak ditemukan.");
       setIsLoading(false);
       return;
+    }
+
+    const documents: { name: string; url: string }[] = [];
+
+    if (selectedFiles.length > 0) {
+      for (const file of selectedFiles) {
+        const filePath = `${userId}/${Date.now()}_${file.name}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          setError("Gagal upload file: " + uploadError.message);
+          setIsLoading(false);
+          return;
+        }
+
+        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+        const publicUrl = urlData.publicUrl;
+        documents.push({ name: file.name, url: publicUrl });
+      }
     }
 
     const { error } = await supabase
@@ -73,6 +123,7 @@ export default function CreateContentPage() {
         pembuat: userId,
         jenis_create: data.jenis_create,
         konten: data.konten,
+        documents: documents,
         deadline: data.deadline,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -175,11 +226,37 @@ export default function CreateContentPage() {
                       'searchreplace visualblocks code fullscreen',
                       'insertdatetime media table paste code help wordcount'
                     ],
-                    toolbar: 'undo redo | formatselect | bold italic backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help',
+                    toolbar: 'undo redo | formatselect | bold italic backcolor | link image | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help',
                   }}
                   onEditorChange={handleEditorChange}
                 />
                 {errors.konten && <p className="text-red-600 text-sm">{errors.konten.message}</p>}
+              </div>
+              <div>
+                <Label>Upload Dokumen (maks 5, total 12MB)</Label>
+                <Input 
+                  type="file" 
+                  multiple 
+                  accept=".pdf,.doc,.docx,.jpg,.png,.txt" 
+                  onChange={handleFileChange} 
+                />
+                {fileErrors && <p className="text-red-600 text-sm">{fileErrors}</p>}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedFiles.map((file, index) => (
+                    <div key={index} className="bg-blue-100 text-blue-800 px-2 py-1 rounded flex items-center gap-2">
+                      {file.name}
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm" 
+                        className="p-0 h-auto text-red-600" 
+                        onClick={() => removeFile(index)}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div>
                 <Label htmlFor="deadline">Deadline</Label>
