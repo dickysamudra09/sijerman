@@ -53,6 +53,7 @@ interface ClassRoom {
   description: string;
   students: Student[];
   createdAt: string;
+  teacherName?: string;
 }
 
 interface TeacherStudentModeProps {
@@ -71,19 +72,21 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isJoinConfirmOpen, setIsJoinConfirmOpen] = useState(false);
+  const [selectedClassToJoin, setSelectedClassToJoin] = useState<any>(null);
   const router = useRouter();
 
   useEffect(() => {
     const fetchUserData = async () => {
       setIsLoading(true);
       setError(null);
-      console.log("Fetching user data...");
+      console.log("Mengambil data pengguna...");
 
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      console.log("Session response:", { sessionData, error: sessionError });
+      console.log("Respons sesi:", { sessionData, error: sessionError });
 
       if (sessionError || !sessionData.session?.user) {
-        setError("No session found. Please log in.");
+        setError("Tidak ada sesi ditemukan. Silakan masuk.");
         setIsLoading(false);
         router.push("/login");
         return;
@@ -97,10 +100,10 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
         .select("name, role")
         .eq("id", userId)
         .single();
-      console.log("User data response:", { userData, error: userError });
+      console.log("Respons data pengguna:", { userData, error: userError });
 
       if (userError) {
-        setError("Error fetching user data: " + userError.message);
+        setError("Gagal mengambil data pengguna: " + userError.message);
         setIsLoading(false);
         return;
       }
@@ -117,12 +120,12 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
   }, [router]);
 
   const handleLogout = async () => {
-    console.log("Attempting logout...");
+    console.log("Mencoba keluar...");
     const { error } = await supabase.auth.signOut();
-    console.log("Logout response:", { error });
+    console.log("Respons keluar:", { error });
 
     if (error) {
-      setError("Error logging out: " + error.message);
+      setError("Gagal keluar: " + error.message);
       return;
     }
     setUserRole(null);
@@ -135,63 +138,160 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
     if (!userId) return;
     setIsLoading(true);
     setError(null);
-    console.log("Fetching classrooms...");
+    console.log("Mengambil kelas untuk pengguna:", userId, "Peran:", userRole);
 
-    const { data, error } = await supabase
-      .from("classrooms")
-      .select("id, name, code, description, created_at")
-      .eq("teacher_id", userId);
+    if (userRole === "teacher") {
+      const { data, error } = await supabase
+        .from("classrooms")
+        .select("id, name, code, description, created_at")
+        .eq("teacher_id", userId);
 
-    console.log("Classrooms response:", { data, error });
+      console.log("Respons kelas guru:", { data, error });
 
-    if (error) {
-      setError("Error fetching classrooms: " + error.message);
-      setIsLoading(false);
-      return;
-    }
+      if (error) {
+        setError("Gagal mengambil kelas: " + error.message);
+        setIsLoading(false);
+        return;
+      }
 
-    if (data) {
-      const classroomsWithStudents = await Promise.all(
-        data.map(async (classroom) => {
-          const { data: students, error: studentsError } = await supabase
-            .from("students")
-            .select("id, name, email, progress, last_active, completed_quizzes, average_score")
-            .eq("classroom_id", classroom.id);
+      if (data) {
+        const classroomsWithStudents = await Promise.all(
+          data.map(async (classroom) => {
+            const { data: registrations, error: regError } = await supabase
+              .from("classroom_registrations")
+              .select("student_id")
+              .eq("classroom_id", classroom.id);
 
-          if (studentsError) {
-            console.error("Error fetching students:", studentsError);
-            setError("Error fetching students: " + studentsError.message);
+            if (regError) {
+              console.error("Gagal mengambil registrasi:", regError.message);
+              setError("Gagal mengambil registrasi: " + regError.message);
+              return {
+                id: classroom.id,
+                name: classroom.name,
+                code: classroom.code,
+                description: classroom.description || "",
+                students: [],
+                createdAt: classroom.created_at,
+              } as ClassRoom;
+            }
+
+            const studentIds = registrations.map(reg => reg.student_id);
+            let students: Student[] = [];
+            if (studentIds.length > 0) {
+              const { data: studentData, error: studentError } = await supabase
+                .from("users")
+                .select("id, name, email")
+                .in("id", studentIds);
+
+              if (studentError) {
+                console.error("Gagal mengambil data siswa:", studentError.message);
+                setError("Gagal mengambil data siswa: " + studentError.message);
+              } else {
+                students = studentData.map(student => ({
+                  id: student.id,
+                  name: student.name,
+                  email: student.email,
+                  progress: 0,
+                  last_active: new Date().toISOString(),
+                  completed_quizzes: 0,
+                  average_score: 0,
+                }));
+              }
+            }
+
             return {
               id: classroom.id,
               name: classroom.name,
               code: classroom.code,
               description: classroom.description || "",
-              students: [],
+              students,
               createdAt: classroom.created_at,
             } as ClassRoom;
-          }
+          })
+        );
+        setClassrooms(classroomsWithStudents);
+        console.log("Kelas guru yang di-set:", classroomsWithStudents);
+      }
+    } else if (userRole === "student") {
+      const { data: registrations, error: regError } = await supabase
+        .from("classroom_registrations")
+        .select("classroom_id, joined_at")
+        .eq("student_id", userId);
 
-          const mappedStudents: Student[] = students.map((student) => ({
-            id: student.id,
-            name: student.name,
-            email: student.email,
-            progress: student.progress,
-            last_active: student.last_active,
-            completed_quizzes: student.completed_quizzes,
-            average_score: student.average_score,
-          }));
+      console.log("Respons registrasi siswa:", { registrations, error: regError });
+
+      if (regError) {
+        console.error("Gagal mengambil registrasi siswa:", regError.message);
+        setError("Gagal mengambil kelas yang diikuti: " + regError.message);
+        setClassrooms([]);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!registrations || registrations.length === 0) {
+        console.log("Tidak ada kelas yang diikuti oleh siswa.");
+        setClassrooms([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const classroomIds = registrations.map(reg => reg.classroom_id);
+      console.log("ID kelas yang diikuti:", classroomIds);
+
+      const { data: classroomData, error: classError } = await supabase
+        .from("classrooms")
+        .select("id, name, code, description, created_at, teacher_id")
+        .in("id", classroomIds);
+
+      console.log("Respons data kelas siswa:", { classroomData, error: classError });
+
+      if (classError) {
+        console.error("Gagal mengambil detail kelas:", classError.message);
+        setError("Gagal mengambil detail kelas: " + classError.message);
+        setClassrooms([]);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!classroomData || classroomData.length === 0) {
+        console.log("Tidak ada data kelas yang ditemukan untuk ID:", classroomIds);
+        setClassrooms([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const classroomsWithTeacher = await Promise.all(
+        classroomData.map(async (classroom) => {
+          let teacherName = "Guru Tidak Dikenal";
+          try {
+            const { data: teacherData, error: teacherError } = await supabase
+              .from("users")
+              .select("name")
+              .eq("id", classroom.teacher_id)
+              .single();
+
+            console.log("Respons data guru untuk kelas", classroom.id, ":", { teacherData, error: teacherError });
+
+            if (!teacherError && teacherData) {
+              teacherName = teacherData.name || "Guru Tidak Dikenal";
+            }
+          } catch (err) {
+            console.warn("Kesalahan saat mengambil data guru untuk kelas", classroom.id, ":", err);
+          }
 
           return {
             id: classroom.id,
             name: classroom.name,
             code: classroom.code,
-            description: classroom.description || "",
-            students: mappedStudents,
+            description: classroom.description || "Tidak ada deskripsi",
+            students: [],
             createdAt: classroom.created_at,
+            teacherName,
           } as ClassRoom;
         })
       );
-      setClassrooms(classroomsWithStudents);
+      setClassrooms(classroomsWithTeacher);
+      console.log("Kelas siswa yang di-set:", classroomsWithTeacher);
     }
     setIsLoading(false);
   };
@@ -218,13 +318,13 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
     });
 
     if (error) {
-      setError("Error creating class: " + error.message);
+      setError("Gagal membuat kelas: " + error.message);
     } else {
       setNewClassName("");
       setNewClassDescription("");
       setIsModalOpen(false);
       toast.success("Kelas berhasil dibuat!");
-      window.location.reload(); // Reload penuh sebagai fallback
+      await fetchClassrooms();
     }
     setIsLoading(false);
   };
@@ -243,46 +343,125 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
     setIsLoading(true);
     setError(null);
 
+    console.log("Mencoba bergabung dengan kode kelas:", joinCode.trim());
+
     const { data, error } = await supabase
       .from("classrooms")
-      .select("id, teacher_id")
-      .eq("code", joinCode)
+      .select("id, name, description, created_at, teacher_id")
+      .eq("code", joinCode.trim())
       .single();
 
+    console.log("Respons query kelas:", { data, error });
+
     if (error || !data) {
-      setError("Invalid or expired class code.");
-    } else if (data.teacher_id === userId) {
-      setError("You cannot join your own class.");
-    } else {
-      const { error: joinError } = await supabase.from("students").insert({
-        id: crypto.randomUUID(),
-        user_id: userId,
-        classroom_id: data.id,
-        name: userName,
-        email: (await supabase.auth.getUser()).data.user?.email || "",
-        progress: 0,
-        last_active: new Date().toISOString(),
-        completed_quizzes: 0,
-        average_score: 0,
-      });
-      if (joinError) {
-        setError("Error joining class: " + joinError.message);
-      } else {
-        setJoinCode("");
-        fetchClassrooms();
+      setError("Kode kelas tidak valid atau telah kedaluwarsa. Pastikan kode benar dan coba lagi.");
+      setIsLoading(false);
+      return;
+    }
+
+    let teacherName = "Guru Tidak Dikenal";
+    try {
+      const { data: teacherData, error: teacherError } = await supabase
+        .from("users")
+        .select("name")
+        .eq("id", data.teacher_id)
+        .single();
+
+      console.log("Respons query guru:", { teacherData, error: teacherError });
+
+      if (teacherError) {
+        console.warn("Gagal mengambil data guru:", teacherError.message || "Tidak ada pesan error");
+      } else if (teacherData) {
+        teacherName = teacherData.name || "Guru Tidak Dikenal";
       }
+    } catch (err) {
+      console.warn("Kesalahan tak terduga saat mengambil data guru:", err);
+    }
+
+    setSelectedClassToJoin({
+      id: data.id,
+      name: data.name,
+      description: data.description || "Tidak ada deskripsi",
+      createdAt: data.created_at,
+      teacherName,
+    });
+    setIsJoinConfirmOpen(true);
+    setIsLoading(false);
+  };
+
+  const confirmJoinClass = async () => {
+    if (!userId || !selectedClassToJoin) return;
+    setIsLoading(true);
+    setError(null);
+
+    console.log("Mengkonfirmasi bergabung ke kelas:", selectedClassToJoin);
+
+    const { data, error: fetchError } = await supabase
+      .from("classrooms")
+      .select("id, teacher_id")
+      .eq("id", selectedClassToJoin.id)
+      .single();
+
+    console.log("Respons verifikasi kelas:", { data, error: fetchError });
+
+    if (fetchError || !data) {
+      setError("Kelas tidak ditemukan.");
+      setIsLoading(false);
+      setIsJoinConfirmOpen(false);
+      return;
+    }
+
+    if (data.teacher_id === userId) {
+      setError("Anda tidak bisa bergabung dengan kelas Anda sendiri.");
+      setIsLoading(false);
+      setIsJoinConfirmOpen(false);
+      return;
+    }
+
+    const { data: existingRegistration, error: checkError } = await supabase
+      .from("classroom_registrations")
+      .select("id")
+      .eq("classroom_id", selectedClassToJoin.id)
+      .eq("student_id", userId)
+      .single();
+
+    console.log("Pemeriksaan registrasi yang ada:", { existingRegistration, error: checkError });
+
+    if (existingRegistration) {
+      setError("Anda sudah terdaftar di kelas ini.");
+      setIsLoading(false);
+      setIsJoinConfirmOpen(false);
+      return;
+    }
+
+    const { error: joinError } = await supabase.from("classroom_registrations").insert({
+      id: crypto.randomUUID(),
+      classroom_id: selectedClassToJoin.id,
+      student_id: userId,
+      joined_at: new Date().toISOString(),
+    });
+
+    console.log("Respons insert registrasi:", { error: joinError });
+
+    if (joinError) {
+      setError("Gagal bergabung ke kelas: " + joinError.message);
+    } else {
+      setJoinCode("");
+      toast.success("Berhasil bergabung ke kelas!");
+      await fetchClassrooms();
+      setIsJoinConfirmOpen(false);
     }
     setIsLoading(false);
   };
 
   useEffect(() => {
-    if (userRole === "teacher" && userId) {
+    if (userId && userRole) {
       fetchClassrooms();
     }
   }, [userRole, userId]);
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div>Memuat...</div>;
   }
 
   if (error) {
@@ -295,7 +474,7 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
           <CardContent>
             <p className="text-red-600">{error}</p>
             <Button onClick={() => router.push("/login")} className="mt-4">
-              Go to Login
+              Ke Halaman Masuk
             </Button>
           </CardContent>
         </Card>
@@ -306,7 +485,7 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
   const createOrUpdateUserProfile = async (name: string, role: "teacher" | "student") => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.error("No authenticated user found.");
+      console.error("Tidak ada pengguna terautentikasi ditemukan.");
       return;
     }
 
@@ -317,22 +496,15 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
         email: user.email || "",
         role,
       },
-      { onConflict: "id" } // Mencegah duplikat berdasarkan id
+      { onConflict: "id" }
     );
 
     if (error) {
-      console.error("Error creating/updating profile:", error.message);
+      console.error("Gagal membuat/memperbarui profil:", error.message);
     } else {
-      console.log("Profile created/updated successfully.");
+      console.log("Profil berhasil dibuat/diperbarui.");
     }
   };
-
-  // Panggil fungsi ini setelah login berhasil, misalnya:
-  // useEffect(() => {
-  //   if (userId) {
-  //     createOrUpdateUserProfile("Nama Pengguna", "teacher"); // Ganti dengan input dinamis jika perlu
-  //   }
-  // }, [userId]);
 
   if (userRole === "teacher") {
     const selectedClassData = classrooms.find(c => c.id === selectedClass);
@@ -344,15 +516,15 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button variant="ghost" onClick={onBack}>
-                ← Zurück
+                ← Kembali
               </Button>
               <div className="flex items-center gap-2">
                 <GraduationCap className="h-5 w-5 text-primary" />
-                <h1>Lehrer Dashboard - Selamat Datang, {userName}</h1>
+                <h1>Dashboard Guru - Selamat Datang, {userName}</h1>
               </div>
             </div>
             <Button variant="outline" onClick={handleLogout}>
-              Logout
+              Keluar
             </Button>
           </div>
 
@@ -365,7 +537,7 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
                   <p className="text-muted-foreground">{selectedClassData.description}</p>
                 </div>
                 <Button variant="ghost" onClick={() => setSelectedClass(null)}>
-                  ← Zurück zu Klassen
+                  ← Kembali ke Kelas
                 </Button>
               </div>
 
@@ -374,7 +546,7 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
                   <CardContent className="p-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-primary">{selectedClassData.students.length}</div>
-                      <p className="text-sm text-muted-foreground">Schüler</p>
+                      <p className="text-sm text-muted-foreground">Siswa</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -382,9 +554,9 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
                   <CardContent className="p-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-green-600">
-                        {Math.round(selectedClassData.students.reduce((acc, s) => acc + s.average_score, 0) / selectedClassData.students.length) || 0}%
+                        {Math.round(selectedClassData.students.reduce((acc, s) => acc + s.average_score, 0) / (selectedClassData.students.length || 1)) || 0}%
                       </div>
-                      <p className="text-sm text-muted-foreground">Durchschnitt</p>
+                      <p className="text-sm text-muted-foreground">Rata-rata</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -392,7 +564,7 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
                   <CardContent className="p-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-blue-600">{selectedClassData.code}</div>
-                      <p className="text-sm text-muted-foreground">Klassencode</p>
+                      <p className="text-sm text-muted-foreground">Kode Kelas</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -402,7 +574,7 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
                       <div className="text-2xl font-bold text-purple-600">
                         {selectedClassData.students.reduce((acc, s) => acc + s.completed_quizzes, 0)}
                       </div>
-                      <p className="text-sm text-muted-foreground">Quizze gesamt</p>
+                      <p className="text-sm text-muted-foreground">Total Kuis</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -410,7 +582,7 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Schülerfortschritt</CardTitle>
+                  <CardTitle>Kemajuan Siswa</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -427,18 +599,18 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
                             </div>
                             <div className="text-right">
                               <Badge variant={student.average_score >= 80 ? "default" : student.average_score >= 60 ? "secondary" : "destructive"}>
-                                {student.average_score}% Durchschnitt
+                                {student.average_score}% Rata-rata
                               </Badge>
                             </div>
                           </div>
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
-                              <span>Fortschritt: {student.progress}%</span>
-                              <span>{student.completed_quizzes} Quizze abgeschlossen</span>
+                              <span>Kemajuan: {student.progress}%</span>
+                              <span>{student.completed_quizzes} Kuis selesai</span>
                             </div>
                             <Progress value={student.progress} className="h-2" />
                             <p className="text-xs text-muted-foreground">
-                              Zuletzt aktiv: {new Date(student.last_active).toLocaleDateString('de-DE')}
+                              Terakhir aktif: {new Date(student.last_active).toLocaleDateString('id-ID')}
                             </p>
                           </div>
                         </div>
@@ -452,8 +624,8 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
             /* Class Overview */
             <Tabs defaultValue="classes" className="w-full">
               <TabsList>
-                <TabsTrigger value="classes">Meine Klassen</TabsTrigger>
-                <TabsTrigger value="create">Neue Klasse</TabsTrigger>
+                <TabsTrigger value="classes">Kelas Saya</TabsTrigger>
+                <TabsTrigger value="create">Kelas Baru</TabsTrigger>
               </TabsList>
 
               <TabsContent value="classes" className="space-y-4">
@@ -463,14 +635,14 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
                       <CardHeader>
                         <CardTitle className="flex items-center justify-between">
                           {classroom.name}
-                          <Badge variant="outline">{classroom.students.length} Schüler</Badge>
+                          <Badge variant="outline">{classroom.students.length} Siswa</Badge>
                         </CardTitle>
                         <CardDescription>{classroom.description}</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Klassencode:</span>
+                            <span className="text-sm text-muted-foreground">Kode Kelas:</span>
                             <div className="flex items-center gap-2">
                               <code className="bg-muted px-2 py-1 rounded text-sm">{classroom.code}</code>
                               <Button 
@@ -489,7 +661,7 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
                               onClick={() => setSelectedClass(classroom.id)}
                             >
                               <Eye className="h-4 w-4 mr-2" />
-                              Ansehen
+                              Lihat
                             </Button>
                             <Button size="sm" variant="outline">
                               <Share2 className="h-4 w-4" />
@@ -507,34 +679,34 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Plus className="h-5 w-5" />
-                      Neue Klasse erstellen
+                      Buat Kelas Baru
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <label className="block mb-2">Klassenname</label>
+                      <label className="block mb-2">Nama Kelas</label>
                       <Input
-                        placeholder="z.B. Deutsch A2 - Fortgeschritten"
+                        placeholder="Contoh: Bahasa Indonesia A2 - Lanjutan"
                         value={newClassName}
                         onChange={(e) => setNewClassName(e.target.value)}
                       />
                     </div>
                     <div>
-                      <label className="block mb-2">Beschreibung</label>
+                      <label className="block mb-2">Deskripsi</label>
                       <Textarea
-                        placeholder="Kurze Beschreibung der Klasse..."
+                        placeholder="Deskripsi singkat kelas..."
                         value={newClassDescription}
                         onChange={(e) => setNewClassDescription(e.target.value)}
                       />
                     </div>
                     <Button onClick={() => setIsModalOpen(true)} disabled={!newClassName.trim()} className="bg-blue-600 text-white hover:bg-blue-700">
                       <Plus className="h-4 w-4 mr-2" />
-                      Klasse erstellen
+                      Buat Kelas
                     </Button>
                     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>New Classroom</DialogTitle>
+                          <DialogTitle>Kelas Baru</DialogTitle>
                           <DialogDescription>
                             Tambahkan kelas baru untuk memulai sesi belajar Anda
                           </DialogDescription>
@@ -552,7 +724,7 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
                           />
                           <Button onClick={createNewClass} disabled={isLoading} className="bg-blue-600 text-white hover:bg-blue-700">
                             <Plus className="h-4 w-4 mr-2" />
-                            Create Kelas
+                            Buat Kelas
                           </Button>
                         </div>
                       </DialogContent>
@@ -575,15 +747,15 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" onClick={onBack}>
-              ← Zurück
+              ← Kembali
             </Button>
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-accent" />
-              <h1>Schüler Dashboard - Selamat Datang, {userName}</h1>
+              <h1>Dashboard Siswa - Selamat Datang, {userName}</h1>
             </div>
           </div>
           <Button variant="outline" onClick={handleLogout}>
-            Logout
+            Keluar
           </Button>
         </div>
 
@@ -592,24 +764,119 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5" />
-              Klasse beitreten
+              Bergabung ke Kelas
             </CardTitle>
             <CardDescription>
-              Geben Sie den Klassencode ein, den Sie von Ihrem Lehrer erhalten haben
+              Masukkan kode kelas yang diberikan oleh guru Anda
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
               <Input
-                placeholder="Klassencode eingeben..."
+                placeholder="Masukkan kode kelas..."
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}
                 className="flex-1"
               />
               <Button onClick={joinClass} disabled={!joinCode.trim() || isLoading}>
                 <Send className="h-4 w-4 mr-2" />
-                Beitreten
+                Bergabung
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Join Confirmation Dialog */}
+        <Dialog open={isJoinConfirmOpen} onOpenChange={setIsJoinConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Bergabung ke Kelas</DialogTitle>
+              <DialogDescription>
+                Konfirmasi detail kelas sebelum bergabung
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {selectedClassToJoin && (
+                <>
+                  <div>
+                    <h3 className="font-semibold">Nama Kelas: {selectedClassToJoin.name}</h3>
+                    <p className="text-sm text-muted-foreground">Deskripsi: {selectedClassToJoin.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Dibuat pada: {new Date(selectedClassToJoin.createdAt).toLocaleDateString('id-ID')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Guru: {selectedClassToJoin.teacherName}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={confirmJoinClass} disabled={isLoading} className="bg-green-600 text-white hover:bg-green-700">
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Masuk
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsJoinConfirmOpen(false)}>
+                      Batal
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Enrolled Classes */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Kelas Saya
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {classrooms.length > 0 ? (
+                classrooms.map((classroom) => (
+                  <Card key={classroom.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        {classroom.name}
+                        <Badge variant="outline">{classroom.students.length} Siswa</Badge>
+                      </CardTitle>
+                      <CardDescription>{classroom.description}</CardDescription>
+                      <p className="text-sm text-muted-foreground">Guru: {classroom.teacherName}</p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Kode Kelas:</span>
+                          <div className="flex items-center gap-2">
+                            <code className="bg-muted px-2 py-1 rounded text-sm">{classroom.code}</code>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => copyClassCode(classroom.code)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            className="flex-1"
+                            onClick={() => setSelectedClass(classroom.id)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Lihat
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <p className="text-muted-foreground">Anda belum bergabung dengan kelas apa pun.</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -620,13 +887,13 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Target className="h-5 w-5" />
-                Meine Punkte
+                Poin Saya
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary">856</div>
-                <p className="text-sm text-muted-foreground">Gesamtpunkte</p>
+                <p className="text-sm text-muted-foreground">Total Poin</p>
               </div>
             </CardContent>
           </Card>
@@ -635,13 +902,13 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5" />
-                Abgeschlossen
+                Selesai
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center">
                 <div className="text-3xl font-bold text-green-600">12</div>
-                <p className="text-sm text-muted-foreground">Quizze</p>
+                <p className="text-sm text-muted-foreground">Kuis</p>
               </div>
             </CardContent>
           </Card>
@@ -650,13 +917,13 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                Durchschnitt
+                Rata-rata
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center">
                 <div className="text-3xl font-bold text-blue-600">78%</div>
-                <p className="text-sm text-muted-foreground">Erfolgsrate</p>
+                <p className="text-sm text-muted-foreground">Tingkat Keberhasilan</p>
               </div>
             </CardContent>
           </Card>
@@ -667,15 +934,15 @@ export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              Letzte Aktivität
+              Aktivitas Terakhir
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {[
-                { title: "Grammatik Quiz A2", score: 85, date: "Heute" },
-                { title: "Wortschatz Übung", score: 92, date: "Gestern" },
-                { title: "Hörverständnis Test", score: 76, date: "2 Tage her" }
+                { title: "Kuis Tata Bahasa A2", score: 85, date: "Hari ini" },
+                { title: "Latihan Kosakata", score: 92, date: "Kemarin" },
+                { title: "Tes Pemahaman Mendengar", score: 76, date: "2 Hari lalu" }
               ].map((activity, index) => (
                 <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
