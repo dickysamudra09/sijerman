@@ -11,15 +11,11 @@ import { useRouter, useParams } from "next/navigation";
 import {
   CheckCircle2,
   Clock,
+  GraduationCap,
   BookOpen,
   Target,
   TrendingUp,
-  Users,
-  GraduationCap,
   Plus,
-  Share2,
-  Eye,
-  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -265,10 +261,10 @@ export default function ClassroomsPage() {
             <Card>
               <CardContent className="p-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    {Math.round(classroom.students.reduce((acc, s) => acc + s.average_score, 0) / (classroom.students.length || 1)) || 0}%
-                  </div>
-                  <p className="text-sm text-muted-foreground">Rata-rata</p>
+                  <Button onClick={() => router.push(`/home/classrooms/create?classId=${classId}`)} className="w-full bg-green-600 text-white hover:bg-green-700">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create
+                  </Button>
                 </div>
               </CardContent>
             </Card>
