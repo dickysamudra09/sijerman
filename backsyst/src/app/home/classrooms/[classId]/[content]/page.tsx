@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Edit } from "lucide-react";
 
 interface ContentItem {
   id: string;
@@ -18,22 +18,26 @@ interface ContentItem {
   deadline: string | null;
   created_at: string;
   updated_at: string;
+  pembuat: string;
 }
 
 export default function ContentDetailPage() {
   const [content, setContent] = useState<ContentItem | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const params = useParams();
   const classId = params.classId as string;
-  const contentId = params.content as string; 
+  const contentId = params.content as string;
 
   useEffect(() => {
     const fetchContent = async () => {
       setIsLoading(true);
       setError(null);
 
+      // Add validation for parameters
       if (!classId || !contentId) {
         setError("Parameter kelas atau konten tidak valid.");
         setIsLoading(false);
@@ -51,24 +55,79 @@ export default function ContentDetailPage() {
         return;
       }
 
-      const userId = sessionData.session.user.id;
+      const currentUserId = sessionData.session.user.id;
+      setUserId(currentUserId);
 
-      const { data, error: fetchError } = await supabase
-        .from("teacher_create")
-        .select("*")
-        .eq("id", contentId)
-        .eq("kelas", classId)
-        .eq("pembuat", userId)
+      // Get user role
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", currentUserId)
         .single();
 
-      console.log("Supabase response:", { data, error: fetchError }); 
+      if (userError || !userData) {
+        setError("Gagal mengambil data pengguna: " + (userError?.message || ""));
+        setIsLoading(false);
+        return;
+      }
 
-      if (fetchError) {
-        setError("Gagal mengambil konten: " + fetchError.message);
-      } else if (!data) {
-        setError("Konten tidak ditemukan atau Anda tidak memiliki akses.");
+      setUserRole(userData.role);
+
+      // Fetch content based on role
+      if (userData.role === "teacher") {
+        // Teacher can only see their own content
+        const { data, error: fetchError } = await supabase
+          .from("teacher_create")
+          .select("*")
+          .eq("id", contentId)
+          .eq("kelas", classId)
+          .eq("pembuat", currentUserId)
+          .single();
+
+        console.log("Supabase response for teacher:", { data, error: fetchError });
+
+        if (fetchError) {
+          setError("Gagal mengambil konten: " + fetchError.message);
+        } else if (!data) {
+          setError("Konten tidak ditemukan atau Anda tidak memiliki akses.");
+        } else {
+          setContent(data);
+        }
+      } else if (userData.role === "student") {
+        // Student can see any content in classes they're registered to
+        // First check if student is registered to this class
+        const { data: registration, error: regError } = await supabase
+          .from("classroom_registrations")
+          .select("classroom_id")
+          .eq("classroom_id", classId)
+          .eq("student_id", currentUserId)
+          .single();
+
+        if (regError || !registration) {
+          setError("Anda tidak terdaftar di kelas ini.");
+          setIsLoading(false);
+          return;
+        }
+
+        // Then fetch the content
+        const { data, error: fetchError } = await supabase
+          .from("teacher_create")
+          .select("*")
+          .eq("id", contentId)
+          .eq("kelas", classId)
+          .single();
+
+        console.log("Supabase response for student:", { data, error: fetchError });
+
+        if (fetchError) {
+          setError("Gagal mengambil konten: " + fetchError.message);
+        } else if (!data) {
+          setError("Konten tidak ditemukan.");
+        } else {
+          setContent(data);
+        }
       } else {
-        setContent(data);
+        setError("Role pengguna tidak valid.");
       }
 
       setIsLoading(false);
@@ -78,13 +137,14 @@ export default function ContentDetailPage() {
   }, [classId, contentId, router]);
 
   const handleDelete = async () => {
-    if (!content) return;
+    if (!content || userRole !== "teacher" || content.pembuat !== userId) return;
 
     const confirmDelete = window.confirm("Apakah Anda yakin ingin menghapus konten ini?");
     if (!confirmDelete) return;
 
     setIsLoading(true);
 
+    // Delete files from storage
     if (content.documents && content.documents.length > 0) {
       const filePaths = content.documents.map(doc => doc.url.split('/storage/v1/object/public/documents/')[1]);
       const { error: storageError } = await supabase.storage
@@ -98,6 +158,7 @@ export default function ContentDetailPage() {
       }
     }
 
+    // Delete from database
     const { error } = await supabase
       .from("teacher_create")
       .delete()
@@ -111,6 +172,12 @@ export default function ContentDetailPage() {
     }
 
     setIsLoading(false);
+  };
+
+  const handleUpdate = () => {
+    if (!content || userRole !== "teacher" || content.pembuat !== userId) return;
+    // Redirect to update page (you'll need to create this)
+    toast.info("Fitur update akan segera tersedia!");
   };
 
   if (isLoading) {
@@ -135,6 +202,9 @@ export default function ContentDetailPage() {
     );
   }
 
+  // Check if current user is the content creator (for teachers)
+  const isContentCreator = userRole === "teacher" && content.pembuat === userId;
+
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -146,13 +216,19 @@ export default function ContentDetailPage() {
             </Button>
             <h1 className="text-2xl font-bold">{content.judul}</h1>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" disabled>Update</Button>
-            <Button className="text-red-500" variant="destructive" onClick={handleDelete} disabled={isLoading}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
-          </div>
+          {/* Show Update and Delete buttons only for teachers who created the content */}
+          {isContentCreator && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleUpdate} disabled={isLoading}>
+                <Edit className="h-4 w-4 mr-2" />
+                Update
+              </Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={isLoading}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            </div>
+          )}
         </div>
 
         <Card>
@@ -184,6 +260,20 @@ export default function ContentDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Show additional info for students */}
+        {userRole === "student" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Informasi Pembelajaran</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Pastikan Anda memahami materi ini dengan baik. Jika ada pertanyaan, silakan tanyakan kepada guru Anda.
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

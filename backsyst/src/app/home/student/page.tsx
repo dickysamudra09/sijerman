@@ -346,6 +346,12 @@ export function StudentMode({ onBack }: StudentModeProps) {
     setIsLoading(false);
   };
 
+  // Function to handle viewing a classroom
+  const handleViewClassroom = (classroomId: string) => {
+    console.log("Student navigating to classroom with id:", classroomId);
+    router.push(`/home/classrooms/${classroomId}`);
+  };
+
   useEffect(() => {
     if (userId) {
       fetchClassrooms();
@@ -495,7 +501,7 @@ export function StudentMode({ onBack }: StudentModeProps) {
                     <CardHeader>
                       <CardTitle className="flex items-center justify-between">
                         {classroom.name}
-                        <Badge variant="outline">{classroom.students.length} Siswa</Badge>
+                        <Badge variant="outline">Aktif</Badge>
                       </CardTitle>
                       <CardDescription>{classroom.description}</CardDescription>
                       <p className="text-sm text-muted-foreground">Guru: {classroom.teacherName}</p>
@@ -519,7 +525,7 @@ export function StudentMode({ onBack }: StudentModeProps) {
                           <Button 
                             size="sm" 
                             className="flex-1"
-                            onClick={() => setSelectedClass(classroom.id)}
+                            onClick={() => handleViewClassroom(classroom.id)}
                           >
                             <Eye className="h-4 w-4 mr-2" />
                             Lihat
