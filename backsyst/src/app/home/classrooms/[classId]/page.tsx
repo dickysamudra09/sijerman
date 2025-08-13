@@ -576,7 +576,6 @@ export default function ClassroomsPage() {
                   </CardContent>
                 </Card>
               )}
-
             
             {userRole === "student" && (
               <Card className="hover:shadow-md transition-shadow">
