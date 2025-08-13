@@ -1,17 +1,17 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Editor } from '@tinymce/tinymce-react';
+
+const Editor = dynamic(() => import("@tinymce/tinymce-react").then(m => m.Editor), { ssr: false });
 
 interface CreateFormData {
   judul: string;
@@ -22,7 +22,9 @@ interface CreateFormData {
 }
 
 export default function CreateContentPage() {
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<CreateFormData>();
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<CreateFormData>({
+    defaultValues: { jenis_create: "materi" }
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -31,8 +33,14 @@ export default function CreateContentPage() {
   const searchParams = useSearchParams();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileErrors, setFileErrors] = useState<string | null>(null);
+  
 
   useEffect(() => {
+
+    const handleEditorChange = (content: string) => {
+        setValue("konten", content);
+    };
+    
     const fetchUserData = async () => {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
@@ -200,17 +208,11 @@ export default function CreateContentPage() {
                 {errors.sub_judul && <p className="text-red-600 text-sm">{errors.sub_judul.message}</p>}
               </div>
               <div>
-                <Label htmlFor="jenis_create">Jenis Konten</Label>
-                <Select onValueChange={(value) => setValue("jenis_create", value as "materi" | "Latihan soal" | "kuis")}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih jenis" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="materi">Materi</SelectItem>
-                    <SelectItem value="Latihan soal">Latihan Soal</SelectItem>
-                    <SelectItem value="kuis">Kuis</SelectItem>
-                  </SelectContent>
-                </Select>
+                <input
+                    type="hidden"
+                    {...register("jenis_create")}
+                    value="materi"
+                />
                 {errors.jenis_create && <p className="text-red-600 text-sm">{errors.jenis_create.message}</p>}
               </div>
               <div>
@@ -221,12 +223,10 @@ export default function CreateContentPage() {
                   init={{
                     height: 500,
                     menubar: false,
-                    plugins: [
-                      'advlist autolink lists link image charmap print preview anchor',
-                      'searchreplace visualblocks code fullscreen',
-                      'insertdatetime media table paste code help wordcount'
-                    ],
-                    toolbar: 'undo redo | formatselect | bold italic backcolor | link image | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help',
+                    plugins: 'advlist autolink lists link image charmap preview anchor ' +
+                    'searchreplace visualblocks code fullscreen ' +
+                    'insertdatetime media table help wordcount',
+                    toolbar: 'undo redo | formatselect | bold italic backcolor | link image | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help | print',
                   }}
                   onEditorChange={handleEditorChange}
                 />

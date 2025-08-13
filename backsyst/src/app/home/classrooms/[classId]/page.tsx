@@ -561,21 +561,22 @@ export default function ClassroomsPage() {
             </Card>
             
             {/* Action Card */}
-            {userRole === "teacher" && (
-              <Card className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="text-center">
-                    <Button 
-                      onClick={() => router.push(`/home/classrooms/create?classId=${classId}`)} 
-                      className="w-full bg-green-600 text-white hover:bg-green-700 transition-colors"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Buat Konten
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+              {userRole === "teacher" && (
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <Button 
+                        onClick={() => router.push(`/home/classrooms/hub?classId=${classroom.id}`)}
+                        className="w-full bg-green-600 text-white hover:bg-green-700 transition-colors"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Buat Konten
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
             
             {userRole === "student" && (
               <Card className="hover:shadow-md transition-shadow">
