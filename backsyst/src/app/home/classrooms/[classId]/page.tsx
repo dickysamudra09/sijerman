@@ -60,9 +60,156 @@ export default function ClassroomsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attendanceRecorded, setAttendanceRecorded] = useState(false);
+  const [isRecordingAttendance, setIsRecordingAttendance] = useState(false);
   const router = useRouter();
   const params = useParams();
   const classId = params.classId as string;
+
+  const recordAttendance = async (userId: string, classroomId: string) => {
+    if (isRecordingAttendance) {
+      console.log("Attendance recording already in progress, skipping...");
+      return false;
+    }
+
+    setIsRecordingAttendance(true);
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      console.log("Recording attendance for:", { userId, classroomId, date: today });
+
+      let sessionId: string | null = null;
+      
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !sessionData.session) {
+        console.log("No active auth session found, will create manual session");
+      }
+
+      const { data: userSession, error: userSessionError } = await supabase
+        .from("sessions")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (userSessionError || !userSession) {
+        const newSessionId = crypto.randomUUID();
+        const { data: newSession, error: newSessionError } = await supabase
+          .from("sessions")
+          .insert({
+            id: newSessionId,
+            user_id: userId,
+            is_active: true,
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            user_agent: navigator.userAgent || 'Unknown',
+            ip_address: '',
+          })
+          .select()
+          .single();
+
+        if (newSessionError) {
+          console.error("Failed to create session:", newSessionError.message);
+          toast.error("Gagal membuat sesi: " + newSessionError.message);
+          return false;
+        }
+        sessionId = newSession.id;
+      } else {
+        sessionId = userSession.id;
+      }
+
+      const attendanceData: {
+        id: string;
+        classroom_id: string;
+        student_id: string;
+        session_id: string | null;
+        date: string;
+        is_present: boolean;
+      } = {
+        id: crypto.randomUUID(),
+        classroom_id: classroomId,
+        student_id: userId,
+        session_id: sessionId,
+        date: today,
+        is_present: true,
+      };
+
+      console.log("Attempting to upsert attendance:", attendanceData);
+
+      const { data: attendanceResult, error: attendanceError } = await supabase
+        .from("attendance")
+        .upsert(
+          attendanceData,
+          {
+            onConflict: 'student_id,classroom_id,date', 
+            ignoreDuplicates: false 
+          }
+        )
+        .select()
+        .single();
+
+      console.log("Attendance upsert result:", { attendanceResult, error: attendanceError });
+
+      if (attendanceError) {
+        console.error("Failed to record attendance:", attendanceError.message);
+        
+        if (attendanceError.code === '23505') {
+          console.log("Attendance already exists for today, treating as success");
+          toast.info("Kehadiran hari ini sudah tercatat sebelumnya.");
+          return true; 
+        } else if (attendanceError.code === '42501' || attendanceError.message.includes('RLS')) {
+          console.error("RLS Policy blocking attendance insert. Check your RLS policies for attendance table.");
+          toast.error("Tidak dapat mencatat kehadiran. Periksa pengaturan keamanan database.");
+        } else {
+          toast.error("Gagal mencatat kehadiran: " + attendanceError.message);
+        }
+        return false;
+      } else {
+        console.log("Attendance recorded successfully for date:", today);
+        toast.success("Kehadiran hari ini telah dicatat!");
+        return true;
+      }
+    } catch (err) {
+      console.error("Error in recordAttendance:", err);
+      toast.error("Terjadi kesalahan saat mencatat kehadiran.");
+      return false;
+    } finally {
+      setIsRecordingAttendance(false);
+    }
+  };
+
+  const checkTodayAttendance = async (userId: string, classroomId: string) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("id")
+        .eq("student_id", userId)
+        .eq("classroom_id", classroomId)
+        .eq("date", today)
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error("Error checking attendance:", error.message);
+        return false;
+      }
+
+      if (data) {
+        console.log("Attendance already recorded today");
+        setAttendanceRecorded(true);
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      console.error("Error in checkTodayAttendance:", err);
+      return false;
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -109,9 +256,9 @@ export default function ClassroomsPage() {
       setUserName(userData.name || "");
       setUserRole(userData.role);
 
-      // Check access based on role
+      const alreadyRecorded = await checkTodayAttendance(userId, classId);
+
       if (userData.role === "teacher") {
-        // Teacher: fetch classroom they created
         const { data: classroomData, error: classroomError } = await supabase
           .from("classrooms")
           .select("id, name, code, description, created_at")
@@ -174,6 +321,13 @@ export default function ClassroomsPage() {
             students,
             createdAt: classroomData.created_at,
           });
+          
+          if (!alreadyRecorded && !isRecordingAttendance) {
+            const success = await recordAttendance(userId, classId);
+            if (success) {
+              setAttendanceRecorded(true);
+            }
+          }
         }
 
         // Fetch contents for teacher
@@ -245,12 +399,20 @@ export default function ClassroomsPage() {
           name: classroomData.name,
           code: classroomData.code,
           description: classroomData.description || "",
-          students: [], // Students don't need to see other students
+          students: [],
           createdAt: classroomData.created_at,
           teacherName,
         });
 
-        // Fetch contents for student (all contents in this class created by the teacher)
+        // Record attendance for student only if not already recorded
+        if (!alreadyRecorded && !isRecordingAttendance) {
+          const success = await recordAttendance(userId, classId);
+          if (success) {
+            setAttendanceRecorded(true);
+          }
+        }
+
+        // Fetch contents for student
         console.log("Mengambil konten untuk siswa di kelas:", classId, "dengan teacher_id:", classroomData.teacher_id);
         
         const { data: contentsData, error: contentsError } = await supabase
@@ -284,19 +446,26 @@ export default function ClassroomsPage() {
   }, [classId, router]);
 
   if (initialLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-background">Memuat...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Memuat...</p>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card>
+        <Card className="max-w-md">
           <CardHeader>
-            <CardTitle>Error</CardTitle>
+            <CardTitle className="text-red-600">Error</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-red-600">{error}</p>
-            <Button onClick={() => router.push(userRole === "teacher" ? "/home/teacher" : "/home/student")} className="mt-4">
+            <p className="text-red-600 mb-4">{error}</p>
+            <Button onClick={() => router.push(userRole === "teacher" ? "/home/teacher" : "/home/student")} className="w-full">
               Kembali ke Dashboard
             </Button>
           </CardContent>
@@ -308,13 +477,13 @@ export default function ClassroomsPage() {
   if (!classroom) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card>
+        <Card className="max-w-md">
           <CardHeader>
-            <CardTitle>Error</CardTitle>
+            <CardTitle className="text-red-600">Error</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-red-600">Kelas tidak ditemukan</p>
-            <Button onClick={() => router.push(userRole === "teacher" ? "/home/teacher" : "/home/student")} className="mt-4">
+            <p className="text-red-600 mb-4">Kelas tidak ditemukan</p>
+            <Button onClick={() => router.push(userRole === "teacher" ? "/home/teacher" : "/home/student")} className="w-full">
               Kembali ke Dashboard
             </Button>
           </CardContent>
@@ -329,29 +498,38 @@ export default function ClassroomsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => router.push(userRole === "teacher" ? "/home/teacher" : "/home/student")}>
+            <Button 
+              variant="ghost" 
+              onClick={() => router.push(userRole === "teacher" ? "/home/teacher" : "/home/student")}
+              className="hover:bg-gray-100"
+            >
               ← Kembali
             </Button>
             <div className="flex items-center gap-2">
-              <GraduationCap className="h-5 w-5 text-primary" />
-              <h1>Dashboard Kelas - {classroom.name}</h1>
+              <GraduationCap className="h-6 w-6 text-primary" />
+              <h1 className="text-2xl font-bold">Dashboard Kelas - {classroom.name}</h1>
             </div>
           </div>
         </div>
 
         <div className="space-y-6">
+          {/* Classroom Info */}
           <div className="flex items-center justify-between">
             <div>
-              <h2>{classroom.name}</h2>
+              <h2 className="text-xl font-semibold">{classroom.name}</h2>
               <p className="text-muted-foreground">{classroom.description}</p>
               {userRole === "student" && classroom.teacherName && (
-                <p className="text-sm text-muted-foreground">Guru: {classroom.teacherName}</p>
+                <p className="text-sm text-muted-foreground mt-1">Guru: {classroom.teacherName}</p>
               )}
             </div>
+            <Badge variant="secondary" className="text-lg px-3 py-1">
+              Kode: {classroom.code}
+            </Badge>
           </div>
 
+          {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
+            <Card className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary">
@@ -363,7 +541,8 @@ export default function ClassroomsPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            
+            <Card className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">{classroom.code}</div>
@@ -371,7 +550,8 @@ export default function ClassroomsPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            
+            <Card className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600">{contents.length}</div>
@@ -379,25 +559,32 @@ export default function ClassroomsPage() {
                 </div>
               </CardContent>
             </Card>
-            {/* Show Create button only for teachers */}
+            
+            {/* Action Card */}
             {userRole === "teacher" && (
-              <Card>
+              <Card className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="text-center">
-                    <Button onClick={() => router.push(`/home/classrooms/create?classId=${classId}`)} className="w-full bg-green-600 text-white hover:bg-green-700">
+                    <Button 
+                      onClick={() => router.push(`/home/classrooms/create?classId=${classId}`)} 
+                      className="w-full bg-green-600 text-white hover:bg-green-700 transition-colors"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
-                      Create
+                      Buat Konten
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             )}
-            {/* For students, show a different card */}
+            
             {userRole === "student" && (
-              <Card>
+              <Card className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">Active</div>
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      <div className="text-2xl font-bold text-green-600">Active</div>
+                    </div>
                     <p className="text-sm text-muted-foreground">Status</p>
                   </div>
                 </CardContent>
@@ -405,53 +592,85 @@ export default function ClassroomsPage() {
             )}
           </div>
 
+          {/* Content List */}
           <Card>
             <CardHeader>
-              <CardTitle>Daftar Konten</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                Daftar Konten
+              </CardTitle>
+              <CardDescription>
+                {userRole === "teacher" 
+                  ? "Kelola konten pembelajaran yang telah Anda buat" 
+                  : "Konten pembelajaran yang tersedia di kelas ini"
+                }
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {contents.map((content) => (
-                  <div key={content.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">{content.judul}</h3>
-                      <p className="text-sm text-muted-foreground">{content.sub_judul}</p>
-                      <Badge variant="outline" className="mt-1">
-                        {content.jenis_create}
-                      </Badge>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {new Date(content.created_at).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}
-                      </p>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="default" 
-                          className="bg-blue-600 hover:bg-blue-700"
-                          onClick={() => router.push(`/home/classrooms/${classId}/${content.id}`)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          {userRole === "teacher" ? "Review" : "Lihat"}
-                        </Button>
+                  <Card key={content.id} className="border-l-4 border-l-primary hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg mb-1">{content.judul}</h3>
+                          <p className="text-sm text-muted-foreground mb-2">{content.sub_judul}</p>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline" className="text-xs">
+                              {content.jenis_create}
+                            </Badge>
+                            {content.deadline && (
+                              <Badge variant="destructive" className="text-xs">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Deadline: {new Date(content.deadline).toLocaleDateString('id-ID')}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Dibuat: {new Date(content.created_at).toLocaleString('id-ID', { 
+                              dateStyle: 'full', 
+                              timeStyle: 'short' 
+                            })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="default" 
+                            className="bg-blue-600 hover:bg-blue-700 transition-colors"
+                            onClick={() => router.push(`/home/classrooms/${classId}/${content.id}`)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            {userRole === "teacher" ? "Review" : "Lihat"}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 ))}
+                
+                {/* Empty State */}
                 {contents.length === 0 && (
-                  <div className="text-center py-8">
-                    <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">
+                  <div className="text-center py-12">
+                    <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+                    <h3 className="text-lg font-semibold text-muted-foreground mb-2">
                       {userRole === "teacher" 
-                        ? "Belum ada konten yang dibuat." 
-                        : "Belum ada konten yang tersedia di kelas ini."
+                        ? "Belum ada konten yang dibuat" 
+                        : "Belum ada konten tersedia"
+                      }
+                    </h3>
+                    <p className="text-muted-foreground mb-6">
+                      {userRole === "teacher" 
+                        ? "Mulai dengan membuat konten pembelajaran pertama Anda." 
+                        : "Guru belum menambahkan konten pembelajaran di kelas ini."
                       }
                     </p>
                     {userRole === "teacher" && (
                       <Button 
                         onClick={() => router.push(`/home/classrooms/create?classId=${classId}`)}
-                        className="mt-4 bg-green-600 text-white hover:bg-green-700"
+                        className="bg-green-600 text-white hover:bg-green-700 transition-colors"
+                        size="lg"
                       >
-                        <Plus className="h-4 w-4 mr-2" />
+                        <Plus className="h-5 w-5 mr-2" />
                         Buat Konten Pertama
                       </Button>
                     )}
