@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   CheckCircle2,
   Clock,
@@ -65,6 +66,88 @@ export default function ClassroomsPage() {
   const router = useRouter();
   const params = useParams();
   const classId = params.classId as string;
+
+  const [selectedLatihan, setSelectedLatihan] = useState<ContentItem | null>(null);
+  const [showLatihanModal, setShowLatihanModal] = useState(false);
+  const [currentLatihan, setCurrentLatihan] = useState<{
+    id: string;
+    title: string;
+    questionCount: number;
+  } | null>(null);
+
+  const handleKerjakanLatihan = async (content: ContentItem) => {
+    if (content.jenis_create === "Latihan soal") {
+      try {
+        console.log("Mencari exercise set untuk content:", content.id);
+        
+        const { data: exerciseSet, error: exerciseError } = await supabase
+          .from('exercise_sets')
+          .select('id, judul_latihan')
+          .or(`konten_id.eq.${content.id},and(judul_latihan.eq.${content.sub_judul},kelas_id.eq.${classId})`)
+          .single();
+
+        if (exerciseError || !exerciseSet) {
+          console.error("Error finding exercise set:", exerciseError);
+          console.log("Trying alternative approach...");
+          
+          const { data: altExerciseSet, error: altError } = await supabase
+            .from('exercise_sets')
+            .select('id, judul_latihan')
+            .eq('judul_latihan', content.sub_judul)
+            .eq('kelas_id', classId)
+            .single();
+            
+          if (altError || !altExerciseSet) {
+            console.error("Exercise set not found with alternative approach:", altError);
+            toast.error("Latihan soal tidak ditemukan. Pastikan soal sudah dibuat.");
+            return;
+          }
+          
+          const { count, error: countError } = await supabase
+            .from('questions')
+            .select('*', { count: 'exact', head: true })
+            .eq('exercise_set_id', altExerciseSet.id);
+
+          if (countError) {
+            console.error("Error counting questions:", countError);
+            toast.error("Gagal memuat detail latihan soal");
+            return;
+          }
+
+          setCurrentLatihan({
+            id: altExerciseSet.id,
+            title: content.sub_judul,
+            questionCount: count || 0
+          });
+        } else {
+          const { count, error: countError } = await supabase
+            .from('questions')
+            .select('*', { count: 'exact', head: true })
+            .eq('exercise_set_id', exerciseSet.id);
+
+          if (countError) {
+            console.error("Error counting questions:", countError);
+            toast.error("Gagal memuat detail latihan soal");
+            return;
+          }
+
+          setCurrentLatihan({
+            id: exerciseSet.id,
+            title: content.sub_judul,
+            questionCount: count || 0
+          });
+        }
+
+        setShowLatihanModal(true);
+        
+      } catch (error) {
+        console.error("Error fetching exercise details:", error);
+        toast.error("Gagal memuat detail latihan soal");
+      }
+    } else {
+      router.push(`/home/classrooms/${classId}/latihan/${content.id}`);
+    }
+  };
 
   const recordAttendance = async (userId: string, classroomId: string) => {
     if (isRecordingAttendance) {
@@ -634,14 +717,28 @@ export default function ClassroomsPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
+                          {content.jenis_create === "Latihan soal" ? (
+                          <>
+                            <Button 
+                              variant="default" 
+                              className="bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                              onClick={() => handleKerjakanLatihan(content)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              Kerjakan
+                            </Button>
+                          </>
+                        ) : (
                           <Button 
                             variant="default" 
                             className="bg-blue-600 hover:bg-blue-700 transition-colors"
                             onClick={() => router.push(`/home/classrooms/${classId}/${content.id}`)}
                           >
                             <Eye className="h-4 w-4 mr-2" />
-                            {userRole === "teacher" ? "Review" : "Lihat"}
+                            Review
                           </Button>
+                        )}
+
                         </div>
                       </div>
                     </CardContent>
@@ -681,6 +778,38 @@ export default function ClassroomsPage() {
           </Card>
         </div>
       </div>
+      <Dialog open={showLatihanModal} onOpenChange={setShowLatihanModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Latihan: {currentLatihan?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500">Jumlah Pertanyaan</p>
+                <p className="text-lg">{currentLatihan?.questionCount}</p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-4">
+              <Button 
+                variant="outline"
+                onClick={() => setShowLatihanModal(false)}
+              >
+                Nanti Saja
+              </Button>
+              <Button 
+                onClick={() => {
+                  router.push(`/home/classrooms/${classId}/latihan/${currentLatihan?.id}`);
+                  setShowLatihanModal(false);
+                }}
+              >
+                Kerjakan Sekarang
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
