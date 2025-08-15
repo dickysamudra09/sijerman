@@ -145,28 +145,43 @@ export default function LatihanSoalPage() {
 
     setIsSaving(true);
     try {
-      const { data: exerciseSet, error } = await supabase
+        const { data: exerciseSet, error } = await supabase
         .from("exercise_sets")
         .insert({
-          judul_latihan: newTitle.trim(),
-          deskripsi: "",
-          kelas_id: classId,
-          pembuat_id: userId,
-          deadline_enabled: false,
-          max_attempts: 1,
-          shuffle_questions: false,
-          shuffle_options: false,
-          is_active: true
+            judul_latihan: newTitle.trim(),
+            deskripsi: "",
+            kelas_id: classId,
+            pembuat_id: userId,
+            deadline_enabled: false,
+            max_attempts: 1,
+            shuffle_questions: false,
+            shuffle_options: false,
+            is_active: true
         })
         .select()
         .single();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const newExerciseSet: ExerciseSet = {
+        // Tambahkan ini untuk menyimpan ke teacher_create
+        const { error: teacherCreateError } = await supabase
+        .from("teacher_create")
+        .insert({
+            judul: "latihan",
+            sub_judul: newTitle.trim(),
+            kelas: classId,
+            pembuat: userId,
+            jenis_create: "Latihan soal",
+            konten: ""
+        });
+
+        if (teacherCreateError) throw teacherCreateError;
+
+        const newExerciseSet: ExerciseSet = {
         ...exerciseSet,
         questions: []
-      };
+        };
+
 
       setExerciseSets(prev => [newExerciseSet, ...prev]);
       setNewTitle("");
