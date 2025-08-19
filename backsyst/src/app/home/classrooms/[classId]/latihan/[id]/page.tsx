@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,6 +71,7 @@ export default function InteractiveQuiz() {
   const [state, setState] = useState<QuizState>(initialQuizState);
   const [timeLeft, setTimeLeft] = useState(30);
   const [startTime, setStartTime] = useState<Date | null>(null);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -92,43 +93,35 @@ export default function InteractiveQuiz() {
         throw new Error("Exercise set ID is missing.");
       }
       
-      const { data: existingAttempt, error: checkError } = await supabase
+      const { data: existingAttempts, error: checkError } = await supabase
         .from("exercise_attempts")
-        .select("id")
+        .select("id, attempt_number, status")
         .eq("exercise_set_id", exerciseSetId)
         .eq("student_id", userId)
-        .eq("status", "in_progress")
-        .maybeSingle();
+        .order("attempt_number", { ascending: false });
 
-      if (checkError) {
-        console.error("Error checking existing attempt:", checkError.message);
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error("Error checking existing attempts:", checkError.message);
+        throw new Error(`Failed to check existing attempts: ${checkError.message}`);
       }
 
-      if (existingAttempt) {
-        console.log("Found existing in_progress attempt:", existingAttempt.id);
+      const inProgressAttempt = existingAttempts?.find(attempt => attempt.status === 'in_progress');
+      if (inProgressAttempt) {
+        console.log("Found existing in_progress attempt:", inProgressAttempt.id);
         toast.info("Melanjutkan sesi latihan yang belum selesai.");
-        return existingAttempt.id;
-      }
-      
-      const { data: maxAttemptData, error: maxAttemptError } = await supabase
-        .from("exercise_attempts")
-        .select("attempt_number")
-        .eq("exercise_set_id", exerciseSetId)
-        .eq("student_id", userId)
-        .order("attempt_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (maxAttemptError && maxAttemptError.code !== 'PGRST116') {
-        console.error("Error getting max attempt number:", maxAttemptError.message);
-        throw new Error(`Failed to get attempt history: ${maxAttemptError.message}`);
+        return inProgressAttempt.id;
       }
 
-      const nextAttemptNumber = maxAttemptData ? maxAttemptData.attempt_number + 1 : 1;
+      const maxAttemptNumber = existingAttempts && existingAttempts.length > 0 
+        ? existingAttempts[0].attempt_number 
+        : 0;
+      const nextAttemptNumber = maxAttemptNumber + 1;
       
       console.log(`Creating new attempt with number: ${nextAttemptNumber}`);
       
+      const tempAttemptId = crypto.randomUUID();
       const attemptData = {
+        id: tempAttemptId,
         exercise_set_id: exerciseSetId,
         student_id: userId,
         attempt_number: nextAttemptNumber,
@@ -148,22 +141,42 @@ export default function InteractiveQuiz() {
 
       if (insertError) {
         console.error("Error creating exercise attempt:", insertError.message);
-        console.error("Error details:", JSON.stringify(insertError, null, 2));
         
         if (insertError.code === '23505') {
-          console.log("Duplicate key error, trying to find existing attempt...");
-          const { data: existingDuplicate, error: findError } = await supabase
+          console.log("Duplicate key error detected, searching for existing attempt...");
+          
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          const { data: raceAttempt, error: raceError } = await supabase
             .from("exercise_attempts")
             .select("id")
             .eq("exercise_set_id", exerciseSetId)
             .eq("student_id", userId)
-            .eq("attempt_number", nextAttemptNumber)
+            .eq("status", "in_progress")
             .maybeSingle();
             
-          if (!findError && existingDuplicate) {
-            console.log("Found existing attempt with same number:", existingDuplicate.id);
-            return existingDuplicate.id;
+          if (!raceError && raceAttempt) {
+            console.log("Found attempt created by race condition:", raceAttempt.id);
+            return raceAttempt.id;
           }
+          
+          const finalAttemptData = {
+            ...attemptData,
+            id: crypto.randomUUID(),
+            attempt_number: nextAttemptNumber + 1,
+          };
+          
+          const { data: finalAttempt, error: finalError } = await supabase
+            .from("exercise_attempts")
+            .insert([finalAttemptData])
+            .select("id")
+            .single();
+            
+          if (finalError) {
+            throw new Error(`Failed to create attempt after handling race condition: ${finalError.message}`);
+          }
+          
+          return finalAttempt.id;
         }
         
         throw new Error(`Gagal membuat sesi latihan: ${insertError.message}`);
@@ -253,49 +266,21 @@ export default function InteractiveQuiz() {
         throw new Error(`Gagal menyelesaikan latihan: ${updateAttemptError.message}`);
       }
 
-      const { data: analytics, error: analyticsError } = await supabase
-        .from("exercise_analytics")
-        .select("total_attempts, total_submissions, average_score, average_time_minutes, highest_score, lowest_score")
-        .eq("exercise_set_id", exerciseSetId)
-        .maybeSingle();
-      
-      let newAnalyticsData;
-      if (analytics) {
-        const currentTotalScore = (analytics.average_score / 100) * analytics.total_submissions * totalMaxScore;
-        const currentTotalTime = analytics.average_time_minutes * analytics.total_submissions;
-        const newTotalSubmissions = (analytics.total_submissions || 0) + 1;
+      try {
+        const { error: analyticsError } = await supabase.rpc('update_exercise_analytics_manual', {
+          p_exercise_set_id: exerciseSetId,
+          p_total_score: totalScore,
+          p_max_score: totalMaxScore,
+          p_percentage: percentage,
+          p_time_minutes: Math.max(timeSpentMinutes, 1)
+        });
 
-        newAnalyticsData = {
-          total_attempts: (analytics.total_attempts || 0) + 1,
-          total_submissions: newTotalSubmissions,
-          average_score: parseFloat((((currentTotalScore + totalScore) / newTotalSubmissions / totalMaxScore) * 100).toFixed(2)),
-          average_time_minutes: Math.round((currentTotalTime + timeSpentMinutes) / newTotalSubmissions), // Round to integer
-          highest_score: parseFloat(Math.max(analytics.highest_score || 0, totalScore).toFixed(2)),
-          lowest_score: parseFloat(Math.min(analytics.lowest_score || Infinity, totalScore).toFixed(2)),
-          updated_at: new Date().toISOString(),
-        };
-      } else {
-        newAnalyticsData = {
-          exercise_set_id: exerciseSetId,
-          total_attempts: 1,
-          total_submissions: 1,
-          average_score: parseFloat((totalMaxScore > 0 ? (totalScore / totalMaxScore * 100) : 0).toFixed(2)),
-          average_time_minutes: Math.max(timeSpentMinutes, 1), // Ensure at least 1 minute and integer
-          highest_score: parseFloat(totalScore.toFixed(2)),
-          lowest_score: parseFloat(totalScore.toFixed(2)),
-          updated_at: new Date().toISOString(),
-        };
-      }
-
-      console.log("Analytics data to upsert:", newAnalyticsData);
-
-      const { error: upsertError } = await supabase
-        .from("exercise_analytics")
-        .upsert(newAnalyticsData, { onConflict: 'exercise_set_id' });
-
-      if (upsertError) {
-        console.error("Error upserting exercise analytics:", upsertError.message);
-        throw new Error(`Gagal menyimpan data analitik: ${upsertError.message}`);
+        if (analyticsError) {
+          console.error("Error updating analytics via RPC:", analyticsError.message);
+          console.warn("Analytics update failed, but quiz completion succeeded");
+        }
+      } catch (analyticsErr) {
+        console.error("Analytics update failed:", analyticsErr);
       }
 
       toast.success("Latihan berhasil diselesaikan!");
@@ -308,7 +293,7 @@ export default function InteractiveQuiz() {
 
   useEffect(() => {
     const fetchQuestions = async () => {
-      if (!exerciseSetId || state.hasInitialized) {
+      if (!exerciseSetId || initializedRef.current) {
         if (!exerciseSetId) {
           setState(s => ({ ...s, error: "ID set latihan tidak ditemukan.", isLoading: false }));
           toast.error("ID set latihan tidak ditemukan.");
@@ -316,7 +301,7 @@ export default function InteractiveQuiz() {
         return;
       }
       
-      setState(s => ({ ...s, hasInitialized: true }));
+      initializedRef.current = true;
 
       try {
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -378,7 +363,7 @@ export default function InteractiveQuiz() {
     };
 
     fetchQuestions();
-  }, [exerciseSetId, state.hasInitialized]);
+  }, [exerciseSetId]);
 
   const handleSubmitAnswer = async () => {
     const currentQuestion = state.questions[state.currentQuestionIndex];
