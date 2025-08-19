@@ -105,42 +105,71 @@ export default function InteractiveQuiz() {
       }
 
       if (existingAttempt) {
+        console.log("Found existing in_progress attempt:", existingAttempt.id);
         toast.info("Melanjutkan sesi latihan yang belum selesai.");
         return existingAttempt.id;
       }
       
-      const { count: submittedCount, error: countError } = await supabase
+      const { data: maxAttemptData, error: maxAttemptError } = await supabase
         .from("exercise_attempts")
-        .select("*", { count: "exact", head: true })
+        .select("attempt_number")
         .eq("exercise_set_id", exerciseSetId)
         .eq("student_id", userId)
-        .eq("status", "submitted");
+        .order("attempt_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (countError) {
-        throw new Error(`Failed to count previous attempts: ${countError.message}`);
+      if (maxAttemptError && maxAttemptError.code !== 'PGRST116') {
+        console.error("Error getting max attempt number:", maxAttemptError.message);
+        throw new Error(`Failed to get attempt history: ${maxAttemptError.message}`);
       }
 
-      const nextAttemptNumber = (submittedCount || 0) + 1;
+      const nextAttemptNumber = maxAttemptData ? maxAttemptData.attempt_number + 1 : 1;
+      
+      console.log(`Creating new attempt with number: ${nextAttemptNumber}`);
       
       const attemptData = {
         exercise_set_id: exerciseSetId,
         student_id: userId,
         attempt_number: nextAttemptNumber,
         status: 'in_progress',
+        started_at: new Date().toISOString(),
+        total_score: 0.00,
+        max_possible_score: 0.00,
+        percentage: 0.00,
+        time_spent_minutes: 0,
       };
 
-      const { data: attempt, error } = await supabase
+      const { data: attempt, error: insertError } = await supabase
         .from("exercise_attempts")
         .insert([attemptData])
         .select("id")
         .single();
 
-      if (error) {
-        console.error("Error creating exercise attempt:", error.message);
-        console.error("Error details:", JSON.stringify(error, null, 2));
-        throw new Error(`Gagal membuat sesi latihan: ${error.message}`);
+      if (insertError) {
+        console.error("Error creating exercise attempt:", insertError.message);
+        console.error("Error details:", JSON.stringify(insertError, null, 2));
+        
+        if (insertError.code === '23505') {
+          console.log("Duplicate key error, trying to find existing attempt...");
+          const { data: existingDuplicate, error: findError } = await supabase
+            .from("exercise_attempts")
+            .select("id")
+            .eq("exercise_set_id", exerciseSetId)
+            .eq("student_id", userId)
+            .eq("attempt_number", nextAttemptNumber)
+            .maybeSingle();
+            
+          if (!findError && existingDuplicate) {
+            console.log("Found existing attempt with same number:", existingDuplicate.id);
+            return existingDuplicate.id;
+          }
+        }
+        
+        throw new Error(`Gagal membuat sesi latihan: ${insertError.message}`);
       }
 
+      console.log("Created new attempt:", attempt.id);
       return attempt.id;
     } catch (err: any) {
       console.error("Unexpected error creating attempt:", err.message);
@@ -162,6 +191,7 @@ export default function InteractiveQuiz() {
         selected_option_id: selectedOptionId,
         is_correct: isCorrect,
         points_earned: pointsEarned,
+        answered_at: new Date().toISOString(),
       };
 
       const { error } = await supabase
@@ -200,6 +230,7 @@ export default function InteractiveQuiz() {
 
       const totalScore = answers?.reduce((sum, answer) => sum + answer.points_earned, 0) || 0;
       const totalMaxScore = state.questions.reduce((sum, q) => sum + q.points, 0);
+      const percentage = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
 
       const endTime = new Date();
       const timeSpentMinutes = startTime ? Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)) : 0;
@@ -210,8 +241,10 @@ export default function InteractiveQuiz() {
           submitted_at: endTime.toISOString(),
           time_spent_minutes: Math.max(timeSpentMinutes, 1),
           status: 'submitted',
-          score: totalScore,
-          max_score: totalMaxScore,
+          total_score: totalScore,
+          max_possible_score: totalMaxScore,
+          percentage: percentage,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', state.attemptId);
 
@@ -235,22 +268,26 @@ export default function InteractiveQuiz() {
         newAnalyticsData = {
           total_attempts: (analytics.total_attempts || 0) + 1,
           total_submissions: newTotalSubmissions,
-          average_score: ((currentTotalScore + totalScore) / newTotalSubmissions / totalMaxScore) * 100,
-          average_time_minutes: (currentTotalTime + timeSpentMinutes) / newTotalSubmissions,
-          highest_score: Math.max(analytics.highest_score || 0, totalScore),
-          lowest_score: Math.min(analytics.lowest_score || Infinity, totalScore),
+          average_score: parseFloat((((currentTotalScore + totalScore) / newTotalSubmissions / totalMaxScore) * 100).toFixed(2)),
+          average_time_minutes: Math.round((currentTotalTime + timeSpentMinutes) / newTotalSubmissions), // Round to integer
+          highest_score: parseFloat(Math.max(analytics.highest_score || 0, totalScore).toFixed(2)),
+          lowest_score: parseFloat(Math.min(analytics.lowest_score || Infinity, totalScore).toFixed(2)),
+          updated_at: new Date().toISOString(),
         };
       } else {
         newAnalyticsData = {
           exercise_set_id: exerciseSetId,
           total_attempts: 1,
           total_submissions: 1,
-          average_score: totalMaxScore > 0 ? (totalScore / totalMaxScore * 100) : 0,
-          average_time_minutes: timeSpentMinutes,
-          highest_score: totalScore,
-          lowest_score: totalScore,
+          average_score: parseFloat((totalMaxScore > 0 ? (totalScore / totalMaxScore * 100) : 0).toFixed(2)),
+          average_time_minutes: Math.max(timeSpentMinutes, 1), // Ensure at least 1 minute and integer
+          highest_score: parseFloat(totalScore.toFixed(2)),
+          lowest_score: parseFloat(totalScore.toFixed(2)),
+          updated_at: new Date().toISOString(),
         };
       }
+
+      console.log("Analytics data to upsert:", newAnalyticsData);
 
       const { error: upsertError } = await supabase
         .from("exercise_analytics")
@@ -269,7 +306,6 @@ export default function InteractiveQuiz() {
     }
   };
 
-
   useEffect(() => {
     const fetchQuestions = async () => {
       if (!exerciseSetId || state.hasInitialized) {
@@ -286,7 +322,7 @@ export default function InteractiveQuiz() {
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !sessionData.session?.user) {
           console.error("Session error:", sessionError?.message);
-          setState(s => ({ ...s, error: "Sesi tidak ditemukan. Silakan login." }));
+          setState(s => ({ ...s, error: "Sesi tidak ditemukan. Silakan login.", isLoading: false }));
           toast.error("Sesi tidak ditemukan. Silakan login.");
           return;
         }
@@ -317,13 +353,13 @@ export default function InteractiveQuiz() {
 
         if (error) {
           console.error("Error fetching questions:", error.message);
-          setState(s => ({ ...s, error: `Gagal memuat pertanyaan: ${error.message}` }));
+          setState(s => ({ ...s, error: `Gagal memuat pertanyaan: ${error.message}`, isLoading: false }));
           toast.error("Gagal memuat pertanyaan.");
           return;
         }
 
         if (!data || data.length === 0) {
-          setState(s => ({ ...s, error: "Tidak ada pertanyaan untuk latihan ini." }));
+          setState(s => ({ ...s, error: "Tidak ada pertanyaan untuk latihan ini.", isLoading: false }));
           toast.info("Tidak ada pertanyaan untuk latihan ini.");
           return;
         }
@@ -333,13 +369,11 @@ export default function InteractiveQuiz() {
           options: (question.options as Option[]).sort((a, b) => a.order_index - b.order_index)
         })) as Question[];
         
-        setState(s => ({ ...s, questions: questionsData }));
+        setState(s => ({ ...s, questions: questionsData, isLoading: false }));
       } catch (err: any) {
         console.error("Unexpected error in fetchQuestions:", err.message);
-        setState(s => ({ ...s, error: err.message || "Terjadi kesalahan yang tidak terduga." }));
+        setState(s => ({ ...s, error: err.message || "Terjadi kesalahan yang tidak terduga.", isLoading: false }));
         toast.error(err.message || "Terjadi kesalahan yang tidak terduga.");
-      } finally {
-        setState(s => ({ ...s, isLoading: false }));
       }
     };
 
