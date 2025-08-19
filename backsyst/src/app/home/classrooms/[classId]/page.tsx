@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Plus,
   Eye,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -52,6 +53,15 @@ interface ContentItem {
   created_at: string;
 }
 
+interface ExerciseAttempt {
+  id: string;
+  total_score: number;
+  max_possible_score: number;
+  percentage: number;
+  status: string;
+  submitted_at: string;
+}
+
 export default function ClassroomsPage() {
   const [userName, setUserName] = useState<string>("");
   const [userId, setUserId] = useState<string | null>(null);
@@ -63,6 +73,7 @@ export default function ClassroomsPage() {
   const [error, setError] = useState<string | null>(null);
   const [attendanceRecorded, setAttendanceRecorded] = useState(false);
   const [isRecordingAttendance, setIsRecordingAttendance] = useState(false);
+  const [exerciseAttempts, setExerciseAttempts] = useState<Record<string, ExerciseAttempt>>({});
   const router = useRouter();
   const params = useParams();
   const classId = params.classId as string;
@@ -73,79 +84,139 @@ export default function ClassroomsPage() {
     id: string;
     title: string;
     questionCount: number;
+    attempt?: ExerciseAttempt;
   } | null>(null);
 
+  // --- Check Exercise Attempts ---
+  const checkExerciseAttempts = async (userId: string) => {
+    if (userRole !== 'student') return;
+
+    try {
+      const { data: attempts, error } = await supabase
+        .from('exercise_attempts')
+        .select(`
+          id,
+          exercise_set_id,
+          total_score,
+          max_possible_score,
+          percentage,
+          status,
+          submitted_at
+        `)
+        .eq('student_id', userId)
+        .eq('status', 'submitted');
+
+      if (error) {
+        console.error("Error fetching exercise attempts:", error);
+        return;
+      }
+
+      const attemptsByExerciseSet: Record<string, ExerciseAttempt> = {};
+      if (attempts) {
+        attempts.forEach((attempt: any) => {
+          attemptsByExerciseSet[attempt.exercise_set_id] = attempt;
+        });
+      }
+
+      setExerciseAttempts(attemptsByExerciseSet);
+    } catch (err) {
+      console.error("Unexpected error checking exercise attempts:", err);
+    }
+  };
+
   const handleKerjakanLatihan = async (content: ContentItem) => {
-    if (content.jenis_create === "Latihan soal") {
-      try {
-        console.log("Mencari exercise set untuk content:", content.id);
-        
-        const { data: exerciseSet, error: exerciseError } = await supabase
-          .from('exercise_sets')
-          .select('id, judul_latihan')
-          .or(`konten_id.eq.${content.id},and(judul_latihan.eq.${content.sub_judul},kelas_id.eq.${classId})`)
-          .single();
+    if (content.jenis_create !== "Latihan soal") {
+      router.push(`/home/classrooms/${classId}/latihan/${content.id}`);
+      return;
+    }
 
-        if (exerciseError || !exerciseSet) {
-          console.error("Error finding exercise set:", exerciseError);
-          console.log("Trying alternative approach...");
-          
-          const { data: altExerciseSet, error: altError } = await supabase
-            .from('exercise_sets')
-            .select('id, judul_latihan')
-            .eq('judul_latihan', content.sub_judul)
-            .eq('kelas_id', classId)
-            .single();
-            
-          if (altError || !altExerciseSet) {
-            console.error("Exercise set not found with alternative approach:", altError);
-            toast.error("Latihan soal tidak ditemukan. Pastikan soal sudah dibuat.");
-            return;
-          }
-          
-          const { count, error: countError } = await supabase
-            .from('questions')
-            .select('*', { count: 'exact', head: true })
-            .eq('exercise_set_id', altExerciseSet.id);
+    try {
+      console.log("Mencari exercise set untuk content:", content.id);
 
-          if (countError) {
-            console.error("Error counting questions:", countError);
-            toast.error("Gagal memuat detail latihan soal");
-            return;
-          }
+      const { data: exerciseSet, error } = await supabase
+        .from("exercise_sets")
+        .select("id, judul_latihan")
+        .or(
+          `konten_id.eq.${content.id},and(judul_latihan.eq.${content.sub_judul},kelas_id.eq.${classId})`
+        )
+        .maybeSingle(); 
 
-          setCurrentLatihan({
-            id: altExerciseSet.id,
-            title: content.sub_judul,
-            questionCount: count || 0
-          });
-        } else {
-          const { count, error: countError } = await supabase
-            .from('questions')
-            .select('*', { count: 'exact', head: true })
-            .eq('exercise_set_id', exerciseSet.id);
+      if (!exerciseSet || error) {
+        console.error("Exercise set not found:", error);
+        toast.error(
+          "Latihan soal tidak ditemukan. Pastikan soal sudah dibuat."
+        );
+        return;
+      }
 
-          if (countError) {
-            console.error("Error counting questions:", countError);
-            toast.error("Gagal memuat detail latihan soal");
-            return;
-          }
+      const { count, error: countError } = await supabase
+        .from("questions")
+        .select("*", { count: "exact", head: true })
+        .eq("exercise_set_id", exerciseSet.id);
 
-          setCurrentLatihan({
-            id: exerciseSet.id,
-            title: content.sub_judul,
-            questionCount: count || 0
-          });
+      if (countError) {
+        console.error("Error counting questions:", countError);
+        toast.error("Gagal memuat detail latihan soal");
+        return;
+      }
+
+      const existingAttempt = exerciseAttempts[exerciseSet.id];
+
+      setCurrentLatihan({
+        id: exerciseSet.id,
+        title: content.sub_judul,
+        questionCount: count || 0,
+        attempt: existingAttempt,
+      });
+
+      setShowLatihanModal(true);
+    } catch (err) {
+      console.error("Error fetching exercise details:", err);
+      toast.error("Gagal memuat detail latihan soal");
+    }
+  };
+
+
+  const handleStartNewAttempt = async () => {
+    if (!currentLatihan) return;
+
+    try {
+      // Delete existing attempt if any
+      if (currentLatihan.attempt && userId) {
+        const { error: deleteError } = await supabase
+          .from('exercise_attempts')
+          .delete()
+          .eq('exercise_set_id', currentLatihan.id)
+          .eq('student_id', userId);
+
+        if (deleteError) {
+          console.error("Error deleting previous attempt:", deleteError);
+          toast.error("Gagal menghapus percobaan sebelumnya");
+          return;
         }
 
-        setShowLatihanModal(true);
-        
-      } catch (error) {
-        console.error("Error fetching exercise details:", error);
-        toast.error("Gagal memuat detail latihan soal");
+        // Also delete student answers
+        const { error: deleteAnswersError } = await supabase
+          .from('student_answers')
+          .delete()
+          .eq('attempt_id', currentLatihan.attempt.id);
+
+        if (deleteAnswersError) {
+          console.error("Error deleting previous answers:", deleteAnswersError);
+        }
       }
-    } else {
-      router.push(`/home/classrooms/${classId}/latihan/${content.id}`);
+
+      // Navigate to quiz
+      router.push(`/home/classrooms/${classId}/latihan/${currentLatihan.id}`);
+      setShowLatihanModal(false);
+      
+      // Refresh attempts after starting new one
+      if (userId) {
+        await checkExerciseAttempts(userId);
+      }
+    } catch (error) {
+      console.error("Error starting new attempt:", error);
+      toast.error("Gagal memulai percobaan baru");
     }
   };
 
@@ -495,6 +566,9 @@ export default function ClassroomsPage() {
           }
         }
 
+        // Check exercise attempts for student
+        await checkExerciseAttempts(userId);
+
         // Fetch contents for student
         console.log("Mengambil konten untuk siswa di kelas:", classId, "dengan teacher_id:", classroomData.teacher_id);
         
@@ -574,6 +648,31 @@ export default function ClassroomsPage() {
       </div>
     );
   }
+
+  const getExerciseSetId = async (content: ContentItem): Promise<string | null> => {
+    try {
+      const { data: exerciseSet, error } = await supabase
+        .from('exercise_sets')
+        .select('id')
+        .or(`konten_id.eq.${content.id},and(judul_latihan.eq.${content.sub_judul},kelas_id.eq.${classId})`)
+        .single();
+
+      if (error || !exerciseSet) {
+        const { data: altExerciseSet, error: altError } = await supabase
+          .from('exercise_sets')
+          .select('id')
+          .eq('judul_latihan', content.sub_judul)
+          .eq('kelas_id', classId)
+          .single();
+          
+        return altExerciseSet?.id || null;
+      }
+      
+      return exerciseSet.id;
+    } catch {
+      return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -691,59 +790,89 @@ export default function ClassroomsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {contents.map((content) => (
-                  <Card key={content.id} className="border-l-4 border-l-primary hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-lg mb-1">{content.judul}</h3>
-                          <p className="text-sm text-muted-foreground mb-2">{content.sub_judul}</p>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge variant="outline" className="text-xs">
-                              {content.jenis_create}
-                            </Badge>
-                            {content.deadline && (
-                              <Badge variant="destructive" className="text-xs">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Deadline: {new Date(content.deadline).toLocaleDateString('id-ID')}
+                {contents.map((content) => {
+                  const exerciseAttempt = content.jenis_create === "Latihan soal" ? exerciseAttempts[content.id] : null;
+                  
+                  return (
+                    <Card key={content.id} className="border-l-4 border-l-primary hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-lg mb-1">{content.judul}</h3>
+                            <p className="text-sm text-muted-foreground mb-2">{content.sub_judul}</p>
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline" className="text-xs">
+                                {content.jenis_create}
                               </Badge>
+                              {content.deadline && (
+                                <Badge variant="destructive" className="text-xs">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Deadline: {new Date(content.deadline).toLocaleDateString('id-ID')}
+                                </Badge>
+                              )}
+                              {exerciseAttempt && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Selesai: {exerciseAttempt.percentage.toFixed(0)}%
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Dibuat: {new Date(content.created_at).toLocaleString('id-ID', { 
+                                dateStyle: 'full', 
+                                timeStyle: 'short' 
+                              })}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {content.jenis_create === "Latihan soal" ? (
+                              <>
+                                {exerciseAttempt ? (
+                                  <Button 
+                                    variant="outline" 
+                                    className="border-gray-300 text-gray-600 cursor-not-allowed"
+                                    disabled
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                    Selesai
+                                  </Button>
+                                ) : (
+                                  <Button 
+                                    variant="default" 
+                                    className="bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                                    onClick={() => handleKerjakanLatihan(content)}
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    Kerjakan
+                                  </Button>
+                                )}
+                                {exerciseAttempt && (
+                                  <Button 
+                                    variant="outline" 
+                                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                                    onClick={() => handleKerjakanLatihan(content)}
+                                  >
+                                    <RotateCcw className="h-4 w-4 mr-2" />
+                                    Coba Lagi
+                                  </Button>
+                                )}
+                              </>
+                            ) : (
+                              <Button 
+                                variant="default" 
+                                className="bg-blue-600 hover:bg-blue-700 transition-colors"
+                                onClick={() => router.push(`/home/classrooms/${classId}/${content.id}`)}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                Review
+                              </Button>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            Dibuat: {new Date(content.created_at).toLocaleString('id-ID', { 
-                              dateStyle: 'full', 
-                              timeStyle: 'short' 
-                            })}
-                          </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {content.jenis_create === "Latihan soal" ? (
-                          <>
-                            <Button 
-                              variant="default" 
-                              className="bg-indigo-600 hover:bg-indigo-700 transition-colors"
-                              onClick={() => handleKerjakanLatihan(content)}
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              Kerjakan
-                            </Button>
-                          </>
-                        ) : (
-                          <Button 
-                            variant="default" 
-                            className="bg-blue-600 hover:bg-blue-700 transition-colors"
-                            onClick={() => router.push(`/home/classrooms/${classId}/${content.id}`)}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            Review
-                          </Button>
-                        )}
-
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
                 
                 {/* Empty State */}
                 {contents.length === 0 && (
@@ -778,6 +907,7 @@ export default function ClassroomsPage() {
           </Card>
         </div>
       </div>
+
       <Dialog open={showLatihanModal} onOpenChange={setShowLatihanModal}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -789,23 +919,54 @@ export default function ClassroomsPage() {
                 <p className="text-sm font-medium text-gray-500">Jumlah Pertanyaan</p>
                 <p className="text-lg">{currentLatihan?.questionCount}</p>
               </div>
+              {currentLatihan?.attempt && (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-gray-500">Skor Terakhir</p>
+                  <p className="text-lg font-semibold text-green-600">
+                    {currentLatihan.attempt.percentage.toFixed(0)}%
+                  </p>
+                </div>
+              )}
             </div>
+            
+            {currentLatihan?.attempt && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-700">
+                  ✅ Anda sudah menyelesaikan latihan ini dengan skor{' '}
+                  <strong>{currentLatihan.attempt.total_score}/{currentLatihan.attempt.max_possible_score}</strong>{' '}
+                  ({currentLatihan.attempt.percentage.toFixed(0)}%)
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Diselesaikan: {new Date(currentLatihan.attempt.submitted_at).toLocaleString('id-ID')}
+                </p>
+              </div>
+            )}
             
             <div className="flex justify-end gap-2 pt-4">
               <Button 
                 variant="outline"
                 onClick={() => setShowLatihanModal(false)}
               >
-                Nanti Saja
+                Batal
               </Button>
-              <Button 
-                onClick={() => {
-                  router.push(`/home/classrooms/${classId}/latihan/${currentLatihan?.id}`);
-                  setShowLatihanModal(false);
-                }}
-              >
-                Kerjakan Sekarang
-              </Button>
+              {currentLatihan?.attempt ? (
+                <Button 
+                  onClick={handleStartNewAttempt}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Mulai Ulang
+                </Button>
+              ) : (
+                <Button 
+                  onClick={() => {
+                    router.push(`/home/classrooms/${classId}/latihan/${currentLatihan?.id}`);
+                    setShowLatihanModal(false);
+                  }}
+                >
+                  Kerjakan Sekarang
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>
