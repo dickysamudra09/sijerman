@@ -251,41 +251,74 @@ export default function InteractiveQuiz() {
   const generateAIFeedback = async (studentAnswerId: string, questionId: string, selectedOptionId: string | null, isCorrect: boolean) => {
     if (!studentAnswerId) return;
 
-    setState(s => ({ ...s, isLoadingFeedback: true }));
+  setState(s => ({ ...s, isLoadingFeedback: true }));
 
-    try {
-      const response = await fetch('/api/ai-feedback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          studentAnswerId,
-          questionId,
-          attemptId: state.attemptId,
-          selectedOptionId,
-          isCorrect,
-        }),
-      });
+  try {
+    const payload = {
+      studentAnswerId,
+      questionId,
+      attemptId: state.attemptId,
+      selectedOptionId,
+      isCorrect,
+    };
+    
+    console.log('Sending AI feedback request with payload:', payload);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+    const response = await fetch('/api/ai-feedback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    console.log('AI feedback response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API error: ${response.status} - ${errorText}`);
+      
+      // Parse error jika JSON
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText };
       }
+      
+      throw new Error(`HTTP error! status: ${response.status}, details: ${JSON.stringify(errorData)}`);
+    }
 
-      const result = await response.json();
+    const result = await response.json();
+    console.log('AI feedback result:', result);
 
-      if (result.success) {
-        setState(s => ({ 
-          ...s, 
-          aiFeedback: result.data,
-          isLoadingFeedback: false 
-        }));
-      } else {
-        throw new Error(result.error || 'Failed to generate AI feedback');
+    if (result.success) {
+      setState(s => ({ 
+        ...s, 
+        aiFeedback: result.data,
+        isLoadingFeedback: false 
+      }));
+      
+      if (result.warning) {
+        console.warn('AI Feedback warning:', result.warning);
       }
+    } else {
+      throw new Error(result.error || 'Failed to generate AI feedback');
+    }
 
-    } catch (error) {
+  } catch (error: unknown) {
       console.error('Error generating AI feedback:', error);
+      
+      let errorMessage = 'Unknown error occurred';
+      
+      if (error instanceof Error) {
+          errorMessage = error.message;
+      } else if (typeof error === 'string') {
+          errorMessage = error;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+          errorMessage = String((error as any).message);
+      }
+      
       setState(s => ({ 
         ...s, 
         aiFeedback: {
@@ -295,9 +328,11 @@ export default function InteractiveQuiz() {
         },
         isLoadingFeedback: false 
       }));
-      toast.error("Gagal memuat feedback AI");
-    }
-  };
+      
+      toast.error("Gagal memuat feedback AI: " + errorMessage);
+  }
+};
+
   
   const completeExerciseAttempt = async () => {
     if (!state.attemptId) {
