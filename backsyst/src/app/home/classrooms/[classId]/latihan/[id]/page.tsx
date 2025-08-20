@@ -20,6 +20,9 @@ import {
   ArrowRight,
   Loader2,
   ChevronLeft,
+  BookOpen,
+  ExternalLink,
+  Lightbulb,
 } from "lucide-react";
 
 interface Option {
@@ -38,6 +41,19 @@ interface Question {
   options: Option[];
 }
 
+interface AIFeedback {
+  id?: string;
+  feedback_text: string;
+  explanation: string;
+  reference_materials: {
+    title: string;
+    url: string;
+    description: string;
+  }[];
+  processing_time_ms?: number;
+  ai_model?: string;
+}
+
 interface QuizState {
   questions: Question[];
   currentQuestionIndex: number;
@@ -49,6 +65,8 @@ interface QuizState {
   error: string | null;
   attemptId: string | null;
   hasInitialized: boolean;
+  aiFeedback: AIFeedback | null;
+  isLoadingFeedback: boolean;
 }
 
 const initialQuizState: QuizState = {
@@ -62,6 +80,8 @@ const initialQuizState: QuizState = {
   error: null,
   attemptId: null,
   hasInitialized: false,
+  aiFeedback: null,
+  isLoadingFeedback: false,
 };
 
 export default function InteractiveQuiz() {
@@ -194,7 +214,7 @@ export default function InteractiveQuiz() {
   const saveStudentAnswer = async (questionId: string, selectedOptionId: string | null, isCorrect: boolean, pointsEarned: number) => {
     if (!state.attemptId) {
       console.error("No attempt ID available for saving answer");
-      return;
+      return null;
     }
 
     try {
@@ -207,19 +227,75 @@ export default function InteractiveQuiz() {
         answered_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("student_answers")
-        .upsert([answerData], { onConflict: 'attempt_id, question_id' });
+        .upsert([answerData], { onConflict: 'attempt_id, question_id' })
+        .select('id')
+        .single();
 
       if (error) {
         console.error("Error saving student answer:", error.message);
         console.error("Insert error details:", JSON.stringify(error, null, 2));
         toast.error(`Gagal menyimpan jawaban: ${error.message}`);
-        return;
+        return null;
       }
+
+      return data.id;
     } catch (err) {
       console.error("Unexpected error saving answer:", err);
       toast.error("Terjadi kesalahan saat menyimpan jawaban");
+      return null;
+    }
+  };
+
+  const generateAIFeedback = async (studentAnswerId: string, questionId: string, selectedOptionId: string | null, isCorrect: boolean) => {
+    if (!studentAnswerId) return;
+
+    setState(s => ({ ...s, isLoadingFeedback: true }));
+
+    try {
+      const response = await fetch('/api/ai-feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentAnswerId,
+          questionId,
+          attemptId: state.attemptId,
+          selectedOptionId,
+          isCorrect,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        setState(s => ({ 
+          ...s, 
+          aiFeedback: result.data,
+          isLoadingFeedback: false 
+        }));
+      } else {
+        throw new Error(result.error || 'Failed to generate AI feedback');
+      }
+
+    } catch (error) {
+      console.error('Error generating AI feedback:', error);
+      setState(s => ({ 
+        ...s, 
+        aiFeedback: {
+          feedback_text: "Maaf, feedback AI tidak dapat dimuat saat ini.",
+          explanation: "Silakan lanjutkan dengan pertanyaan berikutnya.",
+          reference_materials: []
+        },
+        isLoadingFeedback: false 
+      }));
+      toast.error("Gagal memuat feedback AI");
     }
   };
   
@@ -384,13 +460,18 @@ export default function InteractiveQuiz() {
     const isCorrect = selectedOption?.is_correct ?? false;
     const pointsEarned = isCorrect ? currentQuestion.points : 0;
 
-    await saveStudentAnswer(currentQuestion.id, selectedOptionId, isCorrect, pointsEarned);
+    const studentAnswerId = await saveStudentAnswer(currentQuestion.id, selectedOptionId, isCorrect, pointsEarned);
 
     setState(s => ({
       ...s,
       showResult: true,
       score: s.score + pointsEarned,
+      aiFeedback: null, 
     }));
+
+    if (studentAnswerId) {
+      await generateAIFeedback(studentAnswerId, currentQuestion.id, selectedOptionId, isCorrect);
+    }
   };
 
   const handleNextQuestion = async () => {
@@ -400,6 +481,7 @@ export default function InteractiveQuiz() {
         currentQuestionIndex: s.currentQuestionIndex + 1,
         selectedOptionId: null,
         showResult: false,
+        aiFeedback: null, 
       }));
       setTimeLeft(30);
     } else {
@@ -571,6 +653,93 @@ export default function InteractiveQuiz() {
               </div>
             )}
 
+            {state.showResult && (
+              <div className="space-y-4">
+                {state.isLoadingFeedback ? (
+                  <Card className="border-blue-200 bg-blue-50/50">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+                        <div>
+                          <h4 className="font-medium text-blue-900">Menghasilkan Feedback AI...</h4>
+                          <p className="text-sm text-blue-700">Mohon tunggu sebentar</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : state.aiFeedback && (
+                  <Card className="border-purple-200 bg-purple-50/50">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center gap-2">
+                        <Lightbulb className="h-5 w-5 text-purple-600" />
+                        <CardTitle className="text-lg text-purple-900">AI Feedback</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <h5 className="font-medium text-purple-900 mb-2">Feedback:</h5>
+                        <p className="text-purple-800 bg-white/60 p-3 rounded-md">
+                          {state.aiFeedback.feedback_text}
+                        </p>
+                      </div>
+                      {state.aiFeedback.explanation && (
+                        <div>
+                          <h5 className="font-medium text-purple-900 mb-2">Penjelasan Detail:</h5>
+                          <p className="text-purple-800 bg-white/60 p-3 rounded-md">
+                            {state.aiFeedback.explanation}
+                          </p>
+                        </div>
+                      )}
+
+                      {state.aiFeedback.reference_materials && state.aiFeedback.reference_materials.length > 0 && (
+                        <div>
+                          <h5 className="font-medium text-purple-900 mb-3 flex items-center gap-2">
+                            <BookOpen className="h-4 w-4" />
+                            Referensi Belajar:
+                          </h5>
+                          <div className="space-y-3">
+                            {state.aiFeedback.reference_materials.map((ref, index) => (
+                              <div key={index} className="bg-white/80 p-3 rounded-md border border-purple-200">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1">
+                                    <h6 className="font-medium text-purple-900 text-sm">
+                                      {ref.title}
+                                    </h6>
+                                    <p className="text-sm text-purple-700 mt-1">
+                                      {ref.description}
+                                    </p>
+                                  </div>
+                                  {ref.url && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="shrink-0 h-8 px-2 border-purple-300 text-purple-700 hover:bg-purple-100"
+                                      onClick={() => window.open(ref.url, '_blank')}
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {state.aiFeedback.ai_model && process.env.NODE_ENV === 'development' && (
+                        <div className="text-xs text-purple-600 pt-2 border-t border-purple-200">
+                          Powered by {state.aiFeedback.ai_model}
+                          {state.aiFeedback.processing_time_ms && 
+                            ` • Generated in ${state.aiFeedback.processing_time_ms}ms`
+                          }
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+
             <div className="flex justify-end">
               {!state.showResult ? (
                 <Button 
@@ -581,7 +750,11 @@ export default function InteractiveQuiz() {
                   Submit
                 </Button>
               ) : (
-                <Button onClick={handleNextQuestion} className="min-w-32">
+                <Button 
+                  onClick={handleNextQuestion} 
+                  className="min-w-32"
+                  disabled={state.isLoadingFeedback}
+                >
                   {state.currentQuestionIndex < totalQuestions - 1 ? (
                     <>
                       Selanjutnya <ArrowRight className="h-4 w-4 ml-2" />
