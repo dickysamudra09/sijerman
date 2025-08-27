@@ -145,43 +145,42 @@ export default function LatihanSoalPage() {
 
     setIsSaving(true);
     try {
-        const { data: exerciseSet, error } = await supabase
+      const { data: exerciseSet, error } = await supabase
         .from("exercise_sets")
         .insert({
-            judul_latihan: newTitle.trim(),
-            deskripsi: "",
-            kelas_id: classId,
-            pembuat_id: userId,
-            deadline_enabled: false,
-            max_attempts: 1,
-            shuffle_questions: false,
-            shuffle_options: false,
-            is_active: true
+          judul_latihan: newTitle.trim(),
+          deskripsi: "",
+          kelas_id: classId,
+          pembuat_id: userId,
+          deadline_enabled: false,
+          max_attempts: 1,
+          shuffle_questions: false,
+          shuffle_options: false,
+          is_active: true
         })
         .select()
         .single();
 
-        if (error) throw error;
+      if (error) throw error;
 
-        // Tambahkan ini untuk menyimpan ke teacher_create
-        const { error: teacherCreateError } = await supabase
+      // Tambahkan ini untuk menyimpan ke teacher_create
+      const { error: teacherCreateError } = await supabase
         .from("teacher_create")
         .insert({
-            judul: "latihan",
-            sub_judul: newTitle.trim(),
-            kelas: classId,
-            pembuat: userId,
-            jenis_create: "Latihan soal",
-            konten: ""
+          judul: "latihan",
+          sub_judul: newTitle.trim(),
+          kelas: classId,
+          pembuat: userId,
+          jenis_create: "Latihan soal",
+          konten: ""
         });
 
-        if (teacherCreateError) throw teacherCreateError;
+      if (teacherCreateError) throw teacherCreateError;
 
-        const newExerciseSet: ExerciseSet = {
+      const newExerciseSet: ExerciseSet = {
         ...exerciseSet,
         questions: []
-        };
-
+      };
 
       setExerciseSets(prev => [newExerciseSet, ...prev]);
       setNewTitle("");
@@ -549,240 +548,241 @@ export default function LatihanSoalPage() {
               </CardContent>
             </Card>
           ) : (
-            <Accordion 
-              type="single" 
-              collapsible 
-              value={editingExercise || ""}
-              onValueChange={setEditingExercise}
-            >
+            <div className="space-y-4">
               {exerciseSets.map((exercise) => (
-                <AccordionItem key={exercise.id} value={exercise.id} className="border-0 mb-4">
-                  <Card className="border-0 shadow-lg overflow-hidden">
-                    <AccordionTrigger className="hover:no-underline p-0">
-                      <CardHeader className="w-full text-left p-6">
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                              <CheckCircle className="h-6 w-6 text-indigo-600" />
-                            </div>
-                            <div>
-                              <CardTitle className="text-xl font-semibold text-gray-900">
-                                {exercise.judul_latihan}
-                              </CardTitle>
-                              <CardDescription className="flex items-center gap-4 mt-2">
-                                <div className="flex items-center gap-1">
+                <Card key={exercise.id} className="border-0 shadow-lg overflow-hidden">
+                  <div className="relative">
+                    {/* Button Delete terpisah dari AccordionTrigger */}
+                    <div className="absolute top-4 right-4 z-10">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteExerciseSet(exercise.id);
+                        }}
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Custom Accordion-like behavior */}
+                    <button
+                      className="w-full text-left focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-inset"
+                      onClick={() => setEditingExercise(editingExercise === exercise.id ? null : exercise.id)}
+                    >
+                      <CardHeader className="p-6 pr-16 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                            <CheckCircle className="h-6 w-6 text-indigo-600" />
+                          </div>
+                          <div className="flex-1">
+                            <CardTitle className="text-xl font-semibold text-gray-900">
+                              {exercise.judul_latihan}
+                            </CardTitle>
+                            {/* FIX: Ganti CardDescription dengan div biasa */}
+                            <div className="text-muted-foreground">
+                              <div className="flex items-center gap-4 mt-2">
+                                <span className="flex items-center gap-1">
                                   <Users className="h-4 w-4" />
                                   <span>{exercise.questions.length} Pertanyaan</span>
-                                </div>
+                                </span>
                                 {exercise.deadline_enabled && exercise.deadline && (
-                                  <div className="flex items-center gap-1">
+                                  <span className="flex items-center gap-1">
                                     <Clock className="h-4 w-4" />
-                                    <span>Deadline: {new Date(exercise.deadline).toLocaleDateString('id-ID')}</span>
-                                  </div>
+                                    <span>
+                                      Deadline: {new Date(exercise.deadline).toLocaleDateString('id-ID')}
+                                    </span>
+                                  </span>
                                 )}
-                              </CardDescription>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteExerciseSet(exercise.id);
-                              }}
-                              className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
                           </div>
                         </div>
                       </CardHeader>
-                    </AccordionTrigger>
-                    
-                    <AccordionContent className="p-0">
-                      <CardContent className="px-6 pb-6">
-                        <div className="space-y-6">
-                          {exercise.questions.map((question, qIndex) => (
-                            <Card key={question.id} className="bg-gray-50 border-0">
-                              <CardContent className="p-4">
-                                <div className="flex items-start gap-4">
-                                  <div className="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center flex-shrink-0 font-semibold">
-                                    {qIndex + 1}
-                                  </div>
-                                  <div className="flex-1 space-y-4">
-                                    <div>
-                                      <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                                        Pertanyaan
-                                      </Label>
-                                      <Textarea
-                                        value={question.question_text}
-                                        onChange={(e) => 
-                                          setExerciseSets(prev => 
-                                            prev.map(ex => 
-                                              ex.id === exercise.id
-                                                ? {
-                                                    ...ex,
-                                                    questions: ex.questions.map(q => 
-                                                      q.id === question.id 
-                                                        ? { ...q, question_text: e.target.value }
-                                                        : q
-                                                    )
-                                                  }
-                                                : ex
-                                            )
-                                          )
-                                        }
-                                        placeholder="Masukkan pertanyaan di sini..."
-                                        className="bg-white border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                        rows={3}
-                                        disabled={false}
-                                      />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                      {question.options
-                                        .sort((a, b) => a.order_index - b.order_index)
-                                        .map((option, optIndex) => (
-                                          <div key={option.id} className="flex items-center gap-3">
-                                            <div className="flex items-center">
-                                              <input
-                                                type="radio"
-                                                name={`correct-${question.id}`}
-                                                checked={option.is_correct}
-                                                onChange={() => {
-                                                  setExerciseSets(prev => 
-                                                    prev.map(ex => 
-                                                      ex.id === exercise.id 
-                                                        ? {
-                                                            ...ex,
-                                                            questions: ex.questions.map(q => 
-                                                              q.id === question.id 
-                                                                ? {
-                                                                    ...q,
-                                                                    options: q.options.map(opt => ({
-                                                                      ...opt,
-                                                                      is_correct: opt.id === option.id
-                                                                    }))
-                                                                  }
-                                                                : q
-                                                            )
-                                                          }
-                                                        : ex
-                                                    )
-                                                  );
-                                                }}
-                                                className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
-                                                disabled={false}
-                                              />
-                                            </div>
-                                            <div className="flex-1">
-                                              <Input
-                                                value={option.option_text}
-                                                onChange={(e) => 
-                                                  setExerciseSets(prev => 
-                                                    prev.map(ex => 
-                                                      ex.id === exercise.id 
-                                                        ? {
-                                                            ...ex,
-                                                            questions: ex.questions.map(q => 
-                                                              q.id === question.id 
-                                                                ? {
-                                                                    ...q,
-                                                                    options: q.options.map(opt => 
-                                                                      opt.id === option.id 
-                                                                        ? { ...opt, option_text: e.target.value }
-                                                                        : opt
-                                                                    )
-                                                                  }
-                                                                : q
-                                                            )
-                                                          }
-                                                        : ex
-                                                    )
+                    </button>
+                  </div>
+                  
+                  {editingExercise === exercise.id && (
+                    <CardContent className="px-6 pb-6">
+                      <div className="space-y-6">
+                        {exercise.questions.map((question, qIndex) => (
+                          <Card key={question.id} className="bg-gray-50 border-0">
+                            <CardContent className="p-4">
+                              <div className="flex items-start gap-4">
+                                <div className="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center flex-shrink-0 font-semibold">
+                                  {qIndex + 1}
+                                </div>
+                                <div className="flex-1 space-y-4">
+                                  <div>
+                                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                                      Pertanyaan
+                                    </Label>
+                                    <Textarea
+                                      value={question.question_text}
+                                      onChange={(e) => 
+                                        setExerciseSets(prev => 
+                                          prev.map(ex => 
+                                            ex.id === exercise.id
+                                              ? {
+                                                  ...ex,
+                                                  questions: ex.questions.map(q => 
+                                                    q.id === question.id 
+                                                      ? { ...q, question_text: e.target.value }
+                                                      : q
                                                   )
                                                 }
-                                                placeholder={`Pilihan ${String.fromCharCode(65 + optIndex)}`}
-                                                className="bg-white border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                                disabled={false}
-                                              />
-                                            </div>
-                                          </div>
-                                        ))}
-                                    </div>
+                                              : ex
+                                          )
+                                        )
+                                      }
+                                      placeholder="Masukkan pertanyaan di sini..."
+                                      className="bg-white border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                      rows={3}
+                                    />
+                                  </div>
 
-                                    <div className="flex justify-end gap-2">
-                                      {!question.isSaved ? (
-                                        <Button
-                                          onClick={() => saveQuestion(exercise.id, question)}
-                                          disabled={isSaving || !question.question_text.trim() || question.options.some(opt => !opt.option_text.trim())}
-                                          className="bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
-                                        >
-                                          {isSaving ? (
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                                          ) : (
-                                            <Save className="h-4 w-4 mr-2" />
-                                          )}
-                                          {isSaving ? "Menyimpan..." : "Simpan Pertanyaan"}
-                                        </Button>
-                                      ) : (
-                                        <Button
-                                          onClick={() => updateQuestion(exercise.id, question)}
-                                          disabled={isSaving}
-                                          className="bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
-                                        >
-                                          {isSaving ? (
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                                          ) : (
-                                            <Save className="h-4 w-4 mr-2" />
-                                          )}
-                                          {isSaving ? "Mengupdate..." : "Update Pertanyaan"}
-                                        </Button>
-                                      )}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {question.options
+                                      .sort((a, b) => a.order_index - b.order_index)
+                                      .map((option, optIndex) => (
+                                        <div key={option.id} className="flex items-center gap-3">
+                                          <div className="flex items-center">
+                                            <input
+                                              type="radio"
+                                              name={`correct-${question.id}`}
+                                              checked={option.is_correct}
+                                              onChange={() => {
+                                                setExerciseSets(prev => 
+                                                  prev.map(ex => 
+                                                    ex.id === exercise.id 
+                                                      ? {
+                                                          ...ex,
+                                                          questions: ex.questions.map(q => 
+                                                            q.id === question.id 
+                                                              ? {
+                                                                  ...q,
+                                                                  options: q.options.map(opt => ({
+                                                                    ...opt,
+                                                                    is_correct: opt.id === option.id
+                                                                  }))
+                                                                }
+                                                              : q
+                                                          )
+                                                        }
+                                                      : ex
+                                                  )
+                                                );
+                                              }}
+                                              className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                          </div>
+                                          <div className="flex-1">
+                                            <Input
+                                              value={option.option_text}
+                                              onChange={(e) => 
+                                                setExerciseSets(prev => 
+                                                  prev.map(ex => 
+                                                    ex.id === exercise.id 
+                                                      ? {
+                                                          ...ex,
+                                                          questions: ex.questions.map(q => 
+                                                            q.id === question.id 
+                                                              ? {
+                                                                  ...q,
+                                                                  options: q.options.map(opt => 
+                                                                    opt.id === option.id 
+                                                                      ? { ...opt, option_text: e.target.value }
+                                                                      : opt
+                                                                  )
+                                                                }
+                                                              : q
+                                                          )
+                                                        }
+                                                      : ex
+                                                  )
+                                                )
+                                              }
+                                              placeholder={`Pilihan ${String.fromCharCode(65 + optIndex)}`}
+                                              className="bg-white border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+
+                                  <div className="flex justify-end gap-2">
+                                    {!question.isSaved ? (
                                       <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => deleteQuestion(exercise.id, question.id)}
-                                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                                        disabled={isSaving}
+                                        onClick={() => saveQuestion(exercise.id, question)}
+                                        disabled={isSaving || !question.question_text.trim() || question.options.some(opt => !opt.option_text.trim())}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
                                       >
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Hapus Pertanyaan
+                                        {isSaving ? (
+                                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                                        ) : (
+                                          <Save className="h-4 w-4 mr-2" />
+                                        )}
+                                        {isSaving ? "Menyimpan..." : "Simpan Pertanyaan"}
                                       </Button>
-                                    </div>
+                                    ) : (
+                                      <Button
+                                        onClick={() => updateQuestion(exercise.id, question)}
+                                        disabled={isSaving}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+                                      >
+                                        {isSaving ? (
+                                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                                        ) : (
+                                          <Save className="h-4 w-4 mr-2" />
+                                        )}
+                                        {isSaving ? "Mengupdate..." : "Update Pertanyaan"}
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => deleteQuestion(exercise.id, question.id)}
+                                      className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                                      disabled={isSaving}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Hapus Pertanyaan
+                                    </Button>
                                   </div>
                                 </div>
-                              </CardContent>
-                            </Card>
-                          ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
 
-                          <Button
-                            onClick={() => {
-                              const unsavedQuestions = exercise.questions.some(q => !q.isSaved);
-                              if (unsavedQuestions) {
-                                toast.error("Harap simpan semua pertanyaan terlebih dahulu");
-                                return;
-                              }
-                              addQuestion(exercise.id);
-                            }}
-                            disabled={isSaving || exercise.questions.some(q => !q.isSaved)}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
-                            size="lg"
-                          >
-                            {isSaving ? (
-                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
-                            ) : (
-                              <Plus className="h-5 w-5 mr-2" />
-                            )}
-                            Tambah Pertanyaan Baru
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </AccordionContent>
-                  </Card>
-                </AccordionItem>
+                        <Button
+                          onClick={() => {
+                            const unsavedQuestions = exercise.questions.some(q => !q.isSaved);
+                            if (unsavedQuestions) {
+                              toast.error("Harap simpan semua pertanyaan terlebih dahulu");
+                              return;
+                            }
+                            addQuestion(exercise.id);
+                          }}
+                          disabled={isSaving || exercise.questions.some(q => !q.isSaved)}
+                          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+                          size="lg"
+                        >
+                          {isSaving ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
+                          ) : (
+                            <Plus className="h-5 w-5 mr-2" />
+                          )}
+                          Tambah Pertanyaan Baru
+                        </Button>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
               ))}
-            </Accordion>
+            </div>
           )}
         </div>
       </div>

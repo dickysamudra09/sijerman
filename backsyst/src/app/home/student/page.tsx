@@ -24,6 +24,7 @@ import {
   UserPlus,
   Copy,
   Send,
+  Home,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -60,6 +61,12 @@ interface StudentModeProps {
   onBack: () => void;
 }
 
+interface StudentStats {
+  totalClassrooms: number;
+  completedExercises: number;
+  averageScore: number;
+}
+
 export function StudentMode({ onBack }: StudentModeProps) {
   const [userName, setUserName] = useState<string>("");
   const [userId, setUserId] = useState<string | null>(null);
@@ -70,6 +77,11 @@ export function StudentMode({ onBack }: StudentModeProps) {
   const [error, setError] = useState<string | null>(null);
   const [isJoinConfirmOpen, setIsJoinConfirmOpen] = useState(false);
   const [selectedClassToJoin, setSelectedClassToJoin] = useState<any>(null);
+  const [studentStats, setStudentStats] = useState<StudentStats>({
+    totalClassrooms: 0,
+    completedExercises: 0,
+    averageScore: 0
+  });
   const router = useRouter();
 
   useEffect(() => {
@@ -133,6 +145,10 @@ export function StudentMode({ onBack }: StudentModeProps) {
     router.push("/");
   };
 
+  const handleHomeRedirect = () => {
+    router.push("/");
+  };
+
   const copyClassCode = async (code: string) => {
     try {
     await navigator.clipboard.writeText(code);
@@ -141,6 +157,47 @@ export function StudentMode({ onBack }: StudentModeProps) {
     toast.error("Gagal menyalin kode.");
     }
 };
+
+  const fetchStudentStats = async () => {
+    if (!userId) return;
+
+    try {
+      // Fetch total classrooms joined
+      const { data: registrations, error: regError } = await supabase
+        .from("classroom_registrations")
+        .select("classroom_id")
+        .eq("student_id", userId);
+
+      const totalClassrooms = registrations ? registrations.length : 0;
+
+      // Fetch completed exercises (submitted attempts)
+      const { data: attempts, error: attemptsError } = await supabase
+        .from("exercise_attempts")
+        .select("id, percentage")
+        .eq("student_id", userId)
+        .eq("status", "submitted");
+
+      const completedExercises = attempts ? attempts.length : 0;
+
+      // Calculate average score from completed exercises
+      let averageScore = 0;
+      if (attempts && attempts.length > 0) {
+        const totalPercentage = attempts.reduce((sum, attempt) => sum + (attempt.percentage || 0), 0);
+        averageScore = Math.round(totalPercentage / attempts.length);
+      }
+
+      setStudentStats({
+        totalClassrooms,
+        completedExercises,
+        averageScore
+      });
+
+      console.log("Student stats updated:", { totalClassrooms, completedExercises, averageScore });
+
+    } catch (error) {
+      console.error("Error fetching student stats:", error);
+    }
+  };
 
   const fetchClassrooms = async () => {
     if (!userId) return;
@@ -341,6 +398,7 @@ export function StudentMode({ onBack }: StudentModeProps) {
       setJoinCode("");
       toast.success("Berhasil bergabung ke kelas!");
       await fetchClassrooms();
+      await fetchStudentStats(); // Update stats after joining a class
       setIsJoinConfirmOpen(false);
     }
     setIsLoading(false);
@@ -355,6 +413,7 @@ export function StudentMode({ onBack }: StudentModeProps) {
   useEffect(() => {
     if (userId) {
       fetchClassrooms();
+      fetchStudentStats();
     }
   }, [userId]);
 
@@ -410,8 +469,9 @@ export function StudentMode({ onBack }: StudentModeProps) {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={onBack}>
-              ← Kembali
+            <Button variant="ghost" onClick={handleHomeRedirect}>
+              <Home className="h-4 w-4 mr-2" />
+              Home
             </Button>
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-accent" />
@@ -551,13 +611,13 @@ export function StudentMode({ onBack }: StudentModeProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Target className="h-5 w-5" />
-                Poin Saya
+                Kelas yang diikuti
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <div className="text-3xl font-bold text-primary">856</div>
-                <p className="text-sm text-muted-foreground">Total Poin</p>
+                <div className="text-3xl font-bold text-primary">{studentStats.totalClassrooms}</div>
+                <p className="text-sm text-muted-foreground">kelas</p>
               </div>
             </CardContent>
           </Card>
@@ -566,13 +626,13 @@ export function StudentMode({ onBack }: StudentModeProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5" />
-                Selesai
+                Latihan Soal selesai
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <div className="text-3xl font-bold text-green-600">12</div>
-                <p className="text-sm text-muted-foreground">Kuis</p>
+                <div className="text-3xl font-bold text-green-600">{studentStats.completedExercises}</div>
+                <p className="text-sm text-muted-foreground">latihan</p>
               </div>
             </CardContent>
           </Card>
@@ -586,8 +646,8 @@ export function StudentMode({ onBack }: StudentModeProps) {
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600">78%</div>
-                <p className="text-sm text-muted-foreground">Tingkat Keberhasilan</p>
+                <div className="text-3xl font-bold text-blue-600">{studentStats.averageScore}%</div>
+                <p className="text-sm text-muted-foreground">Tingkat penilaian</p>
               </div>
             </CardContent>
           </Card>

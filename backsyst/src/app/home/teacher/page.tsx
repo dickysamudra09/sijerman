@@ -295,9 +295,6 @@ export function TeacherMode({ onBack }: TeacherModeProps) {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={onBack}>
-              ← Kembali
-            </Button>
             <div className="flex items-center gap-2">
               <GraduationCap className="h-5 w-5 text-primary" />
               <h1>Dashboard Guru - Selamat Datang, {userName}</h1>

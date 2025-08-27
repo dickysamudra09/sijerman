@@ -689,7 +689,7 @@ export default function ClassroomsPage() {
             </Button>
             <div className="flex items-center gap-2">
               <GraduationCap className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl font-bold">Dashboard Kelas - {classroom.name}</h1>
+              <h1 className="text-2xl font-bold">{classroom.name}</h1>
             </div>
           </div>
         </div>
@@ -839,7 +839,7 @@ export default function ClassroomsPage() {
                                 ) : (
                                   <Button 
                                     variant="default" 
-                                    className="bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                                    className="bg-indigo-600 hover:bg-indigo-700 transition-colors text-white"
                                     onClick={() => handleKerjakanLatihan(content)}
                                   >
                                     <Eye className="h-4 w-4 mr-2" />
