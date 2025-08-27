@@ -23,6 +23,10 @@ import {
   BookOpen,
   ExternalLink,
   Lightbulb,
+  GraduationCap,
+  Target,
+  Timer,
+  Award,
 } from "lucide-react";
 
 interface Option {
@@ -541,10 +545,16 @@ export default function InteractiveQuiz() {
 
   if (state.isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
-          <p>Memuat pertanyaan...</p>
+      <div className="min-h-screen bg-gray-100 p-6">
+        <div className="max-w-7xl mx-auto">
+          <Card className="bg-white shadow-2xl border-0 rounded-2xl">
+            <CardContent className="flex items-center justify-center p-16">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mx-auto mb-4"></div>
+                <p className="text-gray-600 text-lg">Memuat latihan soal...</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -552,14 +562,27 @@ export default function InteractiveQuiz() {
 
   if (state.error || !state.questions.length) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-        <XCircle className="h-16 w-16 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold mb-2">Terjadi Kesalahan</h1>
-        <p className="text-muted-foreground mb-4">{state.error || "Tidak ada pertanyaan yang tersedia."}</p>
-        <Button onClick={() => router.back()} className="mt-4">
-          <ChevronLeft className="mr-2 h-4 w-4" />
-          Kembali
-        </Button>
+      <div className="min-h-screen bg-gray-100 p-6">
+        <div className="max-w-7xl mx-auto">
+          <Card className="bg-white shadow-2xl border-0 rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-red-600 text-xl flex items-center gap-3">
+                <XCircle className="h-6 w-6" />
+                Terjadi Kesalahan
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-red-600 mb-6">{state.error || "Tidak ada pertanyaan yang tersedia."}</p>
+              <Button 
+                onClick={() => router.back()} 
+                className="bg-sky-500 hover:bg-sky-600 text-white shadow-md"
+              >
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Kembali
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -571,34 +594,84 @@ export default function InteractiveQuiz() {
   if (state.quizCompleted) {
     const percentage = maxPossibleScore > 0 ? Math.round((state.score / maxPossibleScore) * 100) : 0;
     return (
-      <div className="min-h-screen bg-background p-4">
-        <div className="max-w-2xl mx-auto">
-          <Card className="text-center">
-            <CardHeader>
-              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                <Trophy className="h-8 w-8 text-primary" />
-              </div>
-              <CardTitle>Kuis Selesai!</CardTitle>
-              <CardDescription>Berikut adalah hasil Anda.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+      <div className="min-h-screen bg-gray-100 p-6">
+        <div className="max-w-7xl mx-auto">
+          <Card className="bg-white shadow-2xl border-0 rounded-2xl overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100 p-8">
               <div className="text-center">
-                <div className={`text-4xl font-bold ${getScoreColor(percentage)}`}>
-                  {state.score}/{maxPossibleScore}
+                <div className="p-4 bg-sky-500 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center shadow-lg">
+                  <Trophy className="h-10 w-10 text-white" />
                 </div>
-                <p className="text-muted-foreground">Skor Anda</p>
-                <div className={`text-2xl font-semibold ${getScoreColor(percentage)}`}>
-                  {percentage}%
-                </div>
+                <CardTitle className="text-2xl font-bold text-gray-900">Latihan Selesai!</CardTitle>
+                <CardDescription className="text-gray-600 mt-2">Berikut adalah hasil latihan Anda</CardDescription>
               </div>
-              <div className="flex gap-4">
-                <Button onClick={resetQuiz} className="flex-1">
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Coba Lagi
-                </Button>
-                <Button variant="outline" onClick={() => router.back()} className="flex-1">
-                  Kembali
-                </Button>
+            </CardHeader>
+            <CardContent className="p-8">
+              <div className="space-y-6">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
+                    <CardContent className="p-6">
+                      <div className="text-center">
+                        <div className="p-3 bg-green-500 rounded-full w-fit mx-auto mb-3">
+                          <Award className="h-6 w-6 text-white" />
+                        </div>
+                        <div className={`text-2xl font-bold ${getScoreColor(percentage)}`}>
+                          {state.score}/{maxPossibleScore}
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1">Skor Anda</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
+                    <CardContent className="p-6">
+                      <div className="text-center">
+                        <div className="p-3 bg-blue-500 rounded-full w-fit mx-auto mb-3">
+                          <Target className="h-6 w-6 text-white" />
+                        </div>
+                        <div className={`text-2xl font-bold ${getScoreColor(percentage)}`}>
+                          {percentage}%
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1">Persentase</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
+                    <CardContent className="p-6">
+                      <div className="text-center">
+                        <div className="p-3 bg-purple-500 rounded-full w-fit mx-auto mb-3">
+                          <CheckCircle2 className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="text-2xl font-bold text-purple-600">{totalQuestions}</div>
+                        <p className="text-sm text-gray-500 mt-1">Total Soal</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="pt-6 border-t border-gray-200">
+                  <div className="flex gap-4">
+                    <Button 
+                      onClick={resetQuiz} 
+                      className="flex-1 bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 py-3 text-lg"
+                      size="lg"
+                    >
+                      <RotateCcw className="h-5 w-5 mr-2" />
+                      Coba Lagi
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => router.back()} 
+                      className="flex-1 border-gray-300 text-gray-600 shadow-md hover:bg-gray-50 py-3 text-lg"
+                      size="lg"
+                    >
+                      Kembali ke Kelas
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -610,195 +683,315 @@ export default function InteractiveQuiz() {
   const progress = ((state.currentQuestionIndex + 1) / totalQuestions) * 100;
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => router.back()}>
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Kembali
-          </Button>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              <span className={`font-mono ${timeLeft <= 10 ? 'text-red-600' : ''}`}>
-                {timeLeft}s
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Pertanyaan {state.currentQuestionIndex + 1} dari {totalQuestions}</span>
-            <span>Skor: {state.score}</span>
-          </div>
-          <Progress value={progress} className="h-2" />
-        </div>
-
-        <Card>
-          <CardHeader>
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Main Card Container */}
+        <Card className="bg-white shadow-2xl border-0 rounded-2xl overflow-hidden">
+          {/* Header */}
+          <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100 p-8">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Brain className="h-5 w-5 text-primary" />
-                <Badge variant="outline">{currentQuestion.question_type}</Badge>
+              <div className="flex items-center gap-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => router.back()}
+                  className="border-gray-300 text-gray-600 shadow-sm hover:bg-gray-50"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  Kembali
+                </Button>
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-sky-500 rounded-full shadow-lg">
+                    <GraduationCap className="h-6 w-6 text-white" />
+                  </div>
+                  <h1 className="text-2xl font-bold text-gray-900">Latihan Soal Interaktif</h1>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">Poin: {currentQuestion.points}</p>
+              <div className="flex items-center gap-4">
+                <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700 px-4 py-2 text-lg font-medium">
+                  <Clock className="h-4 w-4 mr-2" />
+                  <span className={`font-mono ${timeLeft <= 10 ? 'text-red-600' : ''}`}>
+                    {timeLeft}s
+                  </span>
+                </Badge>
+              </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <h2 className="mb-4 text-lg font-medium">{currentQuestion.question_text}</h2>
-              <RadioGroup 
-                value={state.selectedOptionId ?? ""} 
-                onValueChange={(value) => setState(s => ({ ...s, selectedOptionId: value }))}
-                disabled={state.showResult}
-              >
-                {currentQuestion.options.map((option) => (
-                  <div 
-                    key={option.id} 
-                    className={`flex items-center space-x-2 p-3 rounded-lg border transition-colors ${
-                      state.showResult 
-                        ? option.is_correct 
-                          ? 'bg-green-50 border-green-200' 
-                          : state.selectedOptionId === option.id
-                            ? 'bg-red-50 border-red-200'
-                            : ''
-                        : 'hover:bg-muted/50'
-                    }`}
-                  >
-                    <RadioGroupItem value={option.id} id={`option-${option.id}`} />
-                    <Label htmlFor={`option-${option.id}`} className="flex-1 cursor-pointer">
-                      {option.option_text}
-                    </Label>
-                    {state.showResult && option.is_correct && (
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    )}
-                    {state.showResult && state.selectedOptionId === option.id && !option.is_correct && (
-                      <XCircle className="h-4 w-4 text-red-600" />
-                    )}
+
+          <CardContent className="p-8">
+            <div className="space-y-6">
+              {/* Progress Section */}
+              <Card className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Pertanyaan {state.currentQuestionIndex + 1} dari {totalQuestions}
+                      </h3>
+                      <p className="text-gray-600">Skor saat ini: {state.score} poin</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700">
+                        <Brain className="h-4 w-4 mr-1" />
+                        {currentQuestion.question_type}
+                      </Badge>
+                      <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                        {currentQuestion.points} Poin
+                      </Badge>
+                    </div>
                   </div>
-                ))}
-              </RadioGroup>
-            </div>
+                  <Progress value={progress} className="h-3 bg-gray-200" />
+                  <div className="flex justify-between text-sm text-gray-500 mt-2">
+                    <span>Progress</span>
+                    <span>{Math.round(progress)}%</span>
+                  </div>
+                </CardContent>
+              </Card>
 
-            {state.showResult && currentQuestion.explanation && (
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <h4 className="font-medium mb-2">Penjelasan:</h4>
-                <p className="text-sm text-muted-foreground">{currentQuestion.explanation}</p>
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <div className="p-3 bg-blue-500 rounded-full w-fit mx-auto mb-3">
+                        <Timer className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="text-2xl font-bold text-blue-600">{state.currentQuestionIndex + 1}</div>
+                      <p className="text-sm text-gray-500 mt-1">Soal Saat Ini</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <div className="p-3 bg-green-500 rounded-full w-fit mx-auto mb-3">
+                        <Award className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="text-2xl font-bold text-green-600">{state.score}</div>
+                      <p className="text-sm text-gray-500 mt-1">Skor</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <div className="p-3 bg-purple-500 rounded-full w-fit mx-auto mb-3">
+                        <Target className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="text-2xl font-bold text-purple-600">{totalQuestions}</div>
+                      <p className="text-sm text-gray-500 mt-1">Total Soal</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <div className="p-3 bg-orange-500 rounded-full w-fit mx-auto mb-3">
+                        <Clock className="h-6 w-6 text-white" />
+                      </div>
+                      <div className={`text-2xl font-bold ${timeLeft <= 10 ? 'text-red-600' : 'text-orange-600'}`}>
+                        {timeLeft}s
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">Waktu Tersisa</p>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            )}
 
-            {state.showResult && (
-              <div className="space-y-4">
-                {state.isLoadingFeedback ? (
-                  <Card className="border-blue-200 bg-blue-50/50">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
-                        <div>
-                          <h4 className="font-medium text-blue-900">Menghasilkan Feedback AI...</h4>
-                          <p className="text-sm text-blue-700">Mohon tunggu sebentar</p>
+              {/* Question Card */}
+              <Card className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl">
+                <CardHeader className="pb-6">
+                  <CardTitle className="flex items-center gap-3 text-gray-900 text-xl">
+                    <div className="p-2 bg-sky-500 rounded-lg">
+                      <Brain className="h-5 w-5 text-white" />
+                    </div>
+                    Soal Latihan
+                  </CardTitle>
+                  <CardDescription className="text-gray-600">
+                    Pilih jawaban yang paling tepat untuk soal di bawah ini
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <h2 className="mb-6 text-lg font-medium text-gray-900 leading-relaxed">
+                      {currentQuestion.question_text}
+                    </h2>
+                    
+                    <RadioGroup 
+                      value={state.selectedOptionId ?? ""} 
+                      onValueChange={(value) => setState(s => ({ ...s, selectedOptionId: value }))}
+                      disabled={state.showResult}
+                      className="space-y-3"
+                    >
+                      {currentQuestion.options.map((option, index) => (
+                        <div 
+                          key={option.id} 
+                          className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all duration-200 ${
+                            state.showResult 
+                              ? option.is_correct 
+                                ? 'bg-green-50 border-green-300 shadow-sm' 
+                                : state.selectedOptionId === option.id
+                                  ? 'bg-red-50 border-red-300 shadow-sm'
+                                  : 'bg-gray-50 border-gray-200'
+                              : state.selectedOptionId === option.id
+                                ? 'bg-sky-50 border-sky-300 shadow-md'
+                                : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                          }`}
+                        >
+                          <RadioGroupItem value={option.id} id={`option-${option.id}`} />
+                          <Label htmlFor={`option-${option.id}`} className="flex-1 cursor-pointer text-gray-800 font-medium">
+                            <span className="inline-flex items-center gap-2">
+                              <span className="text-sm font-semibold text-gray-500 bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center">
+                                {String.fromCharCode(65 + index)}
+                              </span>
+                              {option.option_text}
+                            </span>
+                          </Label>
+                          {state.showResult && option.is_correct && (
+                            <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                          )}
+                          {state.showResult && state.selectedOptionId === option.id && !option.is_correct && (
+                            <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                          )}
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : state.aiFeedback && (
-                  <Card className="border-purple-200 bg-purple-50/50">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center gap-2">
-                        <Lightbulb className="h-5 w-5 text-purple-600" />
-                        <CardTitle className="text-lg text-purple-900">AI Feedback</CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <h5 className="font-medium text-purple-900 mb-2">Feedback:</h5>
-                        <p className="text-purple-800 bg-white/60 p-3 rounded-md">
-                          {state.aiFeedback.feedback_text}
-                        </p>
-                      </div>
-                      {state.aiFeedback.explanation && (
-                        <div>
-                          <h5 className="font-medium text-purple-900 mb-2">Penjelasan Detail:</h5>
-                          <p className="text-purple-800 bg-white/60 p-3 rounded-md">
-                            {state.aiFeedback.explanation}
-                          </p>
-                        </div>
-                      )}
+                      ))}
+                    </RadioGroup>
+                  </div>
 
-                      {state.aiFeedback.reference_materials && state.aiFeedback.reference_materials.length > 0 && (
-                        <div>
-                          <h5 className="font-medium text-purple-900 mb-3 flex items-center gap-2">
-                            <BookOpen className="h-4 w-4" />
-                            Referensi Belajar:
-                          </h5>
-                          <div className="space-y-3">
-                            {state.aiFeedback.reference_materials.map((ref, index) => (
-                              <div key={index} className="bg-white/80 p-3 rounded-md border border-purple-200">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1">
-                                    <h6 className="font-medium text-purple-900 text-sm">
-                                      {ref.title}
-                                    </h6>
-                                    <p className="text-sm text-purple-700 mt-1">
-                                      {ref.description}
-                                    </p>
-                                  </div>
-                                  {ref.url && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="shrink-0 h-8 px-2 border-purple-300 text-purple-700 hover:bg-purple-100"
-                                      onClick={() => window.open(ref.url, '_blank')}
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                    </Button>
-                                  )}
+                  {state.showResult && currentQuestion.explanation && (
+                    <div className="bg-blue-50 border border-blue-200 p-6 rounded-xl">
+                      <div className="flex items-center gap-2 mb-3">
+                        <BookOpen className="h-5 w-5 text-blue-600" />
+                        <h4 className="font-semibold text-blue-900">Penjelasan:</h4>
+                      </div>
+                      <p className="text-blue-800 leading-relaxed">{currentQuestion.explanation}</p>
+                    </div>
+                  )}
+
+                  {state.showResult && (
+                    <div className="space-y-4">
+                      {state.isLoadingFeedback ? (
+                        <Card className="border-blue-200 bg-blue-50/50">
+                          <CardContent className="p-6">
+                            <div className="flex items-center gap-3">
+                              <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
+                              <div>
+                                <h4 className="font-semibold text-blue-900 text-lg">Menghasilkan Feedback AI...</h4>
+                                <p className="text-blue-700">Mohon tunggu sebentar</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ) : state.aiFeedback && (
+                        <Card className="border-purple-200 bg-purple-50/50 shadow-lg">
+                          <CardHeader className="pb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-purple-500 rounded-lg">
+                                <Lightbulb className="h-5 w-5 text-white" />
+                              </div>
+                              <CardTitle className="text-lg text-purple-900">AI Feedback</CardTitle>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div>
+                              <h5 className="font-semibold text-purple-900 mb-3">Feedback:</h5>
+                              <p className="text-purple-800 bg-white/80 p-4 rounded-lg border border-purple-200 leading-relaxed">
+                                {state.aiFeedback.feedback_text}
+                              </p>
+                            </div>
+                            {state.aiFeedback.explanation && (
+                              <div>
+                                <h5 className="font-semibold text-purple-900 mb-3">Penjelasan Detail:</h5>
+                                <p className="text-purple-800 bg-white/80 p-4 rounded-lg border border-purple-200 leading-relaxed">
+                                  {state.aiFeedback.explanation}
+                                </p>
+                              </div>
+                            )}
+
+                            {state.aiFeedback.reference_materials && state.aiFeedback.reference_materials.length > 0 && (
+                              <div>
+                                <h5 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                                  <BookOpen className="h-4 w-4" />
+                                  Referensi Belajar:
+                                </h5>
+                                <div className="space-y-3">
+                                  {state.aiFeedback.reference_materials.map((ref, index) => (
+                                    <div key={index} className="bg-white/90 p-4 rounded-lg border border-purple-200 shadow-sm">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="flex-1">
+                                          <h6 className="font-semibold text-purple-900 mb-1">
+                                            {ref.title}
+                                          </h6>
+                                          <p className="text-sm text-purple-700 leading-relaxed">
+                                            {ref.description}
+                                          </p>
+                                        </div>
+                                        {ref.url && (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="shrink-0 border-purple-300 text-purple-700 hover:bg-purple-100 shadow-sm"
+                                            onClick={() => window.open(ref.url, '_blank')}
+                                          >
+                                            <ExternalLink className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                            )}
 
-                      {state.aiFeedback.ai_model && process.env.NODE_ENV === 'development' && (
-                        <div className="text-xs text-purple-600 pt-2 border-t border-purple-200">
-                          Powered by {state.aiFeedback.ai_model}
-                          {state.aiFeedback.processing_time_ms && 
-                            ` • Generated in ${state.aiFeedback.processing_time_ms}ms`
-                          }
-                        </div>
+                            {state.aiFeedback.ai_model && process.env.NODE_ENV === 'development' && (
+                              <div className="text-xs text-purple-600 pt-3 border-t border-purple-200">
+                                Powered by {state.aiFeedback.ai_model}
+                                {state.aiFeedback.processing_time_ms && 
+                                  ` • Generated in ${state.aiFeedback.processing_time_ms}ms`
+                                }
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
                       )}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
-
-            <div className="flex justify-end">
-              {!state.showResult ? (
-                <Button 
-                  onClick={handleSubmitAnswer} 
-                  disabled={!state.selectedOptionId}
-                  className="min-w-32"
-                >
-                  Submit
-                </Button>
-              ) : (
-                <Button 
-                  onClick={handleNextQuestion} 
-                  className="min-w-32"
-                  disabled={state.isLoadingFeedback}
-                >
-                  {state.currentQuestionIndex < totalQuestions - 1 ? (
-                    <>
-                      Selanjutnya <ArrowRight className="h-4 w-4 ml-2" />
-                    </>
-                  ) : (
-                    'Selesai'
+                    </div>
                   )}
-                </Button>
-              )}
+
+                  <div className="pt-6 border-t border-gray-200">
+                    <div className="flex justify-end">
+                      {!state.showResult ? (
+                        <Button 
+                          onClick={handleSubmitAnswer} 
+                          disabled={!state.selectedOptionId}
+                          className="bg-sky-500 hover:bg-sky-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg font-medium"
+                          size="lg"
+                        >
+                          Submit Jawaban
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={handleNextQuestion} 
+                          className="bg-green-500 hover:bg-green-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg font-medium"
+                          size="lg"
+                          disabled={state.isLoadingFeedback}
+                        >
+                          {state.currentQuestionIndex < totalQuestions - 1 ? (
+                            <>
+                              Soal Berikutnya <ArrowRight className="h-5 w-5 ml-2" />
+                            </>
+                          ) : (
+                            <>
+                              Selesai <CheckCircle2 className="h-5 w-5 ml-2" />
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </CardContent>
         </Card>
