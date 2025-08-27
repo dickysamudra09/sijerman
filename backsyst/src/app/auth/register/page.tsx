@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Eye, EyeOff, Mail, Lock, User, CheckCircle2, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, AlertCircle } from "lucide-react";
 
 interface RegisterForm {
   name: string;
@@ -73,13 +72,12 @@ export default function RegisterPage() {
         id: userId,
         name,
         email,
-        role, // Gunakan role dari form register
+        role,
       });
     if (profileError) {
       console.error("Error syncing profile:", profileError.message);
     }
 
-    // Insert session hanya jika auth.uid() tersedia (biasanya tidak tersedia setelah signUp)
     const authUid = (await supabase.auth.getUser()).data.user?.id;
     if (authUid && authUid === userId) {
       const { error: sessionError } = await supabase.from("sessions").insert({
@@ -99,35 +97,52 @@ export default function RegisterPage() {
     }
 
     setIsLoading(false);
-    // Jika email konfirmasi diaktifkan, tunggu konfirmasi
     if (signUpData.user?.confirmation_sent_at) {
       setSuccessMessage("Pendaftaran berhasil! Silakan verifikasi email Anda untuk login.");
-      setTimeout(() => router.push("/auth/login"), 2000); // Redirect ke login setelah 2 detik
+      setTimeout(() => router.push("/auth/login"), 2000);
     } else {
-      router.push("/home"); // Arahkan ke home jika tidak ada konfirmasi
+      router.push("/home");
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center">Buat Akun Baru</CardTitle>
-          <CardDescription className="text-center">Daftar gratis dan mulai belajar hari ini</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
+    <div className="flex min-h-screen flex-row-reverse">
+      {/* Right Section: Register Form */}
+      <div className="flex-1 flex flex-col justify-center items-center p-8 bg-white">
+        <div className="w-full max-w-md">
+          {/* Placeholder for Logo */}
+          <div className="flex items-center gap-2 mb-8">
+            <img
+              src="/img/1.png" 
+              alt="Logo" 
+              className="h-12 w-auto mr-2"
+            />
+            <span className="text-xl font-bold text-gray-800">Si Jerman</span>
+          </div>
+
+          <h1 className="text-4xl font-extrabold text-gray-900 mb-4 leading-tight">
+            Buat akun baru dan mulai belajar sekarang.
+          </h1>
+          <p className="text-lg text-gray-600 mb-8">
+            Selamat Datang! Silahkan daftar untuk membuat akun anda
+          </p>
+
+          <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-6">
             {error && (
-              <div className="text-sm text-red-600 text-center">{error}</div>
+              <div className="text-sm text-red-600 text-center flex items-center justify-center gap-2">
+                <AlertCircle className="h-4 w-4" /> {error}
+              </div>
             )}
             {successMessage && (
-              <div className="text-sm text-green-600 text-center">{successMessage}</div>
+              <div className="text-sm text-green-600 text-center flex items-center justify-center gap-2">
+                <AlertCircle className="h-4 w-4" /> {successMessage}
+              </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="register-role">Daftar sebagai</Label>
+              <Label htmlFor="register-role" className="font-semibold text-gray-700">Daftar sebagai</Label>
               <select
                 id="register-role"
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border rounded-lg px-3 py-2 text-base h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 {...registerForm.register("role", { required: "Pilih peran Anda" })}
               >
                 <option value="">Pilih</option>
@@ -135,100 +150,106 @@ export default function RegisterPage() {
                 <option value="student">Siswa</option>
               </select>
               {registerForm.formState.errors.role && (
-                <div className="flex items-center gap-2 text-sm text-red-600">
+                <p className="flex items-center gap-2 text-sm text-red-600 mt-1">
                   <AlertCircle className="h-4 w-4" />
                   {registerForm.formState.errors.role.message}
-                </div>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="register-name">Nama Lengkap</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="register-name"
-                  type="text"
-                  placeholder="Masukkan nama lengkap"
-                  className="pl-10"
-                  {...registerForm.register("name", { required: "Nama wajib diisi" })}
-                />
-              </div>
-              {registerForm.formState.errors.name && (
-                <div className="flex items-center gap-2 text-sm text-red-600">
-                  <AlertCircle className="h-4 w-4" />
-                  {registerForm.formState.errors.name.message}
-                </div>
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="register-email">Email</Label>
+              <Label htmlFor="register-name" className="font-semibold text-gray-700">Nama Lengkap</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="register-name"
+                  type="text"
+                  placeholder="Masukkan nama lengkap"
+                  className="h-12 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 pr-10"
+                  {...registerForm.register("name", { required: "Nama wajib diisi" })}
+                />
+                {registerForm.formState.errors.name && (
+                  <AlertCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-red-500" />
+                )}
+              </div>
+              {registerForm.formState.errors.name && (
+                <p className="flex items-center gap-2 text-sm text-red-600 mt-1">
+                  <AlertCircle className="h-4 w-4" />
+                  {registerForm.formState.errors.name.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="register-email" className="font-semibold text-gray-700">Email Address</Label>
+              <div className="relative">
                 <Input
                   id="register-email"
                   type="email"
                   placeholder="nama@example.com"
-                  className="pl-10"
+                  className="h-12 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 pr-10"
                   {...registerForm.register("email", { required: "Email wajib diisi" })}
                 />
+                {registerForm.formState.errors.email && (
+                  <AlertCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-red-500" />
+                )}
               </div>
               {registerForm.formState.errors.email && (
-                <div className="flex items-center gap-2 text-sm text-red-600">
+                <p className="flex items-center gap-2 text-sm text-red-600 mt-1">
                   <AlertCircle className="h-4 w-4" />
                   {registerForm.formState.errors.email.message}
-                </div>
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="register-password">Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="register-password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Buat password"
-                  className="pl-10 pr-10"
+                  className="h-12 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 pr-10"
                   {...registerForm.register("password", { required: "Password wajib diisi" })}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
               {registerForm.formState.errors.password && (
-                <div className="flex items-center gap-2 text-sm text-red-600">
+                <p className="flex items-center gap-2 text-sm text-red-600 mt-1">
                   <AlertCircle className="h-4 w-4" />
                   {registerForm.formState.errors.password.message}
-                </div>
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="register-confirm-password">Konfirmasi Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="register-confirm-password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Konfirmasi password"
-                  className="pl-10"
+                  className="h-12 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 pr-10"
                   {...registerForm.register("confirmPassword", {
-                    required: "Please confirm your password",
+                    required: "Konfirmasi password wajib diisi",
                     validate: (value) =>
-                      value === registerForm.getValues("password") || "Passwords do not match",
+                      value === registerForm.getValues("password") || "Passwords tidak cocok",
                   })}
                 />
+                {registerForm.formState.errors.confirmPassword && (
+                  <AlertCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-red-500" />
+                )}
               </div>
               {registerForm.formState.errors.confirmPassword && (
-                <div className="flex items-center gap-2 text-sm text-red-600">
+                <p className="flex items-center gap-2 text-sm text-red-600 mt-1">
                   <AlertCircle className="h-4 w-4" />
                   {registerForm.formState.errors.confirmPassword.message}
-                </div>
+                </p>
               )}
             </div>
 
@@ -236,68 +257,60 @@ export default function RegisterPage() {
               <input
                 type="checkbox"
                 id="terms"
-                className="rounded"
+                className="rounded h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 accent-[#0047AB]"
                 {...registerForm.register("terms", {
-                  required: "You must accept the terms and conditions",
+                  required: "Anda harus menyetujui syarat & ketentuan",
                 })}
               />
-              <label htmlFor="terms" className="text-sm">
+              <label htmlFor="terms" className="text-sm text-gray-600">
                 Saya setuju dengan{" "}
-                <Button variant="link" size="sm" type="button" className="p-0 h-auto">
-                  Syarat & Ketentuan
-                </Button>
+                <a href="#" className="text-blue-600 hover:underline font-medium">Syarat & Ketentuan</a>
               </label>
             </div>
             {registerForm.formState.errors.terms && (
-              <div className="flex items-center gap-2 text-sm text-red-600">
+              <p className="flex items-center gap-2 text-sm text-red-600 mt-1">
                 <AlertCircle className="h-4 w-4" />
                 {registerForm.formState.errors.terms.message}
-              </div>
+              </p>
             )}
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading || !registerForm.formState.isValid}
-            >
-              {isLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Mendaftar...
-                </>
-              ) : (
-                "Daftar Sekarang"
-              )}
-            </Button>
+            <div className="flex gap-4 pt-4">
+              <Button
+                type="submit"
+                className="flex-1 h-12 bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors shadow"
+                disabled={isLoading || !registerForm.formState.isValid}
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Mendaftar...
+                  </>
+                ) : (
+                  "Daftar Sekarang"
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 h-12 border-blue-500 text-blue-500 hover:bg-blue-50 transition-colors rounded-lg shadow"
+                onClick={() => router.push('/auth/login')}
+              >
+                LOGIN
+              </Button>
+            </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card className="w-full max-w-md mt-4">
-        <CardHeader>
-          <CardTitle className="text-center text-sm">Keuntungan Bergabung</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            <li className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <span>Akses ke semua course gratis</span>
-            </li>
-            <li className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <span>Tracking progress belajar</span>
-            </li>
-            <li className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <span>Sertifikat penyelesaian</span>
-            </li>
-            <li className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <span>Komunitas belajar</span>
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
+      {/* Left Section: Abstract Visual */}
+      <div className="flex-1 bg-gradient-to-br from-[#ADD8E6] via-[#B0C4DE] to-[#E0FFFF] relative overflow-hidden hidden md:block">
+        {/* Placeholder for the abstract shapes/bubbles */}
+        <div className="absolute inset-0 z-0 opacity-80">
+          <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+          <div className="absolute top-1/2 right-1/4 w-48 h-48 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+          <div className="absolute bottom-1/4 left-1/3 w-40 h-40 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+        </div>
+      </div>
     </div>
   );
 }
