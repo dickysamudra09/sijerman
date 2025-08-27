@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
-import { Eye, EyeOff, Mail, Lock, User, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, AlertCircle, ArrowLeft } from "lucide-react";
 
 interface RegisterForm {
   name: string;
@@ -107,17 +107,21 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen flex-row-reverse">
-      {/* Right Section: Register Form */}
       <div className="flex-1 flex flex-col justify-center items-center p-8 bg-white">
         <div className="w-full max-w-md">
-          {/* Placeholder for Logo */}
-          <div className="flex items-center gap-2 mb-8">
-            <img
-              src="/img/1.png" 
-              alt="Logo" 
-              className="h-12 w-auto mr-2"
-            />
-            <span className="text-xl font-bold text-gray-800">Si Jerman</span>
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-2">
+              <img
+                src="/img/1.png" 
+                alt="Logo" 
+                className="h-12 w-auto mr-2"
+              />
+              <span className="text-xl font-bold text-gray-800">Si Jerman</span>
+            </div>
+            <Button onClick={() => router.push("/")} className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Kembali
+            </Button>
           </div>
 
           <h1 className="text-4xl font-extrabold text-gray-900 mb-4 leading-tight">

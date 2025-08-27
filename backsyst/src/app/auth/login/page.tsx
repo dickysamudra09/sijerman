@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
-import { AlertCircle, Eye, EyeOff } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 interface LoginForm {
   email: string;
@@ -100,13 +100,22 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Left Section: Login Form */}
       <div className="flex-1 flex flex-col justify-center items-center p-8 bg-white">
         <div className="w-full max-w-md">
-          <div className="flex items-center gap-2 mb-8">
-            <span className="text-xl font-bold text-gray-800">Si Jerman</span>
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-2">
+              <img
+                src="/img/1.png" 
+                alt="Logo" 
+                className="h-12 w-auto mr-2"
+              />
+              <span className="text-xl font-bold text-gray-800">Si Jerman</span>
+            </div>
+            <Button onClick={() => router.push("/")} className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Kembali
+            </Button>
           </div>
-
           <h1 className="text-4xl font-extrabold text-gray-900 mb-4 leading-tight">
             Masuk dengan mudah <br /> nikmati beragam fitur.
           </h1>
