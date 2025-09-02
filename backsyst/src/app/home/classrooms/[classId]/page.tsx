@@ -17,9 +17,11 @@ import {
   RotateCcw,
   Users,
   Code,
-  SquareKanban,
+  FileText,
   FileQuestion,
   GraduationCap as GraduationCapIcon,
+  Edit,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -65,6 +67,13 @@ interface ExerciseAttempt {
   submitted_at: string;
 }
 
+interface StudentSubmission {
+  id: string;
+  assignment_id: string;
+  submitted_at: string;
+  status: string;
+}
+
 export default function ClassroomsPage() {
   const [userName, setUserName] = useState<string>("");
   const [userId, setUserId] = useState<string | null>(null);
@@ -77,6 +86,7 @@ export default function ClassroomsPage() {
   const [attendanceRecorded, setAttendanceRecorded] = useState(false);
   const [isRecordingAttendance, setIsRecordingAttendance] = useState(false);
   const [exerciseAttempts, setExerciseAttempts] = useState<Record<string, ExerciseAttempt>>({});
+  const [studentSubmissions, setStudentSubmissions] = useState<Record<string, StudentSubmission>>({});
   const router = useRouter();
   const params = useParams();
   const classId = params.classId as string;
@@ -126,8 +136,38 @@ export default function ClassroomsPage() {
     }
   };
 
+  const checkStudentSubmissions = async (userId: string) => {
+    if (userRole !== 'student') return;
+
+    try {
+      const { data: submissions, error } = await supabase
+        .from('student_submissions')
+        .select(`id, assignment_id, submitted_at`)
+        .eq('student_id', userId);
+
+      if (error) {
+        console.error("Error fetching student submissions:", error);
+        return;
+      }
+
+      const submissionsByAssignment: Record<string, StudentSubmission> = {};
+      if (submissions) {
+        submissions.forEach((submission: any) => {
+          submissionsByAssignment[submission.assignment_id] = submission;
+        });
+      }
+      setStudentSubmissions(submissionsByAssignment);
+    } catch (err) {
+      console.error("Unexpected error checking student submissions:", err);
+    }
+  };
+
   const handleKerjakanLatihan = async (content: ContentItem) => {
-    // Memastikan jenis_create cocok dengan jenis "Latihan soal" dari database
+    if (content.jenis_create.toLowerCase() === "tugas") {
+      router.push(`/home/classrooms/${classId}/${content.id}`);
+      return;
+    }
+
     if (content.jenis_create.toLowerCase() !== "latihan soal") {
       router.push(`/home/classrooms/${classId}/latihan/${content.id}`);
       return;
@@ -229,13 +269,13 @@ export default function ClassroomsPage() {
 
     try {
       const today = new Date().toISOString().split('T')[0];
-      
+
       console.log("Recording attendance for:", { userId, classroomId, date: today });
 
       let sessionId: string | null = null;
-      
+
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      
+
       if (sessionError || !sessionData.session) {
         console.log("No active auth session found, will create manual session");
       }
@@ -483,11 +523,11 @@ export default function ClassroomsPage() {
           }
         }
 
+        // Perbaikan: Hapus filter `.eq("pembuat", userId)` agar guru dapat melihat semua konten di kelas
         const { data: contentsData, error: contentsError } = await supabase
           .from("teacher_create")
           .select("*")
           .eq("kelas", classId)
-          .eq("pembuat", userId)
           .order("created_at", { ascending: false });
 
         console.log("Respons konten guru:", { contentsData, error: contentsError });
@@ -542,13 +582,42 @@ export default function ClassroomsPage() {
         if (!teacherError && teacherData) {
           teacherName = teacherData.name || "Guru Tidak Dikenal";
         }
+        
+        // --- START PERBAIKAN UNTUK STUDENT ROLE ---
+        // Ambil semua registrasi siswa di kelas ini
+        const { data: registrations, error: regStudentsError } = await supabase
+          .from("classroom_registrations")
+          .select("student_id")
+          .eq("classroom_id", classId);
+
+        let students: Student[] = [];
+        if (regStudentsError) {
+          console.error("Gagal mengambil registrasi siswa lain:", regStudentsError.message);
+        } else {
+          // Buat array data siswa kosong, hanya untuk mendapatkan jumlahnya
+          const studentIds = registrations?.map(reg => reg.student_id);
+          if (studentIds && studentIds.length > 0) {
+            // Karena student role tidak butuh data detail siswa lain, kita bisa mengosongkan array ini
+            // namun jumlahnya tetap akan terhitung di students.length
+            students = studentIds.map(id => ({
+                id,
+                name: '',
+                email: '',
+                progress: 0,
+                last_active: new Date().toISOString(),
+                completed_quizzes: 0,
+                average_score: 0
+            }));
+          }
+        }
+        // --- END PERBAIKAN UNTUK STUDENT ROLE ---
 
         setClassroom({
           id: classroomData.id,
           name: classroomData.name,
           code: classroomData.code,
           description: classroomData.description || "",
-          students: [],
+          students, // Gunakan array siswa yang sudah diperbarui
           createdAt: classroomData.created_at,
           teacherName,
         });
@@ -561,6 +630,7 @@ export default function ClassroomsPage() {
         }
 
         await checkExerciseAttempts(userId);
+        await checkStudentSubmissions(userId);
 
         console.log("Mengambil konten untuk siswa di kelas:", classId, "dengan teacher_id:", classroomData.teacher_id);
 
@@ -592,9 +662,8 @@ export default function ClassroomsPage() {
     };
 
     fetchData();
-  }, [classId, router]);
-  
-  // Mengelompokkan konten berdasarkan jenisnya
+  }, [classId, router, userRole]);
+
   const groupedContents = useMemo(() => {
     const groups: Record<string, ContentItem[]> = {
       'Materi': [],
@@ -602,12 +671,10 @@ export default function ClassroomsPage() {
       'Latihan soal': [],
       'Kuis': [],
     };
-    
+
     contents.forEach(content => {
-      // Normalisasi string untuk memastikan pencocokan yang tepat
       let normalizedKey = content.jenis_create.trim().toLowerCase();
-      
-      // Menggunakan switch/case untuk penanganan yang lebih rapi
+
       switch (normalizedKey) {
         case 'materi':
           groups['Materi'].push(content);
@@ -622,7 +689,6 @@ export default function ClassroomsPage() {
           groups['Kuis'].push(content);
           break;
         default:
-          // Menangani jenis konten lain yang mungkin ada
           if (!groups[content.jenis_create]) {
             groups[content.jenis_create] = [];
           }
@@ -634,7 +700,6 @@ export default function ClassroomsPage() {
     return groups;
   }, [contents]);
 
-  // Fungsi untuk mendapatkan judul yang rapi
   const getGroupTitle = (key: string) => {
     switch (key.toLowerCase()) {
       case 'materi':
@@ -873,12 +938,11 @@ export default function ClassroomsPage() {
                 )}
               </div>
 
-              {/* Mengelompokkan dan menampilkan konten berdasarkan jenisnya */}
               {Object.keys(groupedContents).length > 0 ? (
                 Object.keys(groupedContents).map((key) => {
                   const items = groupedContents[key];
-                  if (items.length === 0) return null; // Jangan render grup kosong
-                  
+                  if (items.length === 0) return null;
+
                   return (
                     <Card key={key} className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl mt-6">
                       <CardHeader className="pb-6">
@@ -901,7 +965,15 @@ export default function ClassroomsPage() {
                       <CardContent className="space-y-4">
                         {items.map((content) => {
                           const exerciseAttempt = content.jenis_create.toLowerCase() === "latihan soal" ? exerciseAttempts[content.id] : null;
+                          const studentSubmission = content.jenis_create.toLowerCase() === "tugas" ? studentSubmissions[content.id] : null;
+                          
                           const { cardBorder, cardBg, badgeBg, badgeText, buttonBg, buttonHoverBg, buttonText } = getColorsForType(content.jenis_create);
+
+                          const deadlineBadgeColor = content.deadline
+                            ? studentSubmission
+                              ? "bg-green-50 border-green-200 text-green-700"
+                              : "bg-red-50 border-red-200 text-red-700"
+                            : "";
 
                           return (
                             <Card key={content.id} className={`bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl border-l-4 ${cardBorder}`}>
@@ -914,9 +986,17 @@ export default function ClassroomsPage() {
                                       {getGroupTitle(content.jenis_create)}
                                     </Badge>
                                     {content.deadline && (
-                                      <Badge variant="destructive" className="bg-red-50 border-red-200 text-red-700 text-xs px-3 py-1">
+                                      <Badge variant="default" className={`${deadlineBadgeColor} text-xs px-3 py-1`}>
                                         <Clock className="h-3 w-3 mr-1" />
                                         Deadline: {new Date(content.deadline).toLocaleDateString('id-ID')}
+                                      </Badge>
+                                    )}
+                                    {userRole === "student" && content.jenis_create.toLowerCase() === "tugas" && (
+                                      <Badge
+                                        variant="default"
+                                        className={studentSubmission ? "bg-green-500 text-white" : "bg-red-500 text-white"}
+                                      >
+                                        {studentSubmission ? "Sudah Dikumpulkan" : "Belum Dikumpulkan"}
                                       </Badge>
                                     )}
                                     {exerciseAttempt && (
@@ -968,15 +1048,26 @@ export default function ClassroomsPage() {
                                         )}
                                       </>
                                     ) : (
-                                      <Button
-                                        variant="default"
-                                        className={`${buttonBg} ${buttonHoverBg} transition-colors ${buttonText} shadow-md hover:shadow-lg`}
-                                        onClick={() => router.push(`/home/classrooms/${classId}/${content.id}`)}
-                                      >
-                                        <Eye className="h-4 w-4" />
-                                        Review
-                                      </Button>
-                                      
+                                      <>
+                                        {userRole === "teacher" && (
+                                          <Button
+                                            variant="outline"
+                                            className="border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm"
+                                            onClick={() => router.push(`/home/classrooms/create?classId=${classId}&contentId=${content.id}`)}
+                                          >
+                                            <Edit className="h-4 w-4 mr-2" />
+                                            Edit
+                                          </Button>
+                                        )}
+                                        <Button
+                                          variant="default"
+                                          className={`${buttonBg} ${buttonHoverBg} transition-colors ${buttonText} shadow-md hover:shadow-lg`}
+                                          onClick={() => router.push(`/home/classrooms/${classId}/${content.id}`)}
+                                        >
+                                          <Eye className="h-4 w-4" />
+                                          {content.jenis_create.toLowerCase() === "tugas" ? "Lihat" : "Review"}
+                                        </Button>
+                                      </>
                                     )}
                                   </div>
                                 </div>
@@ -1039,7 +1130,6 @@ export default function ClassroomsPage() {
           </CardContent>
         </Card>
       </div>
-
       <Dialog open={showLatihanModal} onOpenChange={setShowLatihanModal}>
         <DialogContent className="bg-white border-0 shadow-2xl rounded-2xl max-w-md">
           <DialogHeader>
@@ -1060,7 +1150,6 @@ export default function ClassroomsPage() {
                 </div>
               )}
             </div>
-
             {currentLatihan?.attempt && (
               <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
                 <p className="text-sm text-green-700 leading-relaxed">
@@ -1073,7 +1162,6 @@ export default function ClassroomsPage() {
                 </p>
               </div>
             )}
-
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
               <Button
                 variant="outline"

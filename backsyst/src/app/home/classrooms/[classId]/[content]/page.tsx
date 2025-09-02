@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, Edit, BookOpen, Clock, FileText, UserCircle } from "lucide-react";
+import { Trash2, Edit, BookOpen, Clock, FileText, UserCircle, UploadCloud, CheckCircle2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 
@@ -23,12 +23,23 @@ interface ContentItem {
   pembuat: string;
 }
 
+interface StudentSubmission {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  file_url: string;
+  submitted_at: string;
+}
+
 export default function ContentDetailPage() {
   const [content, setContent] = useState<ContentItem | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<StudentSubmission | null>(null);
   const router = useRouter();
   const params = useParams();
   const classId = params.classId as string;
@@ -73,22 +84,19 @@ export default function ContentDetailPage() {
 
       setUserRole(userData.role);
 
+      let contentData: ContentItem | null = null;
+      let fetchError: any = null;
+
       if (userData.role === "teacher") {
-        const { data, error: fetchError } = await supabase
+        const { data, error: fetchErr } = await supabase
           .from("teacher_create")
           .select("*")
           .eq("id", contentId)
           .eq("kelas", classId)
           .eq("pembuat", currentUserId)
           .single();
-
-        if (fetchError) {
-          setError("Gagal mengambil konten: " + fetchError.message);
-        } else if (!data) {
-          setError("Konten tidak ditemukan atau Anda tidak memiliki akses.");
-        } else {
-          setContent(data);
-        }
+        contentData = data;
+        fetchError = fetchErr;
       } else if (userData.role === "student") {
         const { data: registration, error: regError } = await supabase
           .from("classroom_registrations")
@@ -103,33 +111,51 @@ export default function ContentDetailPage() {
           return;
         }
 
-        const { data, error: fetchError } = await supabase
+        const { data, error: fetchErr } = await supabase
           .from("teacher_create")
-          .select("*, users(name)")
+          .select("*, users!teacher_create_pembuat_fkey(name)")
           .eq("id", contentId)
           .eq("kelas", classId)
           .single();
-
-        if (fetchError) {
-          setError("Gagal mengambil konten: " + fetchError.message);
-        } else if (!data) {
-          setError("Konten tidak ditemukan.");
-        } else {
-          const contentWithTeacherName = {
+        
+        if (data) {
+          contentData = {
             ...data,
             pembuat: data.users.name || "Guru Tidak Dikenal",
           };
-          setContent(contentWithTeacherName as any);
         }
+        fetchError = fetchErr;
+
+        const { data: submissionData, error: submissionError } = await supabase
+          .from("student_submissions")
+          .select("*")
+          .eq("assignment_id", contentId)
+          .eq("student_id", currentUserId)
+          .single();
+
+        if (submissionError && submissionError.code !== 'PGRST116') {
+          console.error("Error fetching submission status:", submissionError);
+        } else {
+          setSubmissionStatus(submissionData || null);
+        }
+        
       } else {
         setError("Role pengguna tidak valid.");
+      }
+
+      if (fetchError) {
+        setError("Gagal mengambil konten: " + fetchError.message);
+      } else if (!contentData) {
+        setError("Konten tidak ditemukan atau Anda tidak memiliki akses.");
+      } else {
+        setContent(contentData);
       }
 
       setIsLoading(false);
     };
 
     fetchContent();
-  }, [classId, contentId, router]);
+  }, [classId, contentId, router, userId]);
 
   const handleDelete = async () => {
     if (!content || userRole !== "teacher" || content.pembuat !== userId) return;
@@ -138,19 +164,6 @@ export default function ContentDetailPage() {
     if (!confirmDelete) return;
 
     setIsLoading(true);
-
-    if (content.documents && content.documents.length > 0) {
-      const filePaths = content.documents.map(doc => doc.url.split('/storage/v1/object/public/documents/')[1]);
-      const { error: storageError } = await supabase.storage
-        .from('documents')
-        .remove(filePaths);
-
-      if (storageError) {
-        toast.error("Gagal menghapus file: " + storageError.message);
-        setIsLoading(false);
-        return;
-      }
-    }
 
     const { error } = await supabase
       .from("teacher_create")
@@ -170,6 +183,97 @@ export default function ContentDetailPage() {
   const handleUpdate = () => {
     if (!content || userRole !== "teacher" || content.pembuat !== userId) return;
     toast.info("Fitur update akan segera tersedia!");
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  // FUNGSI UPLOAD YANG SUDAH DIPERBAIKI DAN RAPI
+  const handleFileUpload = async () => {
+    if (!selectedFile || isUploading || !userId) {
+      toast.error("Pilih file terlebih dahulu.");
+      return;
+    }
+
+    if (selectedFile.size > 12 * 1024 * 1024) {
+      toast.error("Ukuran file maksimal 12MB.");
+      return;
+    }
+
+    setIsUploading(true);
+    // Path file disesuaikan dengan bucket 'documents' dan struktur yang aman
+    const uniqueFileName = `${Date.now()}_${selectedFile.name}`;
+    const filePath = `${userId}/${contentId}/${uniqueFileName}`;
+
+    try {
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents') // Menggunakan bucket 'documents'
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        throw new Error("Gagal mengunggah file: " + uploadError.message);
+      }
+
+      const { data: fileUrlData } = supabase.storage
+        .from('documents') // Menggunakan bucket 'documents'
+        .getPublicUrl(filePath);
+
+      if (!fileUrlData || !fileUrlData.publicUrl) {
+        throw new Error("Gagal mendapatkan URL publik.");
+      }
+
+      const { error: dbError } = await supabase
+        .from('student_submissions')
+        .upsert({
+          assignment_id: contentId,
+          student_id: userId,
+          file_url: fileUrlData.publicUrl,
+          submitted_at: new Date().toISOString(),
+          status: 'submitted',
+        }, { onConflict: 'assignment_id,student_id', ignoreDuplicates: false });
+
+      if (dbError) {
+        console.error("Database upsert error:", dbError);
+        throw new Error("Gagal menyimpan data ke database: " + dbError.message);
+      }
+
+      toast.success("Tugas berhasil dikumpulkan!");
+      setSubmissionStatus({
+        id: crypto.randomUUID(),
+        assignment_id: contentId,
+        student_id: userId,
+        file_url: fileUrlData.publicUrl,
+        submitted_at: new Date().toISOString(),
+      });
+      setSelectedFile(null);
+
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat mengunggah tugas.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   if (isLoading) {
@@ -206,6 +310,7 @@ export default function ContentDetailPage() {
   }
 
   const isContentCreator = userRole === "teacher" && content.pembuat === userId;
+  const isAssignment = content.jenis_create.toLowerCase() === "tugas";
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-100 p-6">
@@ -267,7 +372,6 @@ export default function ContentDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-xl font-bold text-purple-600">
-                  {/* Solusi perbaikan di sini */}
                   {content.deadline ? new Date(content.deadline).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : "Tidak Ada"}
                 </div>
               </CardContent>
@@ -278,6 +382,16 @@ export default function ContentDetailPage() {
             <TabsList className="bg-gray-100 border-0 rounded-xl p-1 shadow-inner">
               <TabsTrigger value="content" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">Isi Konten</TabsTrigger>
               <TabsTrigger value="attachments" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">Dokumen Pendukung</TabsTrigger>
+              {isAssignment && userRole === "student" && (
+                <TabsTrigger value="submission" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">
+                  Kumpulkan Tugas
+                  {submissionStatus ? (
+                    <CheckCircle2 className="h-4 w-4 ml-2 text-green-500" />
+                  ) : (
+                    <Clock className="h-4 w-4 ml-2 text-red-500" />
+                  )}
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="content" className="space-y-6 mt-8">
@@ -317,6 +431,81 @@ export default function ContentDetailPage() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {isAssignment && userRole === "student" && (
+              <TabsContent value="submission" className="space-y-6 mt-8">
+                <Card className="bg-white border border-gray-100 shadow-lg rounded-xl p-6">
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      Kumpulkan Tugas
+                      {submissionStatus ? (
+                        <Badge className="bg-green-500 text-white">Sudah Dikumpulkan</Badge>
+                      ) : (
+                        <Badge className="bg-red-500 text-white">Belum Dikumpulkan</Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>Unggah file tugas Anda. Maksimal 12MB.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-sky-500 transition-colors"
+                    >
+                      <UploadCloud className="w-12 h-12 text-gray-400 mb-4" />
+                      <p className="text-sm text-gray-500 mb-2">Drag and drop file di sini, atau</p>
+                      <label htmlFor="file-upload" className="text-sky-600 font-medium hover:underline cursor-pointer">
+                        Pilih file
+                      </label>
+                      <input
+                        id="file-upload"
+                        type="file"
+                        className="hidden"
+                        onChange={handleFileChange}
+                      />
+                    </div>
+                    {selectedFile && (
+                      <div className="mt-4 p-3 bg-gray-100 rounded-md flex items-center justify-between">
+                        <span className="text-sm text-gray-700">{selectedFile.name}</span>
+                        <Button
+                          variant="ghost"
+                          onClick={() => setSelectedFile(null)}
+                          className="h-6 w-6 p-0 text-red-500 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                    <Button
+                      onClick={handleFileUpload}
+                      className="w-full bg-sky-500 text-white hover:bg-sky-600 mt-6"
+                      disabled={!selectedFile || isUploading}
+                    >
+                      {isUploading ? "Mengunggah..." : "Kumpulkan Tugas"}
+                    </Button>
+                  </CardContent>
+                </Card>
+                {submissionStatus && (
+                  <Card className="bg-white border border-gray-100 shadow-lg rounded-xl p-6">
+                    <CardHeader>
+                      <CardTitle>Detail Pengumpulan Anda</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium text-gray-900">File: </span>
+                        <a href={submissionStatus.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                          Lihat File Tugas
+                        </a>
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium text-gray-900">Waktu Pengumpulan: </span>
+                        {new Date(submissionStatus.submitted_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+            )}
           </Tabs>
         </CardContent>
       </Card>
