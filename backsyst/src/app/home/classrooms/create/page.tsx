@@ -53,6 +53,8 @@ export default function CreateContentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const classIdParam = searchParams.get("classId");
+  const contentIdParam = searchParams.get("contentId"); // Ambil contentId dari URL
+  const isEditing = !!contentIdParam; // Tentukan mode edit
 
   // State untuk data dan UI
   const [initialLoading, setInitialLoading] = useState(true);
@@ -64,8 +66,10 @@ export default function CreateContentPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileErrors, setFileErrors] = useState<string | null>(null);
+  const [editorReady, setEditorReady] = useState(false);
+  const [initialKonten, setInitialKonten] = useState<string>("");
+  const [initialDocuments, setInitialDocuments] = useState<{ name: string; url: string }[]>([]);
 
-  // Amati perubahan pada jenis_create untuk menampilkan input deadline
   const jenis_create = watch("jenis_create");
   
   // Custom hook-like logic untuk mengambil data awal
@@ -103,14 +107,51 @@ export default function CreateContentPage() {
       } else {
         setClassName(classroomData.name || "");
         setClassCode(classroomData.code || "");
-        setIsModalOpen(true); // Buka modal saat data berhasil dimuat
       }
 
+      // Ambil data konten jika dalam mode edit
+      if (isEditing) {
+        const { data: contentData, error: contentError } = await supabase
+          .from("teacher_create")
+          .select("judul, sub_judul, jenis_create, konten, deadline, documents")
+          .eq("id", contentIdParam)
+          .eq("kelas", classIdParam)
+          .eq("pembuat", userId)
+          .single();
+        
+        if (contentError) {
+          setError("Konten tidak ditemukan atau Anda tidak memiliki akses untuk mengedit.");
+          setInitialLoading(false);
+          return;
+        }
+
+        if (contentData) {
+          setValue("judul", contentData.judul);
+          setValue("sub_judul", contentData.sub_judul);
+          setValue("jenis_create", contentData.jenis_create);
+          setValue("konten", contentData.konten);
+          setInitialKonten(contentData.konten); // Set initial value for Editor
+          
+          if (contentData.deadline) {
+            // Format deadline ke format datetime-local
+            const formattedDeadline = new Date(contentData.deadline).toISOString().substring(0, 16);
+            setValue("deadline", formattedDeadline);
+          }
+          
+          if (contentData.documents) {
+            setInitialDocuments(contentData.documents);
+          }
+        }
+      } else {
+        // Jika mode buat baru, buka modal untuk memilih jenis konten
+        setIsModalOpen(true);
+      }
+      
       setInitialLoading(false);
     };
 
     fetchUserData();
-  }, [router, classIdParam]);
+  }, [router, classIdParam, contentIdParam, isEditing, setValue]);
 
   // Handler untuk pemilihan file
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -140,10 +181,15 @@ export default function CreateContentPage() {
     setSelectedFiles(newFiles);
   };
 
+  const removeExistingFile = (index: number) => {
+    const newDocuments = initialDocuments.filter((_, i) => i !== index);
+    setInitialDocuments(newDocuments);
+  };
+
   // Logika utama untuk submit form
   const onSubmit = async (data: CreateFormData) => {
     // Validasi tambahan untuk deadline jika jenis "Tugas"
-    if (data.jenis_create === "tugas" && !data.deadline) {
+    if (data.jenis_create.toLowerCase() === "tugas" && !data.deadline) {
       setFormError("deadline", {
         type: "manual",
         message: "Deadline wajib diisi untuk tugas.",
@@ -161,11 +207,12 @@ export default function CreateContentPage() {
       return;
     }
 
-    const documents: { name: string; url: string }[] = [];
+    let allDocuments: { name: string; url: string }[] = [...initialDocuments];
+    const newFilesToUpload = selectedFiles.filter(file => file.name && file.size > 0);
 
-    // Proses upload dokumen ke Supabase Storage
-    if (selectedFiles.length > 0) {
-      for (const file of selectedFiles) {
+    // Proses upload dokumen baru ke Supabase Storage
+    if (newFilesToUpload.length > 0) {
+      for (const file of newFilesToUpload) {
         const filePath = `${userId}/${Date.now()}_${file.name}`;
         const { error: uploadError } = await supabase.storage
           .from('documents')
@@ -178,34 +225,58 @@ export default function CreateContentPage() {
 
         const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
         const publicUrl = urlData.publicUrl;
-        documents.push({ name: file.name, url: publicUrl });
+        allDocuments.push({ name: file.name, url: publicUrl });
       }
     }
 
-    // Tentukan nilai deadline secara kondisional
-    const deadlineValue = data.jenis_create === "tugas" ? data.deadline : null;
+    const deadlineValue = data.jenis_create.toLowerCase() === "tugas" ? data.deadline : null;
 
-    // Masukkan data ke tabel teacher_create
-    const { error: insertError } = await supabase
-      .from("teacher_create")
-      .insert({
-        judul: data.judul,
-        sub_judul: data.sub_judul,
-        kelas: classId,
-        pembuat: userId,
-        jenis_create: data.jenis_create,
-        konten: data.konten,
-        documents: documents,
-        deadline: deadlineValue, // Menggunakan nilai yang sudah dikondisikan
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+    if (isEditing) {
+      // Logika UPDATE
+      const { error: updateError } = await supabase
+        .from("teacher_create")
+        .update({
+          judul: data.judul,
+          sub_judul: data.sub_judul,
+          jenis_create: data.jenis_create,
+          konten: data.konten,
+          documents: allDocuments,
+          deadline: deadlineValue,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", contentIdParam)
+        .eq("kelas", classId)
+        .eq("pembuat", userId);
 
-    if (insertError) {
-      toast.error("Gagal membuat konten: " + insertError.message);
+      if (updateError) {
+        toast.error("Gagal memperbarui konten: " + updateError.message);
+      } else {
+        toast.success("Konten berhasil diperbarui!");
+        router.push(`/home/classrooms/${classId}`);
+      }
     } else {
-      toast.success("Konten berhasil dibuat!");
-      router.push(`/home/classrooms/${classId}`);
+      // Logika INSERT (tetap sama)
+      const { error: insertError } = await supabase
+        .from("teacher_create")
+        .insert({
+          judul: data.judul,
+          sub_judul: data.sub_judul,
+          kelas: classId,
+          pembuat: userId,
+          jenis_create: data.jenis_create,
+          konten: data.konten,
+          documents: allDocuments,
+          deadline: deadlineValue,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (insertError) {
+        toast.error("Gagal membuat konten: " + insertError.message);
+      } else {
+        toast.success("Konten berhasil dibuat!");
+        router.push(`/home/classrooms/${classId}`);
+      }
     }
   };
 
@@ -213,14 +284,19 @@ export default function CreateContentPage() {
   const handleEditorChange = (content: string) => {
     setValue("konten", content);
   };
+  
+  // Handler untuk inisialisasi TinyMCE
+  const handleEditorInit = () => {
+    setEditorReady(true);
+  };
 
   // Handler untuk pemilihan jenis konten dari modal
-  const handleSelectJenis = (jenis: "materi" | "tugas") => {
-    // Perbaikan: Mengubah nilai yang dikirim agar sesuai dengan huruf kecil pada skema database.
+  const handleSelectJenis = (jenis: "materi" | "tugas" | "Latihan soal" | "kuis") => {
+    // Memperbaiki nilai yang dikirim agar sesuai dengan skema database
     setValue("jenis_create", jenis);
     setIsModalOpen(false);
     clearErrors("deadline");
-    if (jenis === "materi") {
+    if (jenis.toLowerCase() === "materi" || jenis.toLowerCase() === "latihan soal" || jenis.toLowerCase() === "kuis") {
       setValue("deadline", "");
     }
   };
@@ -270,25 +346,24 @@ export default function CreateContentPage() {
                 </Button>
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-sky-500 rounded-full shadow-lg">
-                    <Plus className="h-6 w-6 text-white" />
+                    {isEditing ? <Edit className="h-6 w-6 text-white" /> : <Plus className="h-6 w-6 text-white" />}
                   </div>
-                  <h1 className="text-2xl font-bold text-gray-900">Buat Konten Baru</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">{isEditing ? "Edit Konten" : "Buat Konten Baru"}</h1>
                 </div>
               </div>
             </div>
           </CardHeader>
-
           <CardContent className="p-8">
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900">{className || `Kelas ${classId}`}</h2>
-                  <p className="text-gray-600">Buat konten pembelajaran baru untuk kelas ini</p>
+                  <p className="text-gray-600">{isEditing ? "Ubah detail konten ini" : "Buat konten pembelajaran baru untuk kelas ini"}</p>
                   {jenis_create && (
                     <div className="mt-2 text-sm text-gray-700 font-medium">
                       Pilihan konten Anda:{" "}
-                      <span className={`font-semibold ${jenis_create === "materi" ? 'text-blue-600' : 'text-green-600'}`}>
-                        {jenis_create === "materi" ? "Materi" : "Tugas"}
+                      <span className={`font-semibold ${jenis_create.toLowerCase() === "materi" ? 'text-blue-600' : 'text-green-600'}`}>
+                        {jenis_create}
                       </span>
                     </div>
                   )}
@@ -299,25 +374,35 @@ export default function CreateContentPage() {
                   </Badge>
                 )}
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Button type="button" onClick={() => setIsModalOpen(true)} className={`w-full bg-white border shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-xl p-6 h-auto flex flex-col items-center justify-center text-center group ${jenis_create ? 'border-sky-500' : 'border-gray-100 bg-sky-50 animate-pulse'}`}>
-                  <div className={`p-3 rounded-full w-fit mx-auto mb-3 shadow-md group-hover:scale-110 transition-transform duration-300 ${jenis_create ? 'bg-sky-500' : 'bg-blue-500'}`}>
-                    <FileText className="h-6 w-6 text-white" />
-                  </div>
-                  <div className={`text-lg font-bold mt-2 ${jenis_create ? 'text-sky-600' : 'text-gray-900'}`}>
-                    {jenis_create ? (jenis_create === "materi" ? "Materi" : "Tugas") : "Pilih jenis konten"}
-                  </div>
-                  <p className={`text-sm mt-1 ${jenis_create ? 'text-sky-500' : 'text-gray-500'}`}>
-                    {jenis_create ? '' : 'Klik untuk memilih tipe konten Anda'}
-                  </p>
+                 <Button
+                    type="button"
+                    onClick={() => {
+                        if (!isEditing) {
+                            setIsModalOpen(true);
+                        } else {
+                            toast.info("Tipe konten tidak dapat diubah saat mode edit.");
+                        }
+                    }}
+                    className={`w-full bg-white border shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-xl p-6 h-auto flex flex-col items-center justify-center text-center group ${jenis_create ? 'border-sky-500' : 'border-gray-100 bg-sky-50 animate-pulse'}`}
+                    disabled={isEditing}
+                >
+                    <div className={`p-3 rounded-full w-fit mx-auto mb-3 shadow-md group-hover:scale-110 transition-transform duration-300 ${jenis_create ? 'bg-sky-500' : 'bg-blue-500'}`}>
+                        <FileText className="h-6 w-6 text-white" />
+                    </div>
+                    <div className={`text-lg font-bold mt-2 ${jenis_create ? 'text-sky-600' : 'text-gray-900'}`}>
+                        {jenis_create || "Pilih jenis konten"}
+                    </div>
+                    <p className={`text-sm mt-1 ${jenis_create ? 'text-sky-500' : 'text-gray-500'}`}>
+                        {jenis_create ? '' : 'Klik untuk memilih tipe konten Anda'}
+                    </p>
                 </Button>
                 <Card className="bg-white border border-gray-100 shadow-lg rounded-xl">
                   <CardContent className="p-6 text-center">
                     <div className="p-3 bg-green-500 rounded-full w-fit mx-auto mb-3">
                       <Upload className="h-6 w-6 text-white" />
                     </div>
-                    <div className="text-lg font-bold text-green-600">{selectedFiles.length}/5</div>
+                    <div className="text-lg font-bold text-green-600">{selectedFiles.length + initialDocuments.length}/5</div>
                     <p className="text-sm text-gray-500 mt-1">Dokumen</p>
                   </CardContent>
                 </Card>
@@ -331,15 +416,14 @@ export default function CreateContentPage() {
                   </CardContent>
                 </Card>
               </div>
-
               <Card className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl">
                 <CardHeader className="pb-6">
                   <CardTitle className="flex items-center gap-3 text-gray-900 text-xl">
                     <div className="p-2 bg-sky-500 rounded-lg"><BookOpen className="h-5 w-5 text-white" /></div>
-                    Form Pembuatan Konten
+                    Form {isEditing ? "Edit" : "Pembuatan"} Konten
                   </CardTitle>
                   <CardDescription className="text-gray-600">
-                    Isi form di bawah untuk membuat materi atau tugas baru
+                    Isi form di bawah untuk {isEditing ? "mengubah" : "membuat"} materi atau tugas
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -356,29 +440,54 @@ export default function CreateContentPage() {
                         {errors.sub_judul && <p className="text-red-600 text-sm mt-1">{errors.sub_judul.message}</p>}
                       </div>
                     </div>
-
                     <div>
                       <input type="hidden" {...register("jenis_create", { required: "Jenis konten wajib dipilih" })} />
                       {errors.jenis_create && (<p className="text-red-600 text-sm mt-1">{errors.jenis_create.message}</p>)}
                     </div>
-
                     <div>
                       <Label htmlFor="konten" className="text-sm font-medium text-gray-700">Konten</Label>
                       <div className="mt-1 border border-gray-300 rounded-lg overflow-hidden">
-                        <Editor apiKey="ovw3rgflgzy8eequry80mjqzagd444pabxa9b0tokym3twln" initialValue="" init={{ height: 500, menubar: false, plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount', toolbar: 'undo redo | formatselect | bold italic backcolor | link image | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help | print', }} onEditorChange={handleEditorChange} />
+                        <Editor
+                          apiKey="ovw3rgflgzy8eequry80mjqzagd444pabxa9b0tokym3twln"
+                          initialValue={initialKonten}
+                          onInit={handleEditorInit}
+                          init={{
+                            height: 500,
+                            menubar: false,
+                            plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount',
+                            toolbar: 'undo redo | formatselect | bold italic backcolor | link image | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help | print',
+                          }}
+                          onEditorChange={handleEditorChange}
+                        />
                       </div>
                       {errors.konten && <p className="text-red-600 text-sm mt-1">{errors.konten.message}</p>}
                     </div>
-
                     <div>
                       <Label className="text-sm font-medium text-gray-700">
                         Upload Dokumen (opsional, maks 5, total 12MB)
                       </Label>
                       <Input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.png,.txt" onChange={handleFileChange} className="mt-1 border-gray-300 focus:border-sky-500 focus:ring-sky-500" />
                       {fileErrors && <p className="text-red-600 text-sm mt-1">{fileErrors}</p>}
+                      {/* Tampilkan dokumen yang sudah ada */}
+                      {initialDocuments.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-sm font-medium text-gray-700">Dokumen yang sudah ada:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {initialDocuments.map((doc, index) => (
+                              <div key={index} className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded-lg flex items-center gap-2 shadow-sm">
+                                <FileText className="h-4 w-4" />
+                                <span className="text-sm">{doc.name}</span>
+                                <Button type="button" variant="ghost" size="sm" className="p-0 h-auto text-red-600 hover:text-red-800 ml-1" onClick={() => removeExistingFile(index)}>
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {selectedFiles.length > 0 && (
                         <div className="mt-3 space-y-2">
-                          <p className="text-sm font-medium text-gray-700">File yang dipilih:</p>
+                          <p className="text-sm font-medium text-gray-700">File baru yang akan diunggah:</p>
                           <div className="flex flex-wrap gap-2">
                             {selectedFiles.map((file, index) => (
                               <div key={index} className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded-lg flex items-center gap-2 shadow-sm">
@@ -393,9 +502,7 @@ export default function CreateContentPage() {
                         </div>
                       )}
                     </div>
-
-                    {/* Ini adalah bagian yang dikondisikan untuk deadline */}
-                    {jenis_create === "tugas" && (
+                    {jenis_create.toLowerCase() === "tugas" && (
                       <div className="transition-all duration-300 ease-in-out">
                         <Label htmlFor="deadline" className="text-sm font-medium text-gray-700">
                           Deadline <span className="text-red-500">*wajib diisi</span>
@@ -404,18 +511,17 @@ export default function CreateContentPage() {
                         {errors.deadline && <p className="text-red-600 text-sm mt-1">{errors.deadline.message}</p>}
                       </div>
                     )}
-
                     <div className="pt-6 border-t border-gray-200">
                       <Button type="submit" disabled={isSubmitting} className="w-full bg-sky-500 text-white hover:bg-sky-600 shadow-lg hover:shadow-xl transition-all duration-200 py-3 text-lg font-medium" size="lg">
                         {isSubmitting ? (
                           <div className="flex items-center gap-2">
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                            Membuat Konten...
+                            {isEditing ? "Memperbarui Konten..." : "Membuat Konten..."}
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <Plus className="h-5 w-5" />
-                            Buat Konten
+                            {isEditing ? <Edit className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+                            {isEditing ? "Perbarui Konten" : "Buat Konten"}
                           </div>
                         )}
                       </Button>
@@ -427,8 +533,6 @@ export default function CreateContentPage() {
           </CardContent>
         </Card>
       </div>
-      
-      {/* Modal untuk memilih jenis konten */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="bg-white shadow-2xl border-0 rounded-2xl overflow-hidden p-0">
           <DialogHeader className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100 p-8">

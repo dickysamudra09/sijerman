@@ -6,7 +6,7 @@
 
 :root {
   --font-size: 14px;
-  --background: #F9FAFB;
+  --background: #F0F9FF; /* Changed from #F9FAFB to #F0F9FF */
   --foreground: #1F2937;
   --card: #FFFFFF;
   --card-foreground: #1F2937;
@@ -35,7 +35,7 @@
   --chart-4: #10B981;
   --chart-5: #8B5CF6;
   --radius: 0.625rem;
-  --sidebar: #FFFFFF;
+  --sidebar: #F0F9FF; /* Changed from #FFFFFF to #F0F9FF */
   --sidebar-foreground: #1F2937;
   --sidebar-primary: #2F3E75;
   --sidebar-primary-foreground: #FFFFFF;

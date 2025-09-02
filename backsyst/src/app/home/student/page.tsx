@@ -72,7 +72,6 @@ export function StudentMode({ onBack }: StudentModeProps) {
   const [userId, setUserId] = useState<string | null>(null);
   const [classrooms, setClassrooms] = useState<ClassRoom[]>([]);
   const [joinCode, setJoinCode] = useState("");
-  const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isJoinConfirmOpen, setIsJoinConfirmOpen] = useState(false);
@@ -80,7 +79,7 @@ export function StudentMode({ onBack }: StudentModeProps) {
   const [studentStats, setStudentStats] = useState<StudentStats>({
     totalClassrooms: 0,
     completedExercises: 0,
-    averageScore: 0
+    averageScore: 0,
   });
   const router = useRouter();
 
@@ -96,7 +95,7 @@ export function StudentMode({ onBack }: StudentModeProps) {
       if (sessionError || !sessionData.session?.user) {
         setError("Tidak ada sesi ditemukan. Silakan masuk.");
         setIsLoading(false);
-        router.push("/login");
+        router.push("/auth/login");
         return;
       }
 
@@ -151,18 +150,17 @@ export function StudentMode({ onBack }: StudentModeProps) {
 
   const copyClassCode = async (code: string) => {
     try {
-    await navigator.clipboard.writeText(code);
-    toast.success("Kode berhasil disalin!");
+      await navigator.clipboard.writeText(code);
+      toast.success("Kode berhasil disalin!");
     } catch (err) {
-    toast.error("Gagal menyalin kode.");
+      toast.error("Gagal menyalin kode.");
     }
-};
+  };
 
   const fetchStudentStats = async () => {
     if (!userId) return;
 
     try {
-      // Fetch total classrooms joined
       const { data: registrations, error: regError } = await supabase
         .from("classroom_registrations")
         .select("classroom_id")
@@ -170,7 +168,6 @@ export function StudentMode({ onBack }: StudentModeProps) {
 
       const totalClassrooms = registrations ? registrations.length : 0;
 
-      // Fetch completed exercises (submitted attempts)
       const { data: attempts, error: attemptsError } = await supabase
         .from("exercise_attempts")
         .select("id, percentage")
@@ -179,7 +176,6 @@ export function StudentMode({ onBack }: StudentModeProps) {
 
       const completedExercises = attempts ? attempts.length : 0;
 
-      // Calculate average score from completed exercises
       let averageScore = 0;
       if (attempts && attempts.length > 0) {
         const totalPercentage = attempts.reduce((sum, attempt) => sum + (attempt.percentage || 0), 0);
@@ -189,11 +185,10 @@ export function StudentMode({ onBack }: StudentModeProps) {
       setStudentStats({
         totalClassrooms,
         completedExercises,
-        averageScore
+        averageScore,
       });
 
       console.log("Student stats updated:", { totalClassrooms, completedExercises, averageScore });
-
     } catch (error) {
       console.error("Error fetching student stats:", error);
     }
@@ -227,7 +222,7 @@ export function StudentMode({ onBack }: StudentModeProps) {
       return;
     }
 
-    const classroomIds = registrations.map(reg => reg.classroom_id);
+    const classroomIds = registrations.map((reg) => reg.classroom_id);
     console.log("ID kelas yang diikuti:", classroomIds);
 
     const { data: classroomData, error: classError } = await supabase
@@ -398,13 +393,12 @@ export function StudentMode({ onBack }: StudentModeProps) {
       setJoinCode("");
       toast.success("Berhasil bergabung ke kelas!");
       await fetchClassrooms();
-      await fetchStudentStats(); // Update stats after joining a class
+      await fetchStudentStats();
       setIsJoinConfirmOpen(false);
     }
     setIsLoading(false);
   };
 
-  // Function to handle viewing a classroom
   const handleViewClassroom = (classroomId: string) => {
     console.log("Student navigating to classroom with id:", classroomId);
     router.push(`/home/classrooms/${classroomId}`);
@@ -418,273 +412,220 @@ export function StudentMode({ onBack }: StudentModeProps) {
   }, [userId]);
 
   if (isLoading) {
-    return <div>Memuat...</div>;
+    return (
+      <div className="min-h-screen bg-gray-100 p-6">
+        <div className="max-w-screen-2xl mx-auto">
+          <Card className="bg-white shadow-2xl border-0 rounded-2xl">
+            <CardContent className="flex items-center justify-center p-16">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mx-auto mb-4"></div>
+                <p className="text-gray-600 text-lg">Memuat...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card>
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-red-600">{error}</p>
-            <Button onClick={() => router.push("/login")} className="mt-4">
-              Ke Halaman Masuk
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gray-100 p-6">
+        <div className="max-w-screen-2xl mx-auto">
+          <Card className="bg-white shadow-2xl border-0 rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-red-600 text-xl">Error</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-red-600 mb-6">{error}</p>
+              <Button onClick={() => router.push("/auth/login")} className="bg-sky-500 hover:bg-sky-600 text-white shadow-md">
+                Ke Halaman Masuk
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
-  const createOrUpdateUserProfile = async (name: string, role: "teacher" | "student") => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      console.error("Tidak ada pengguna terautentikasi ditemukan.");
-      return;
-    }
-
-    const { error } = await supabase.from("users").upsert(
-      {
-        id: user.id,
-        name,
-        email: user.email || "",
-        role,
-      },
-      { onConflict: "id" }
-    );
-
-    if (error) {
-      console.error("Gagal membuat/memperbarui profil:", error.message);
-    } else {
-      console.log("Profil berhasil dibuat/diperbarui.");
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={handleHomeRedirect}>
-              <Home className="h-4 w-4 mr-2" />
-              Home
+    <div className="flex justify-center items-center min-h-screen bg-gray-100 p-6">
+      <Card className="w-full h-[calc(100vh-48px)] max-w-screen-2xl bg-white shadow-2xl border-0 rounded-2xl overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100 p-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-green-500 rounded-full shadow-lg">
+                  <Users className="h-6 w-6 text-white" />
+                </div>
+                <h1 className="text-2xl font-bold text-gray-900">Dashboard Siswa - Selamat Datang, {userName}</h1>
+              </div>
+            </div>
+            <Button variant="outline" onClick={handleLogout} className="border-gray-300 text-gray-600 shadow-sm">
+              Keluar
             </Button>
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-accent" />
-              <h1>Dashboard Siswa - Selamat Datang, {userName}</h1>
-            </div>
           </div>
-          <Button variant="outline" onClick={handleLogout}>
-            Keluar
-          </Button>
-        </div>
+        </CardHeader>
+        <CardContent className="p-8 overflow-y-auto h-full">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <Card className="bg-white border-0 shadow-lg rounded-xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500">Kelas yang diikuti</CardTitle>
+                <Target className="h-5 w-5 text-gray-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-sky-600">{studentStats.totalClassrooms}</div>
+                <p className="text-xs text-muted-foreground">Kelas</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white border-0 shadow-lg rounded-xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500">Latihan Soal selesai</CardTitle>
+                <CheckCircle2 className="h-5 w-5 text-gray-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{studentStats.completedExercises}</div>
+                <p className="text-xs text-muted-foreground">Latihan</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white border-0 shadow-lg rounded-xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500">Rata-rata Nilai</CardTitle>
+                <TrendingUp className="h-5 w-5 text-gray-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-600">{studentStats.averageScore}%</div>
+                <p className="text-xs text-muted-foreground">Dari semua latihan</p>
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Join Class Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
-              Bergabung ke Kelas
-            </CardTitle>
-            <CardDescription>
-              Masukkan kode kelas yang diberikan oleh guru Anda
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <Input
-                placeholder="Masukkan kode kelas..."
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value)}
-                className="flex-1"
-              />
-              <Button onClick={joinClass} disabled={!joinCode.trim() || isLoading}>
-                <Send className="h-4 w-4 mr-2" />
-                Bergabung
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Join Confirmation Dialog */}
-        <Dialog open={isJoinConfirmOpen} onOpenChange={setIsJoinConfirmOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Bergabung ke Kelas</DialogTitle>
-              <DialogDescription>
-                Konfirmasi detail kelas sebelum bergabung
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              {selectedClassToJoin && (
-                <>
-                  <div>
-                    <h3 className="font-semibold">Nama Kelas: {selectedClassToJoin.name}</h3>
-                    <p className="text-sm text-muted-foreground">Deskripsi: {selectedClassToJoin.description}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Dibuat pada: {new Date(selectedClassToJoin.createdAt).toLocaleDateString('id-ID')}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Guru: {selectedClassToJoin.teacherName}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={confirmJoinClass} disabled={isLoading} className="bg-green-600 text-white hover:bg-green-700">
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Masuk
-                    </Button>
-                    <Button variant="outline" onClick={() => setIsJoinConfirmOpen(false)}>
-                      Batal
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Enrolled Classes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Kelas Saya
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {classrooms.length > 0 ? (
-                classrooms.map((classroom) => (
-                  <Card key={classroom.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
-                        {classroom.name}
-                        <Badge variant="outline">Aktif</Badge>
-                      </CardTitle>
-                      <CardDescription>{classroom.description}</CardDescription>
-                      <p className="text-sm text-muted-foreground">Guru: {classroom.teacherName}</p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Kode Kelas:</span>
-                          <div className="flex items-center gap-2">
-                            <code className="bg-muted px-2 py-1 rounded text-sm">{classroom.code}</code>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              onClick={() => copyClassCode(classroom.code)}
+          <Tabs defaultValue="classrooms" className="w-full">
+            <TabsList className="bg-gray-100 border-0 rounded-xl p-1 shadow-inner">
+              <TabsTrigger value="classrooms" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">Kelas Saya</TabsTrigger>
+              <TabsTrigger value="join" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">Bergabung Kelas</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="classrooms" className="space-y-6 mt-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {classrooms.length > 0 ? (
+                  classrooms.map((classroom) => (
+                    <Card key={classroom.id} className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
+                      <CardHeader className="pb-4">
+                        <CardTitle className="flex items-center justify-between text-gray-900 text-lg">
+                          {classroom.name}
+                          <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 px-3 py-1">
+                            Aktif
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription className="text-gray-600 text-sm leading-relaxed">{classroom.description}</CardDescription>
+                        <p className="text-sm text-muted-foreground">Guru: {classroom.teacherName}</p>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-500">Kode Kelas:</span>
+                            <div className="flex items-center gap-2">
+                              <code className="bg-gray-100 px-3 py-2 rounded-lg text-sm font-mono text-gray-700 border">{classroom.code}</code>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => copyClassCode(classroom.code)}
+                                className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 p-2"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="flex gap-3 pt-2">
+                            <Button
+                              size="sm"
+                              className="flex-1 bg-sky-500 hover:bg-sky-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                              onClick={() => handleViewClassroom(classroom.id)}
                             >
-                              <Copy className="h-4 w-4" />
+                              <Eye className="h-4 w-4 mr-2" />
+                              Lihat
+                            </Button>
+                            <Button size="sm" variant="outline" className="border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm">
+                              <Share2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            className="flex-1"
-                            onClick={() => handleViewClassroom(classroom.id)}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            Lihat
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            <Share2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <p className="text-muted-foreground">Anda belum bergabung dengan kelas apa pun.</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Student Progress */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Kelas yang diikuti
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-primary">{studentStats.totalClassrooms}</div>
-                <p className="text-sm text-muted-foreground">kelas</p>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <p className="text-muted-foreground">Anda belum bergabung dengan kelas apa pun.</p>
+                )}
               </div>
-            </CardContent>
-          </Card>
+            </TabsContent>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5" />
-                Latihan Soal selesai
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-600">{studentStats.completedExercises}</div>
-                <p className="text-sm text-muted-foreground">latihan</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Rata-rata
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600">{studentStats.averageScore}%</div>
-                <p className="text-sm text-muted-foreground">Tingkat penilaian</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Aktivitas Terakhir
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {[
-                { title: "Kuis Tata Bahasa A2", score: 85, date: "Hari ini" },
-                { title: "Latihan Kosakata", score: 92, date: "Kemarin" },
-                { title: "Tes Pemahaman Mendengar", score: 76, date: "2 Hari lalu" }
-              ].map((activity, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <BookOpen className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">{activity.title}</p>
-                      <p className="text-sm text-muted-foreground">{activity.date}</p>
+            <TabsContent value="join" className="space-y-6 mt-8">
+              <Card className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl">
+                <CardHeader className="pb-6">
+                  <CardTitle className="flex items-center gap-3 text-gray-900 text-xl">
+                    <div className="p-2 bg-purple-500 rounded-lg">
+                      <UserPlus className="h-5 w-5 text-white" />
                     </div>
+                    Bergabung ke Kelas
+                  </CardTitle>
+                  <CardDescription className="text-gray-600">
+                    Masukkan kode kelas yang diberikan oleh guru Anda
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex gap-4">
+                    <Input
+                      placeholder="Masukkan kode kelas..."
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value)}
+                      className="flex-1 border-gray-300 focus:border-sky-500 focus:ring-sky-200 bg-white shadow-sm text-lg py-3"
+                    />
+                    <Button onClick={joinClass} disabled={!joinCode.trim() || isLoading} className="bg-green-500 hover:bg-green-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3">
+                      <Send className="h-4 w-4 mr-2" />
+                      Bergabung
+                    </Button>
                   </div>
-                  <Badge variant={activity.score >= 80 ? "default" : "secondary"}>
-                    {activity.score}%
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          <Dialog open={isJoinConfirmOpen} onOpenChange={setIsJoinConfirmOpen}>
+            <DialogContent className="bg-white border-0 shadow-2xl rounded-2xl max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-gray-900 text-xl">Bergabung ke Kelas</DialogTitle>
+                <DialogDescription className="text-gray-600">
+                  Konfirmasi detail kelas sebelum bergabung
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {selectedClassToJoin && (
+                  <>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Nama Kelas: {selectedClassToJoin.name}</h3>
+                      <p className="text-sm text-gray-500">Deskripsi: {selectedClassToJoin.description}</p>
+                      <p className="text-sm text-gray-500">
+                        Dibuat pada: {new Date(selectedClassToJoin.createdAt).toLocaleDateString('id-ID')}
+                      </p>
+                      <p className="text-sm text-gray-500">Guru: {selectedClassToJoin.teacherName}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={confirmJoinClass} disabled={isLoading} className="bg-green-600 text-white hover:bg-green-700 shadow-md">
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Masuk
+                      </Button>
+                      <Button variant="outline" onClick={() => setIsJoinConfirmOpen(false)} className="border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm">
+                        Batal
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        </CardContent>
+      </Card>
     </div>
   );
 }
