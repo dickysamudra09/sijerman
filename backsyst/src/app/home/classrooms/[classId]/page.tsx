@@ -18,8 +18,7 @@ import {
   Users,
   Code,
   FileText,
-  FileQuestion,
-  GraduationCap as GraduationCapIcon,
+  ClipboardList,
   Edit,
   Trash2,
 } from "lucide-react";
@@ -98,8 +97,8 @@ export default function ClassroomsPage() {
     attempt?: ExerciseAttempt;
   } | null>(null);
   const [showLatihanModal, setShowLatihanModal] = useState(false);
+  const [showContentModal, setShowContentModal] = useState(false);
 
-  // --- Check Exercise Attempts ---
   const checkExerciseAttempts = async (userId: string) => {
     if (userRole !== 'student') return;
 
@@ -219,7 +218,6 @@ export default function ClassroomsPage() {
     }
   };
 
-
   const handleStartNewAttempt = async () => {
     if (!currentLatihan) return;
 
@@ -269,17 +267,12 @@ export default function ClassroomsPage() {
 
     try {
       const today = new Date().toISOString().split('T')[0];
-
       console.log("Recording attendance for:", { userId, classroomId, date: today });
-
       let sessionId: string | null = null;
-
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
       if (sessionError || !sessionData.session) {
         console.log("No active auth session found, will create manual session");
       }
-
       const { data: userSession, error: userSessionError } = await supabase
         .from("sessions")
         .select("id")
@@ -288,7 +281,6 @@ export default function ClassroomsPage() {
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
-
       if (userSessionError || !userSession) {
         const newSessionId = crypto.randomUUID();
         const { data: newSession, error: newSessionError } = await supabase
@@ -303,7 +295,6 @@ export default function ClassroomsPage() {
           })
           .select()
           .single();
-
         if (newSessionError) {
           console.error("Failed to create session:", newSessionError.message);
           toast.error("Gagal membuat sesi: " + newSessionError.message);
@@ -313,7 +304,6 @@ export default function ClassroomsPage() {
       } else {
         sessionId = userSession.id;
       }
-
       const attendanceData: {
         id: string;
         classroom_id: string;
@@ -329,9 +319,7 @@ export default function ClassroomsPage() {
         date: today,
         is_present: true,
       };
-
       console.log("Attempting to upsert attendance:", attendanceData);
-
       const { data: attendanceResult, error: attendanceError } = await supabase
         .from("attendance")
         .upsert(
@@ -343,12 +331,9 @@ export default function ClassroomsPage() {
         )
         .select()
         .single();
-
       console.log("Attendance upsert result:", { attendanceResult, error: attendanceError });
-
       if (attendanceError) {
         console.error("Failed to record attendance:", attendanceError.message);
-
         if (attendanceError.code === '23505') {
           console.log("Attendance already exists for today, treating as success");
           toast.info("Kehadiran hari ini sudah tercatat sebelumnya.");
@@ -385,18 +370,15 @@ export default function ClassroomsPage() {
         .eq("date", today)
         .limit(1)
         .single();
-
       if (error && error.code !== 'PGRST116') {
         console.error("Error checking attendance:", error.message);
         return false;
       }
-
       if (data) {
         console.log("Attendance already recorded today");
         setAttendanceRecorded(true);
         return true;
       }
-
       return false;
     } catch (err) {
       console.error("Error in checkTodayAttendance:", err);
@@ -410,10 +392,8 @@ export default function ClassroomsPage() {
       setInitialLoading(true);
       setError(null);
       console.log("Mengambil data untuk classId:", classId);
-
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       console.log("Respons sesi:", { sessionData, error: sessionError });
-
       if (sessionError || !sessionData.session?.user) {
         setError("Tidak ada sesi ditemukan. Silakan masuk.");
         setIsLoading(false);
@@ -421,36 +401,29 @@ export default function ClassroomsPage() {
         router.push("/auth/login");
         return;
       }
-
       const userId = sessionData.session.user.id;
       setUserId(userId);
-
       const { data: userData, error: userError } = await supabase
         .from("users")
         .select("name, role")
         .eq("id", userId)
         .single();
       console.log("Respons data pengguna:", { userData, error: userError });
-
       if (userError) {
         setError("Gagal mengambil data pengguna: " + userError.message);
         setIsLoading(false);
         setInitialLoading(false);
         return;
       }
-
       if (!userData) {
         setError("Data pengguna tidak ditemukan.");
         setIsLoading(false);
         setInitialLoading(false);
         return;
       }
-
       setUserName(userData.name || "");
       setUserRole(userData.role);
-
       const alreadyRecorded = await checkTodayAttendance(userId, classId);
-
       if (userData.role === "teacher") {
         const { data: classroomData, error: classroomError } = await supabase
           .from("classrooms")
@@ -458,22 +431,18 @@ export default function ClassroomsPage() {
           .eq("id", classId)
           .eq("teacher_id", userId)
           .single();
-
         console.log("Respons kelas:", { classroomData, error: classroomError });
-
         if (classroomError) {
           setError("Kelas tidak ditemukan atau Anda tidak memiliki akses: " + classroomError.message);
           setIsLoading(false);
           setInitialLoading(false);
           return;
         }
-
         if (classroomData) {
           const { data: registrations, error: regError } = await supabase
             .from("classroom_registrations")
             .select("student_id")
             .eq("classroom_id", classId);
-
           if (regError) {
             console.error("Gagal mengambil registrasi:", regError.message);
             setError("Gagal mengambil registrasi: " + regError.message);
@@ -481,7 +450,6 @@ export default function ClassroomsPage() {
             setInitialLoading(false);
             return;
           }
-
           const studentIds = registrations.map(reg => reg.student_id);
           let students: Student[] = [];
           if (studentIds.length > 0) {
@@ -489,7 +457,6 @@ export default function ClassroomsPage() {
               .from("users")
               .select("id, name, email")
               .in("id", studentIds);
-
             if (studentError) {
               console.error("Gagal mengambil data siswa:", studentError.message);
               setError("Gagal mengambil data siswa: " + studentError.message);
@@ -505,7 +472,6 @@ export default function ClassroomsPage() {
               }));
             }
           }
-
           setClassroom({
             id: classroomData.id,
             name: classroomData.name,
@@ -514,7 +480,6 @@ export default function ClassroomsPage() {
             students,
             createdAt: classroomData.created_at,
           });
-
           if (!alreadyRecorded && !isRecordingAttendance) {
             const success = await recordAttendance(userId, classId);
             if (success) {
@@ -522,16 +487,12 @@ export default function ClassroomsPage() {
             }
           }
         }
-
-        // Perbaikan: Hapus filter `.eq("pembuat", userId)` agar guru dapat melihat semua konten di kelas
         const { data: contentsData, error: contentsError } = await supabase
           .from("teacher_create")
           .select("*")
           .eq("kelas", classId)
           .order("created_at", { ascending: false });
-
         console.log("Respons konten guru:", { contentsData, error: contentsError });
-
         if (contentsError) {
           console.error("Gagal mengambil konten:", contentsError.message);
           setError("Gagal mengambil konten: " + contentsError.message);
@@ -539,7 +500,6 @@ export default function ClassroomsPage() {
           setContents(contentsData || []);
           console.log("Konten guru yang di-set:", contentsData);
         }
-
       } else if (userData.role === "student") {
         const { data: registration, error: regError } = await supabase
           .from("classroom_registrations")
@@ -547,58 +507,44 @@ export default function ClassroomsPage() {
           .eq("classroom_id", classId)
           .eq("student_id", userId)
           .single();
-
         console.log("Respons registrasi siswa:", { registration, error: regError });
-
         if (regError || !registration) {
           setError("Anda tidak terdaftar di kelas ini atau kelas tidak ditemukan.");
           setIsLoading(false);
           setInitialLoading(false);
           return;
         }
-
         const { data: classroomData, error: classroomError } = await supabase
           .from("classrooms")
           .select("id, name, code, description, created_at, teacher_id")
           .eq("id", classId)
           .single();
-
         console.log("Respons kelas siswa:", { classroomData, error: classroomError });
-
         if (classroomError || !classroomData) {
           setError("Kelas tidak ditemukan: " + (classroomError?.message || ""));
           setIsLoading(false);
           setInitialLoading(false);
           return;
         }
-
         const { data: teacherData, error: teacherError } = await supabase
           .from("users")
           .select("name")
           .eq("id", classroomData.teacher_id)
           .single();
-
         let teacherName = "Guru Tidak Dikenal";
         if (!teacherError && teacherData) {
           teacherName = teacherData.name || "Guru Tidak Dikenal";
         }
-        
-        // --- START PERBAIKAN UNTUK STUDENT ROLE ---
-        // Ambil semua registrasi siswa di kelas ini
         const { data: registrations, error: regStudentsError } = await supabase
           .from("classroom_registrations")
           .select("student_id")
           .eq("classroom_id", classId);
-
         let students: Student[] = [];
         if (regStudentsError) {
           console.error("Gagal mengambil registrasi siswa lain:", regStudentsError.message);
         } else {
-          // Buat array data siswa kosong, hanya untuk mendapatkan jumlahnya
           const studentIds = registrations?.map(reg => reg.student_id);
           if (studentIds && studentIds.length > 0) {
-            // Karena student role tidak butuh data detail siswa lain, kita bisa mengosongkan array ini
-            // namun jumlahnya tetap akan terhitung di students.length
             students = studentIds.map(id => ({
                 id,
                 name: '',
@@ -610,38 +556,30 @@ export default function ClassroomsPage() {
             }));
           }
         }
-        // --- END PERBAIKAN UNTUK STUDENT ROLE ---
-
         setClassroom({
           id: classroomData.id,
           name: classroomData.name,
           code: classroomData.code,
           description: classroomData.description || "",
-          students, // Gunakan array siswa yang sudah diperbarui
+          students,
           createdAt: classroomData.created_at,
           teacherName,
         });
-
         if (!alreadyRecorded && !isRecordingAttendance) {
           const success = await recordAttendance(userId, classId);
           if (success) {
             setAttendanceRecorded(true);
           }
         }
-
         await checkExerciseAttempts(userId);
         await checkStudentSubmissions(userId);
-
         console.log("Mengambil konten untuk siswa di kelas:", classId, "dengan teacher_id:", classroomData.teacher_id);
-
         const { data: contentsData, error: contentsError } = await supabase
           .from("teacher_create")
           .select("*")
           .eq("kelas", classId)
           .order("created_at", { ascending: false });
-
         console.log("Respons konten siswa:", { contentsData, error: contentsError });
-
         if (contentsError) {
           console.error("Gagal mengambil konten:", contentsError.message);
           setError("Gagal mengambil konten: " + contentsError.message);
@@ -656,11 +594,9 @@ export default function ClassroomsPage() {
         setInitialLoading(false);
         return;
       }
-
       setIsLoading(false);
       setInitialLoading(false);
     };
-
     fetchData();
   }, [classId, router, userRole]);
 
@@ -671,10 +607,8 @@ export default function ClassroomsPage() {
       'Latihan soal': [],
       'Kuis': [],
     };
-
     contents.forEach(content => {
       let normalizedKey = content.jenis_create.trim().toLowerCase();
-
       switch (normalizedKey) {
         case 'materi':
           groups['Materi'].push(content);
@@ -696,7 +630,6 @@ export default function ClassroomsPage() {
           break;
       }
     });
-
     return groups;
   }, [contents]);
 
@@ -913,7 +846,7 @@ export default function ClassroomsPage() {
                   <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
                     <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
                        <Button
-                          onClick={() => router.push(`/home/classrooms/hub?classId=${classroom.id}`)}
+                          onClick={() => setShowContentModal(true)}
                           className="w-full bg-green-600 text-white hover:bg-green-700 shadow-md hover:shadow-lg transition-all duration-200"
                         >
                           <Plus className="h-4 w-4 mr-2" />
@@ -1114,7 +1047,7 @@ export default function ClassroomsPage() {
                       </p>
                       {userRole === "teacher" && (
                         <Button
-                          onClick={() => router.push(`/home/classrooms/create?classId=${classId}`)}
+                          onClick={() => setShowContentModal(true)}
                           className="bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg"
                           size="lg"
                         >
@@ -1130,6 +1063,7 @@ export default function ClassroomsPage() {
           </CardContent>
         </Card>
       </div>
+
       <Dialog open={showLatihanModal} onOpenChange={setShowLatihanModal}>
         <DialogContent className="bg-white border-0 shadow-2xl rounded-2xl max-w-md">
           <DialogHeader>
@@ -1193,6 +1127,96 @@ export default function ClassroomsPage() {
           </div>
         </DialogContent>
       </Dialog>
+      <Dialog open={showContentModal} onOpenChange={setShowContentModal}>
+        <DialogContent className="bg-white border-0 shadow-3xl rounded-2xl lg:max-w-[960px] w-full">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-gray-900 text-2xl font-bold">
+              Buat Konten Baru
+            </DialogTitle>
+            <p className="text-gray-500 text-base">
+              Pilih jenis konten yang ingin Anda buat untuk kelas ini.
+            </p>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Materi & Tugas */}
+            <Card
+              className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer rounded-xl"
+              onClick={() => {
+                router.push(`/home/classrooms/create?classId=${classId}`);
+                setShowContentModal(false);
+              }}
+            >
+              <CardHeader className="text-center pb-4">
+                <div className="flex justify-center">
+                  <div className="text-blue-600 p-4 bg-gray-50 rounded-full mb-4">
+                    <BookOpen className="w-10 h-10" />
+                  </div>
+                </div>
+                <CardTitle className="text-gray-900 text-lg font-semibold">
+                  Materi & Tugas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-center px-6 pb-6">
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Buat materi pembelajaran atau tugas untuk siswa.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Latihan Soal */}
+            <Card
+              className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer rounded-xl"
+              onClick={() => {
+                router.push(`/home/classrooms/latihanSoal?classId=${classId}`);
+                setShowContentModal(false);
+              }}
+            >
+              <CardHeader className="text-center pb-4">
+                <div className="flex justify-center">
+                  <div className="text-green-600 p-4 bg-gray-50 rounded-full mb-4">
+                    <FileText className="w-10 h-10" />
+                  </div>
+                </div>
+                <CardTitle className="text-gray-900 text-lg font-semibold">
+                  Latihan Soal
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-center px-6 pb-6">
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Buat paket soal latihan untuk menguji pemahaman siswa.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Kuis */}
+            <Card
+              className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer rounded-xl"
+              onClick={() => {
+                router.push(`/home/classrooms/kuis?classId=${classId}`);
+                setShowContentModal(false);
+              }}
+            >
+              <CardHeader className="text-center pb-4">
+                <div className="flex justify-center">
+                  <div className="text-purple-600 p-4 bg-gray-50 rounded-full mb-4">
+                    <ClipboardList className="w-10 h-10" />
+                  </div>
+                </div>
+                <CardTitle className="text-gray-900 text-lg font-semibold">
+                  Kuis
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-center px-6 pb-6">
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Buat kuis evaluasi singkat untuk siswa.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
