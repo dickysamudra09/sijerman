@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, Edit, BookOpen, Clock, FileText, UserCircle, UploadCloud, CheckCircle2 } from "lucide-react";
+import { Trash2, Edit, BookOpen, Clock, FileText, UserCircle, UploadCloud, CheckCircle2, Download as DownloadIcon } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ContentItem {
   id: string;
@@ -31,15 +33,25 @@ interface StudentSubmission {
   submitted_at: string;
 }
 
+interface SubmissionWithStudentName extends StudentSubmission {
+  users: {
+    name: string;
+  } | null;
+}
+
 export default function ContentDetailPage() {
   const [content, setContent] = useState<ContentItem | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [creatorName, setCreatorName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<StudentSubmission | null>(null);
+  const [submissions, setSubmissions] = useState<SubmissionWithStudentName[] | null>(null);
+  const [selectedSubmissionIds, setSelectedSubmissionIds] = useState<string[]>([]);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const router = useRouter();
   const params = useParams();
   const classId = params.classId as string;
@@ -55,8 +67,6 @@ export default function ContentDetailPage() {
         setIsLoading(false);
         return;
       }
-
-      console.log("Fetching content with classId:", classId, "contentId:", contentId);
 
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
@@ -85,18 +95,39 @@ export default function ContentDetailPage() {
       setUserRole(userData.role);
 
       let contentData: ContentItem | null = null;
+      let creator: string | null = null;
       let fetchError: any = null;
 
       if (userData.role === "teacher") {
         const { data, error: fetchErr } = await supabase
           .from("teacher_create")
-          .select("*")
+          .select("*, users!teacher_create_pembuat_fkey(name)")
           .eq("id", contentId)
           .eq("kelas", classId)
-          .eq("pembuat", currentUserId)
           .single();
-        contentData = data;
+        
+        if (data) {
+          contentData = data;
+          creator = data.users?.name || data.pembuat;
+        }
         fetchError = fetchErr;
+
+        if (contentData && contentData.jenis_create.toLowerCase() === "tugas") {
+          const { data: submissionData, error: submissionError } = await supabase
+            .from("student_submissions")
+            .select(`
+              *,
+              users!student_submissions_student_id_fkey(name)
+            `)
+            .eq("assignment_id", contentId)
+            .order("submitted_at", { ascending: true });
+
+          if (submissionError) {
+            console.error("Error fetching student submissions:", submissionError);
+          } else {
+            setSubmissions(submissionData as SubmissionWithStudentName[]);
+          }
+        }
       } else if (userData.role === "student") {
         const { data: registration, error: regError } = await supabase
           .from("classroom_registrations")
@@ -119,10 +150,8 @@ export default function ContentDetailPage() {
           .single();
         
         if (data) {
-          contentData = {
-            ...data,
-            pembuat: data.users.name || "Guru Tidak Dikenal",
-          };
+          contentData = data;
+          creator = data.users?.name || data.pembuat;
         }
         fetchError = fetchErr;
 
@@ -138,7 +167,6 @@ export default function ContentDetailPage() {
         } else {
           setSubmissionStatus(submissionData || null);
         }
-        
       } else {
         setError("Role pengguna tidak valid.");
       }
@@ -149,6 +177,7 @@ export default function ContentDetailPage() {
         setError("Konten tidak ditemukan atau Anda tidak memiliki akses.");
       } else {
         setContent(contentData);
+        setCreatorName(creator);
       }
 
       setIsLoading(false);
@@ -156,6 +185,62 @@ export default function ContentDetailPage() {
 
     fetchContent();
   }, [classId, contentId, router, userId]);
+
+  const handleDownload = async (fileUrl: string, fileName: string) => {
+    try {
+      const response = await fetch(fileUrl);
+      const blob = await response.blob();
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      toast.error("Gagal mengunduh file: " + (err.message || err));
+    }
+  };
+
+  const handleCheckboxChange = (id: string, isChecked: boolean) => {
+    if (isChecked) {
+      setSelectedSubmissionIds((prev) => [...prev, id]);
+    } else {
+      setSelectedSubmissionIds((prev) => prev.filter((submissionId) => submissionId !== id));
+    }
+  };
+
+  const handleDownloadSelected = async () => {
+    setIsDownloadingAll(true);
+    try {
+      if (!submissions) {
+        toast.error("Tidak ada data pengumpulan untuk diunduh.");
+        return;
+      }
+      
+      const filesToDownload = submissions.filter((sub) => selectedSubmissionIds.includes(sub.id));
+
+      if (filesToDownload.length === 0) {
+        toast.error("Tidak ada file yang dipilih.");
+        return;
+      }
+
+      for (const file of filesToDownload) {
+        const fileUrl = file.file_url;
+        const fileName = `${file.users?.name || "siswa"}_${fileUrl.substring(fileUrl.lastIndexOf('/') + 1)}`;
+        
+        await handleDownload(fileUrl, fileName);
+      }
+
+      toast.success(`${filesToDownload.length} dokumen berhasil diunduh!`);
+      setSelectedSubmissionIds([]);
+      
+    } catch (err: any) {
+      toast.error("Gagal mengunduh file: " + (err.message || err));
+    } finally {
+      setIsDownloadingAll(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!content || userRole !== "teacher" || content.pembuat !== userId) return;
@@ -206,7 +291,6 @@ export default function ContentDetailPage() {
     }
   };
 
-  // FUNGSI UPLOAD YANG SUDAH DIPERBAIKI DAN RAPI
   const handleFileUpload = async () => {
     if (!selectedFile || isUploading || !userId) {
       toast.error("Pilih file terlebih dahulu.");
@@ -219,13 +303,12 @@ export default function ContentDetailPage() {
     }
 
     setIsUploading(true);
-    // Path file disesuaikan dengan bucket 'documents' dan struktur yang aman
     const uniqueFileName = `${Date.now()}_${selectedFile.name}`;
     const filePath = `${userId}/${contentId}/${uniqueFileName}`;
 
     try {
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents') // Menggunakan bucket 'documents'
+        .from('documents')
         .upload(filePath, selectedFile, {
           cacheControl: '3600',
           upsert: true,
@@ -237,7 +320,7 @@ export default function ContentDetailPage() {
       }
 
       const { data: fileUrlData } = supabase.storage
-        .from('documents') // Menggunakan bucket 'documents'
+        .from('documents')
         .getPublicUrl(filePath);
 
       if (!fileUrlData || !fileUrlData.publicUrl) {
@@ -361,7 +444,7 @@ export default function ContentDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-xl font-bold text-green-600">
-                  {content.pembuat}
+                  {creatorName}
                 </div>
               </CardContent>
             </Card>
@@ -392,6 +475,11 @@ export default function ContentDetailPage() {
                   )}
                 </TabsTrigger>
               )}
+              {isAssignment && isContentCreator && (
+                <TabsTrigger value="submissions" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">
+                  Daftar Pengumpulan
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="content" className="space-y-6 mt-8">
@@ -418,10 +506,10 @@ export default function ContentDetailPage() {
                     <ul className="list-disc pl-6 space-y-2">
                       {content.documents.map((doc, index) => (
                         <li key={index}>
-                          <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-2">
+                          <button onClick={() => handleDownload(doc.url, doc.name)} className="text-blue-600 hover:underline flex items-center gap-2">
                             <FileText className="h-4 w-4 text-blue-500" />
                             {doc.name}
-                          </a>
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -493,9 +581,9 @@ export default function ContentDetailPage() {
                     <CardContent className="space-y-2">
                       <p className="text-sm text-gray-600">
                         <span className="font-medium text-gray-900">File: </span>
-                        <a href={submissionStatus.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                          Lihat File Tugas
-                        </a>
+                        <button onClick={() => handleDownload(submissionStatus.file_url, "Tugas Anda")} className="text-blue-600 hover:underline">
+                          Lihat dan Unduh File Tugas
+                        </button>
                       </p>
                       <p className="text-sm text-gray-600">
                         <span className="font-medium text-gray-900">Waktu Pengumpulan: </span>
@@ -504,6 +592,87 @@ export default function ContentDetailPage() {
                     </CardContent>
                   </Card>
                 )}
+              </TabsContent>
+            )}
+
+            {isAssignment && isContentCreator && (
+              <TabsContent value="submissions" className="space-y-6 mt-8">
+                <Card className="bg-white border border-gray-100 shadow-lg rounded-xl p-6">
+                  <CardHeader className="flex flex-row justify-between items-center">
+                    <div className="space-y-1">
+                      <CardTitle>Daftar Pengumpulan Siswa</CardTitle>
+                      <CardDescription>
+                        {submissions && submissions.length > 0
+                          ? `Total ${submissions.length} siswa sudah mengumpulkan.`
+                          : "Belum ada siswa yang mengumpulkan tugas ini."}
+                      </CardDescription>
+                    </div>
+                    <Button
+                      onClick={handleDownloadSelected}
+                      disabled={selectedSubmissionIds.length === 0 || isDownloadingAll}
+                      className="bg-sky-500 hover:bg-sky-600 text-white shadow-md transition-all duration-200 ease-in-out"
+                    >
+                      <DownloadIcon className="h-4 w-4 mr-2" />
+                      {isDownloadingAll ? "Mengunduh..." : `Unduh Dokumen Terpilih (${selectedSubmissionIds.length})`}
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {submissions && submissions.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[50px]">
+                              <Checkbox
+                                checked={selectedSubmissionIds.length === submissions.length}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedSubmissionIds(submissions.map(sub => sub.id));
+                                  } else {
+                                    setSelectedSubmissionIds([]);
+                                  }
+                                }}
+                              />
+                            </TableHead>
+                            <TableHead>Nama Siswa</TableHead>
+                            <TableHead>Status Pengumpulan</TableHead>
+                            <TableHead>Waktu Pengumpulan</TableHead>
+                            <TableHead className="text-right">Dokumen</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {submissions.map((submission) => {
+                            const isLate = content.deadline && new Date(submission.submitted_at) > new Date(content.deadline);
+                            return (
+                              <TableRow key={submission.id}>
+                                <TableCell>
+                                  <Checkbox
+                                    checked={selectedSubmissionIds.includes(submission.id)}
+                                    onCheckedChange={(checked) => handleCheckboxChange(submission.id, checked as boolean)}
+                                  />
+                                </TableCell>
+                                <TableCell className="font-medium">{submission.users?.name || 'Nama Tidak Ditemukan'}</TableCell>
+                                <TableCell>
+                                  <Badge className={isLate ? "bg-red-500 text-white hover:bg-red-500/80" : "bg-green-500 text-white hover:bg-green-500/80"}>
+                                    {isLate ? "Terlambat" : "Tepat Waktu"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{new Date(submission.submitted_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</TableCell>
+                                <TableCell className="text-right">
+                                  <button onClick={() => handleDownload(submission.file_url, `${submission.users?.name || "siswa"}_${submission.file_url.substring(submission.file_url.lastIndexOf('/') + 1)}`)} className="inline-flex items-center gap-2 text-sky-600 hover:underline">
+                                    <DownloadIcon className="h-4 w-4" />
+                                    Unduh
+                                  </button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <p className="text-muted-foreground text-center">Belum ada pengumpulan tugas.</p>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             )}
           </Tabs>
