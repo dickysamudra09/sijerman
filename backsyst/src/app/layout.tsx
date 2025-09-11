@@ -5,9 +5,9 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'EduPlatform - Platform Pembelajaran Online',
+  title: 'Si Jerman - Platform Pembelajaran Online Bahasa Jerman',
   description: 'Platform pembelajaran online terbaik untuk siswa Indonesia. Belajar dengan mudah dan menyenangkan.',
-  keywords: ['pembelajaran online', 'course', 'pendidikan', 'siswa', 'kelas A-1', 'kelas A-2'],
+  keywords: ['pembelajaran online', 'course', 'pendidikan', 'siswa'],
 };
 
 export default async function RootLayout({
