@@ -23,12 +23,19 @@ import {
   Trash2,
   ChevronUp,
   ChevronDown,
-  ArrowLeft, // Tambahkan ini
+  ArrowLeft,
+  ChevronsLeft,
+  ChevronsRight,
+  Bell,
+  User,
+  Home,
+  LogOut
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { id } from "date-fns/locale";
 import Link from "next/link";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface Student {
   id: string;
@@ -97,6 +104,7 @@ export default function ClassroomsPage() {
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [activeContentId, setActiveContentId] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const [currentLatihan, setCurrentLatihan] = useState<{
     id: string;
@@ -446,41 +454,41 @@ export default function ClassroomsPage() {
             .select("student_id")
             .eq("classroom_id", classId);
           if (regError) {
-            console.error("Gagal mengambil registrasi:", regError.message);
-            setError("Gagal mengambil registrasi: " + regError.message);
-            setIsLoading(false);
-            setInitialLoading(false);
-            return;
+              console.error("Gagal mengambil registrasi:", regError.message);
+              setError("Gagal mengambil registrasi: " + regError.message);
+              setIsLoading(false);
+              setInitialLoading(false);
+              return;
           }
           const studentIds = registrations.map(reg => reg.student_id);
           let students: Student[] = [];
           if (studentIds.length > 0) {
-            const { data: studentData, error: studentError } = await supabase
-              .from("users")
-              .select("id, name, email")
-              .in("id", studentIds);
-            if (studentError) {
-              console.error("Gagal mengambil data siswa:", studentError.message);
-              setError("Gagal mengambil data siswa: " + studentError.message);
-            } else {
-              students = studentData.map(student => ({
-                id: student.id,
-                name: student.name,
-                email: student.email,
-                progress: 0,
-                last_active: new Date().toISOString(),
-                completed_quizzes: 0,
-                average_score: 0,
-              }));
-            }
+              const { data: studentData, error: studentError } = await supabase
+                  .from("users")
+                  .select("id, name, email")
+                  .in("id", studentIds);
+              if (studentError) {
+                  console.error("Gagal mengambil data siswa:", studentError.message);
+                  setError("Gagal mengambil data siswa: " + studentError.message);
+              } else {
+                  students = studentData.map(student => ({
+                      id: student.id,
+                      name: student.name,
+                      email: student.email,
+                      progress: 0,
+                      last_active: new Date().toISOString(),
+                      completed_quizzes: 0,
+                      average_score: 0,
+                  }));
+              }
           }
           setClassroom({
-            id: classroomData.id,
-            name: classroomData.name,
-            code: classroomData.code,
-            description: classroomData.description || "",
-            students,
-            createdAt: classroomData.created_at,
+              id: classroomData.id,
+              name: classroomData.name,
+              code: classroomData.code,
+              description: classroomData.description || "",
+              students,
+              createdAt: classroomData.created_at,
           });
           if (!alreadyRecorded && !isRecordingAttendance) {
             const success = await recordAttendance(userId, classId);
@@ -594,7 +602,6 @@ export default function ClassroomsPage() {
     fetchData();
   }, [classId, router, userRole]);
 
-  // Efek baru untuk membuka semua grup menu secara otomatis
   useEffect(() => {
     if (contents.length > 0) {
       setOpenGroups(new Set(Object.keys(groupedContents)));
@@ -755,6 +762,17 @@ export default function ClassroomsPage() {
     }
   };
 
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Logout Error:", error.message);
+      toast.error("Gagal keluar. Silakan coba lagi.");
+    } else {
+      router.push("/auth/login");
+    }
+  };
+
+
   if (initialLoading) {
     return (
       <div className="min-h-screen bg-gray-100 p-6">
@@ -819,535 +837,627 @@ export default function ClassroomsPage() {
   }
   
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="w-full flex flex-col md:flex-row gap-6 p-6 md:p-8 lg:p-10 items-stretch">
+    <div className="flex flex-col min-h-screen bg-gray-100">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md px-6 py-4 flex items-center justify-between">
+      {/* Logo + Title */}
+      <div className="flex items-center space-x-4">
+        <Link href="/home" className="flex items-center space-x-2">
+          <GraduationCap className="h-8 w-8 text-sky-500" />
+          <span className="text-2xl font-bold text-gray-900">
+            Si Jerman - Classrooms
+          </span>
+        </Link>
+      </div>
 
-        <Card className="bg-white shadow-2xl border-0 rounded-2xl w-full md:w-1/4 sticky top-6 self-start">
-          <CardHeader className="p-6">
-            <div className="flex items-center gap-3">
-              {/* START: Perubahan Tombol Kembali */}
+      {/* Right Menu */}
+      <div className="flex items-center space-x-4">
+        {/* Tombol Notifikasi */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative rounded-full hover:bg-gray-100"
+        >
+          <Bell className="h-6 w-6 text-gray-600" />
+          <span className="absolute top-1 right-1 h-2.5 w-2.5 bg-red-500 rounded-full border border-white"></span>
+        </Button>
+
+        {/* Dropdown Profile */}
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="flex items-center justify-center rounded-full transition-colors hover:bg-gray-100"
+            >
+              <User className="h-6 w-6 text-gray-600" />
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent
+            align="end"
+            sideOffset={8}
+            className="w-56 rounded-lg shadow-xl bg-white"
+          >
+            <DropdownMenuLabel className="font-semibold">
+              {userName}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem asChild>
+              <Link
+                href="/home"
+                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors rounded-md"
+              >
+                <Home className="mr-2 h-4 w-4" />
+                Home
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem asChild>
+              <Link
+                href="/home/latihan-soal"
+                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors rounded-md"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Latihan Soal
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors rounded-md"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Keluar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </header>
+      <main className="flex-1 pt-20">
+        <div className="w-full flex flex-col md:flex-row gap-6 p-6 md:p-8 lg:p-10 items-stretch">
+          {!isSidebarOpen && (
+            <Button
+              onClick={() => setIsSidebarOpen(true)}
+              // Perbaikan posisi: Ditempelkan ke pojok kiri dan sejajar dengan konten di bawah header
+              className="fixed left-0 top-28 w-12 h-12 p-0 rounded-r-lg shadow-xl bg-gray-800 text-white hover:bg-gray-700 z-[100]"
+            >
+              <ChevronsRight className="h-6 w-6" />
+            </Button>
+          )}
+
+          <Card 
+            className={`bg-white shadow-2xl border-0 rounded-2xl w-full md:w-1/4 sticky top-24 self-start transform transition-all duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:w-0 md:opacity-0'}`}
+          >
+            <CardHeader className="p-6">
+              <div className="flex items-center gap-3 justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="text-xl font-bold text-gray-900">
+                    Daftar Konten
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="border-gray-300 text-gray-600 shadow-sm hover:bg-gray-50 px-3 py-2.5"
+                >
+                  <ChevronsLeft className="h-5 w-5" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0 pt-4">
+              <nav className="space-y-1">
+                {Object.keys(groupedContents).length > 0 ? (
+                  Object.keys(groupedContents).map((key) => {
+                    const items = groupedContents[key];
+                    const isOpen = openGroups.has(key);
+                    const groupColors = getColorsForType(key);
+                    
+                    const materialCount = groupedContents['Materi']?.length || 0;
+                    const assignmentCount = groupedContents['Tugas']?.length || 0;
+                    const exerciseCount = groupedContents['Latihan soal']?.length || 0;
+                    const quizCount = groupedContents['Kuis']?.length || 0;
+
+                    return (
+                      <div key={key}>
+                          <Button 
+                              variant="ghost" 
+                              onClick={() => toggleGroup(key)}
+                              className={`w-full justify-between text-left text-base font-medium text-gray-700 ${groupColors.sidebarHoverBg} ${isOpen ? 'bg-gray-100' : ''} px-6 py-3`}
+                          >
+                              <span className="flex items-center gap-3">
+                                  {getGroupIcon(key)}
+                                  {getGroupTitle(key)}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                  {(key === 'Materi' && materialCount > 0) && (
+                                      <Badge className={`${groupColors.sidebarBadgeBg} ${groupColors.sidebarBadgeText} text-xs px-2.5 py-0.5 rounded-full font-normal`}>
+                                          {materialCount}
+                                      </Badge>
+                                  )}
+                                  {(key === 'Tugas' && assignmentCount > 0) && (
+                                      <Badge className={`${groupColors.sidebarBadgeBg} ${groupColors.sidebarBadgeText} text-xs px-2.5 py-0.5 rounded-full font-normal`}>
+                                          {assignmentCount}
+                                      </Badge>
+                                  )}
+                                  {(key === 'Latihan soal' && exerciseCount > 0) && (
+                                      <Badge className={`${groupColors.sidebarBadgeBg} ${groupColors.sidebarBadgeText} text-xs px-2.5 py-0.5 rounded-full font-normal`}>
+                                          {exerciseCount}
+                                      </Badge>
+                                  )}
+                                  {(key === 'Kuis' && quizCount > 0) && (
+                                      <Badge className={`${groupColors.sidebarBadgeBg} ${groupColors.sidebarBadgeText} text-xs px-2.5 py-0.5 rounded-full font-normal`}>
+                                          {quizCount}
+                                      </Badge>
+                                  )}
+                                  {isOpen ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
+                              </div>
+                          </Button>
+                          {isOpen && (
+                              <div className="pl-8 border-l border-gray-200 ml-6 space-y-0.5">
+                                  {items.map((content) => {
+                                      const itemColors = getColorsForType(content.jenis_create);
+                                      const isActive = activeContentId === content.id;
+                                      return (
+                                          <a 
+                                              key={content.id} 
+                                              onClick={() => handleScrollAndHighlight(content.id, content.jenis_create)} 
+                                              className="block cursor-pointer"
+                                          >
+                                              <Button 
+                                                  variant="ghost" 
+                                                  className={`w-full justify-start text-left text-sm py-2.5 rounded-lg 
+                                                              ${itemColors.sidebarHoverBg} 
+                                                              ${isActive ? `${itemColors.sidebarActiveBg} ${itemColors.sidebarActiveText}` : 'text-gray-600'}
+                                                              `}
+                                              >
+                                                  <span className="truncate">{content.jenis_create.toLowerCase() === 'latihan soal' || content.jenis_create.toLowerCase() === 'kuis' ? content.sub_judul : content.judul}</span>
+                                              </Button>
+                                          </a>
+                                      );
+                                  })}
+                              </div>
+                          )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-gray-500 text-sm italic p-4 pl-6">Belum ada konten.</p>
+                )}
+              </nav>
+            </CardContent>
+          </Card>
+
+          <Card className={`bg-white shadow-2xl border-0 rounded-2xl w-full transform transition-all duration-300 ${isSidebarOpen ? "md:w-3/4" : "md:w-full"}`}>
+            <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100 p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between">
+              <div className="flex items-center gap-4 mb-4 sm:mb-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-sky-500 rounded-full shadow-lg">
+                    <GraduationCap className="h-6 w-6 text-white" />
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{classroom.name}</h1>
+                </div>
+              </div>
               <Button
                 variant="outline"
                 onClick={() =>
                   router.push(userRole === "teacher" ? "/home/teacher" : "/home/student")
                 }
-                className="border-gray-300 text-gray-600 shadow-sm hover:bg-gray-50 px-3 py-2.5"
+                className="border-gray-300 text-gray-600 shadow-sm hover:bg-gray-50 px-4 py-2.5"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Kembali
               </Button>
-              {/* END: Perubahan Tombol Kembali */}
+            </CardHeader>
 
-              {/* START: Perubahan Judul Daftar Konten */}
-              <div className="text-xl font-bold text-gray-900">
-                Daftar Konten
-              </div>
-              {/* END: Perubahan Judul Daftar Konten */}
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-0 pt-4">
-            <nav className="space-y-1">
-              {Object.keys(groupedContents).length > 0 ? (
-                Object.keys(groupedContents).map((key) => {
-                  const items = groupedContents[key];
-                  const isOpen = openGroups.has(key);
-                  const groupColors = getColorsForType(key);
-                  
-                  const materialCount = groupedContents['Materi']?.length || 0;
-                  const assignmentCount = groupedContents['Tugas']?.length || 0;
-                  const exerciseCount = groupedContents['Latihan soal']?.length || 0;
-                  const quizCount = groupedContents['Kuis']?.length || 0;
-
-                  return (
-                    <div key={key}>
-                        <Button 
-                            variant="ghost" 
-                            onClick={() => toggleGroup(key)}
-                            className={`w-full justify-between text-left text-base font-medium text-gray-700 ${groupColors.sidebarHoverBg} ${isOpen ? 'bg-gray-100' : ''} px-6 py-3`}
-                        >
-                            <span className="flex items-center gap-3">
-                                {getGroupIcon(key)}
-                                {getGroupTitle(key)}
-                            </span>
-                            <div className="flex items-center gap-2">
-                                {(key === 'Materi' && materialCount > 0) && (
-                                    <Badge className={`${groupColors.sidebarBadgeBg} ${groupColors.sidebarBadgeText} text-xs px-2.5 py-0.5 rounded-full font-normal`}>
-                                        {materialCount}
-                                    </Badge>
-                                )}
-                                {(key === 'Tugas' && assignmentCount > 0) && (
-                                    <Badge className={`${groupColors.sidebarBadgeBg} ${groupColors.sidebarBadgeText} text-xs px-2.5 py-0.5 rounded-full font-normal`}>
-                                        {assignmentCount}
-                                    </Badge>
-                                )}
-                                {(key === 'Latihan soal' && exerciseCount > 0) && (
-                                    <Badge className={`${groupColors.sidebarBadgeBg} ${groupColors.sidebarBadgeText} text-xs px-2.5 py-0.5 rounded-full font-normal`}>
-                                        {exerciseCount}
-                                    </Badge>
-                                )}
-                                {(key === 'Kuis' && quizCount > 0) && (
-                                    <Badge className={`${groupColors.sidebarBadgeBg} ${groupColors.sidebarBadgeText} text-xs px-2.5 py-0.5 rounded-full font-normal`}>
-                                        {quizCount}
-                                    </Badge>
-                                )}
-                                {isOpen ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
-                            </div>
-                        </Button>
-                        {isOpen && (
-                            <div className="pl-8 border-l border-gray-200 ml-6 space-y-0.5">
-                                {items.map((content) => {
-                                    const itemColors = getColorsForType(content.jenis_create);
-                                    const isActive = activeContentId === content.id;
-                                    return (
-                                        <a 
-                                            key={content.id} 
-                                            onClick={() => handleScrollAndHighlight(content.id, content.jenis_create)} 
-                                            className="block cursor-pointer"
-                                        >
-                                            <Button 
-                                                variant="ghost" 
-                                                className={`w-full justify-start text-left text-sm py-2.5 rounded-lg 
-                                                            ${itemColors.sidebarHoverBg} 
-                                                            ${isActive ? `${itemColors.sidebarActiveBg} ${itemColors.sidebarActiveText}` : 'text-gray-600'}
-                                                            `}
-                                            >
-                                                <span className="truncate">{content.jenis_create.toLowerCase() === 'latihan soal' || content.jenis_create.toLowerCase() === 'kuis' ? content.sub_judul : content.judul}</span>
-                                            </Button>
-                                        </a>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-gray-500 text-sm italic p-4 pl-6">Belum ada konten.</p>
-              )}
-            </nav>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white shadow-2xl border-0 rounded-2xl w-full md:w-3/4">
-          <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100 p-8">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-sky-500 rounded-full shadow-lg">
-                    <GraduationCap className="h-6 w-6 text-white" />
-                  </div>
-                  <h1 className="text-3xl font-bold text-gray-900">{classroom.name}</h1>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-8 space-y-8">
-            <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    {/* <h2 className="text-3xl font-bold text-gray-900">{classroom.name}</h2> */}
-                    <p className="text-gray-600 mr-20">{classroom.description}</p>
-                    {userRole === "student" && classroom.teacherName && (
-                      <p className="text-sm text-gray-500 mt-1">Guru: {classroom.teacherName}</p>
-                    )}
-                  </div>
-                  <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700 px-4 py-2 text-lg font-medium">
-                    Kode: {classroom.code}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
-                    <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
-                      <div className="p-4 bg-sky-100 rounded-full">
-                        <Users className="h-6 w-6 text-sky-600" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">{classroom.students.length}</h3>
-                        <p className="text-sm text-gray-500">Total Siswa</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
-                    <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
-                      <div className="p-4 bg-purple-100 rounded-full">
-                        <Code className="h-6 w-6 text-purple-600" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">{classroom.code}</h3>
-                        <p className="text-sm text-gray-500">Kode Kelas</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
-                    <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
-                      <div className="p-4 bg-lime-100 rounded-full">
-                        <BookOpen className="h-6 w-6 text-lime-600" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">{contents.length}</h3>
-                        <p className="text-sm text-gray-500">Total Konten</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {userRole === "teacher" && (
-                    <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
-                      <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
-                          <Button
-                            onClick={() => setShowContentModal(true)}
-                            className="w-full bg-green-600 text-white hover:bg-green-700 shadow-md hover:shadow-lg transition-all duration-200"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Buat Konten
-                          </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {userRole === "student" && (
-                    <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
-                      <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
-                        <div className="p-4 bg-green-100 rounded-full">
-                            <CheckCircle2 className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div>
-                            <div className="text-xl font-bold text-green-600">Aktif</div>
-                            <p className="text-sm text-gray-500">Status</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              </div>
-
-              {Object.keys(groupedContents).length > 0 ? (
-                Object.keys(groupedContents).map((key) => {
-                  const items = groupedContents[key];
-                  if (items.length === 0) return null;
-                  
-                  return (
-                    <Card key={key} id={key.toLowerCase().replace(/\s/g, '-')} className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl mt-6">
-                      <CardHeader className="pb-6">
-                        <CardTitle className="flex items-center gap-3 text-gray-900 text-xl">
-                          <div className="p-2 bg-sky-500 rounded-lg">
-                            <BookOpen className="h-5 w-5 text-white" />
-                          </div>
-                          {getGroupTitle(key)}
-                        </CardTitle>
-                        <CardDescription className="text-gray-600">
-                          {getGroupTitle(key) === 'Materi Pembelajaran' && "Konten materi pembelajaran yang dapat Anda pelajari."}
-                          {getGroupTitle(key) === 'Latihan Soal' && "Latihan soal untuk menguji pemahaman Anda."}
-                          {getGroupTitle(key) === 'Kuis' && "Kuis untuk evaluasi singkat."}
-                          {getGroupTitle(key) === 'Tugas' && "Tugas yang perlu Anda kumpulkan."}
-                          {userRole === "teacher" && (
-                              `Daftar ${getGroupTitle(key).toLowerCase()} yang telah Anda buat.`
-                          )}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {items.map((content) => {
-                          const attempts = content.jenis_create.toLowerCase() === "latihan soal" ? exerciseAttempts[content.id] : null;
-                          const studentSubmission = content.jenis_create.toLowerCase() === "tugas" ? studentSubmissions[content.id] : null;
-                          
-                          const { cardBorder, cardBg, badgeBg, badgeText, buttonBg, buttonHoverBg, buttonText, highlightColor } = getColorsForType(content.jenis_create);
-
-                          const deadlineBadgeColor = content.deadline
-                            ? studentSubmission
-                              ? "bg-green-50 border-green-200 text-green-700"
-                              : "bg-red-50 border-red-200 text-red-700"
-                            : "";
-                          const isHighlighted = highlightedId === content.id;
-                          return (
-                            <Card 
-                              key={content.id} 
-                              id={`content-${content.id}`} 
-                              className={`bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl border-l-4 ${cardBorder} ${isHighlighted ? `${cardBg} animate-pulse-once` : ''}`}
-                            >
-                              <CardContent className="p-6 flex flex-col justify-between min-h-[180px]">
-                                <div className="flex-1">
-                                  <h3 className="font-semibold text-lg mb-2 text-gray-900 line-clamp-2">{content.sub_judul}</h3>
-                                  {/* <p className="text-sm text-gray-600 mb-3 line-clamp-2">{content.sub_judul}</p> */}
-                                  <div className="flex items-center gap-3 mb-3 flex-wrap">
-                                    <Badge variant="outline" className={`${badgeBg} ${badgeText} text-xs px-3 py-1`}>
-                                      {getGroupTitle(content.jenis_create)}
-                                    </Badge>
-                                    {content.deadline && (
-                                      <Badge variant="default" className={`${deadlineBadgeColor} text-xs px-3 py-1`}>
-                                        <Clock className="h-3 w-3 mr-1" />
-                                        Deadline: {new Date(content.deadline).toLocaleDateString('id-ID')}
-                                      </Badge>
-                                    )}
-                                    {userRole === "student" && content.jenis_create.toLowerCase() === "tugas" && (
-                                      <Badge
-                                        variant="default"
-                                        className={studentSubmission ? "bg-green-500 text-white" : "bg-red-500 text-white"}
-                                      >
-                                        {studentSubmission ? "Sudah Dikumpulkan" : "Belum Dikumpulkan"}
-                                      </Badge>
-                                    )}
-                                    {attempts && attempts.length > 0 && (
-                                      <Badge variant="secondary" className="bg-green-50 border-green-200 text-green-700 text-xs px-3 py-1">
-                                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                                        Selesai: {attempts[0].percentage.toFixed(0)}%
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="mt-4 flex items-center justify-between">
-                                  <p className="text-xs text-gray-500">
-                                    Dibuat: {new Date(content.created_at).toLocaleString('id-ID', {
-                                      dateStyle: 'full',
-                                      timeStyle: 'short'
-                                    })}
-                                  </p>
-                                  <div className="flex items-center gap-3">
-                                    {content.jenis_create.toLowerCase() === "latihan soal" ? (
-                                      <>
-                                        {attempts && attempts.length > 0 ? (
-                                          <Button
-                                            variant="default"
-                                            className={`${buttonBg} ${buttonHoverBg} transition-colors ${buttonText} shadow-md hover:shadow-lg`}
-                                            onClick={() => handleKerjakanLatihan(content)}
-                                          >
-                                            <Eye className="h-4 w-4" />
-                                            Lihat Riwayat
-                                          </Button>
-                                        ) : (
-                                          <Button
-                                            variant="default"
-                                            className={`${buttonBg} ${buttonHoverBg} transition-colors ${buttonText} shadow-md hover:shadow-lg`}
-                                            onClick={() => handleKerjakanLatihan(content)}
-                                          >
-                                            <Eye className="h-4 w-4" />
-                                            Kerjakan
-                                          </Button>
-                                        )}
-                                      </>
-                                    ) : (
-                                      <>
-                                        {userRole === "teacher" && (
-                                          <Button
-                                            variant="outline"
-                                            className="border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm"
-                                            onClick={() => router.push(`/home/classrooms/create?classId=${classId}&contentId=${content.id}`)}
-                                          >
-                                            <Edit className="h-4 w-4 mr-2" />
-                                            Edit
-                                          </Button>
-                                        )}
-                                        <Button
-                                          variant="default"
-                                          className={`${buttonBg} ${buttonHoverBg} transition-colors ${buttonText} shadow-md hover:shadow-lg`}
-                                          onClick={() => router.push(`/home/classrooms/${classId}/${content.id}`)}
-                                        >
-                                          <Eye className="h-4 w-4" />
-                                          {content.jenis_create.toLowerCase() === "tugas" ? "Lihat" : "Review"}
-                                        </Button>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
-                      </CardContent>
-                    </Card>
-                  );
-                })
-              ) : (
-                <Card className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl">
-                  <CardHeader className="pb-6">
-                    <CardTitle className="flex items-center gap-3 text-gray-900 text-xl">
-                      <div className="p-2 bg-sky-500 rounded-lg">
-                        <BookOpen className="h-5 w-5 text-white" />
-                      </div>
-                      Daftar Konten
-                    </CardTitle>
-                    <CardDescription className="text-gray-600">
-                      {userRole === "teacher"
-                        ? "Kelola konten pembelajaran yang telah Anda buat"
-                        : "Konten pembelajaran yang tersedia di kelas ini"
-                      }
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-center py-16">
-                      <div className="p-4 bg-gray-100 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-                        <BookOpen className="h-12 w-12 text-gray-400" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-700 mb-3">
-                        {userRole === "teacher"
-                          ? "Belum ada konten yang dibuat"
-                          : "Belum ada konten tersedia"
-                        }
-                      </h3>
-                      <p className="text-gray-500 mb-8 max-w-md mx-auto">
-                        {userRole === "teacher"
-                          ? "Mulai dengan membuat konten pembelajaran pertama Anda untuk siswa di kelas ini."
-                          : "Guru belum menambahkan konten pembelajaran di kelas ini. Silakan tunggu atau hubungi guru Anda."
-                        }
-                      </p>
-                      {userRole === "teacher" && (
-                        <Button
-                          onClick={() => setShowContentModal(true)}
-                          className="bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg"
-                          size="lg"
-                        >
-                          <Plus className="h-5 w-5 mr-2" />
-                          Buat Konten Pertama
-                        </Button>
+            <CardContent className="p-8 space-y-8">
+              <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-600 mr-20">{classroom.description}</p>
+                      {userRole === "student" && classroom.teacherName && (
+                        <p className="text-sm text-gray-500 mt-1">Guru: {classroom.teacherName}</p>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-            </CardContent>
-        </Card>
-      </div>
+                    <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700 px-4 py-2 text-lg font-medium">
+                      Kode: {classroom.code}
+                    </Badge>
+                  </div>
 
-      <Dialog open={showLatihanModal} onOpenChange={setShowLatihanModal}>
-        <DialogContent className="bg-white border-0 shadow-2xl rounded-2xl max-w-xl">
-          <DialogHeader>
-            <DialogTitle className="text-gray-900 text-xl">Latihan: {currentLatihan?.title}</DialogTitle>
-            <DialogDescription>
-                {currentLatihan?.attempts && currentLatihan.attempts.length > 0
-                    ? `Anda telah menyelesaikan latihan ini ${currentLatihan.attempts.length} kali.`
-                    : 'Latihan ini belum pernah Anda kerjakan.'
-                }
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-6">
-            {currentLatihan?.attempts && currentLatihan.attempts.length > 0 && (
-                <div className="space-y-4">
-                    <h4 className="text-lg font-semibold text-gray-800">Riwayat Pengerjaan</h4>
-                    {currentLatihan.attempts.map((attempt, index) => (
-                        <Card key={attempt.id} className="border border-gray-200 shadow-sm hover:shadow-md transition-all">
-                            <CardContent className="p-4 flex justify-between items-center">
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-700">Percobaan ke-{attempt.attempt_number}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
+                      <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
+                        <div className="p-4 bg-sky-100 rounded-full">
+                          <Users className="h-6 w-6 text-sky-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900">{classroom.students.length}</h3>
+                          <p className="text-sm text-gray-500">Total Siswa</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
+                      <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
+                        <div className="p-4 bg-purple-100 rounded-full">
+                          <Code className="h-6 w-6 text-purple-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900">{classroom.code}</h3>
+                          <p className="text-sm text-gray-500">Kode Kelas</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
+                      <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
+                        <div className="p-4 bg-lime-100 rounded-full">
+                          <BookOpen className="h-6 w-6 text-lime-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900">{contents.length}</h3>
+                          <p className="text-sm text-gray-500">Total Konten</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {userRole === "teacher" && (
+                      <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
+                        <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
+                            <Button
+                              onClick={() => setShowContentModal(true)}
+                              className="w-full bg-green-600 text-white hover:bg-green-700 shadow-md hover:shadow-lg transition-all duration-200"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Buat Konten
+                            </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {userRole === "student" && (
+                      <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
+                        <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
+                          <div className="p-4 bg-green-100 rounded-full">
+                              <CheckCircle2 className="h-6 w-6 text-green-600" />
+                          </div>
+                          <div>
+                              <div className="text-xl font-bold text-green-600">Aktif</div>
+                              <p className="text-sm text-gray-500">Status</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </div>
+
+                {Object.keys(groupedContents).length > 0 ? (
+                  Object.keys(groupedContents).map((key) => {
+                    const items = groupedContents[key];
+                    if (items.length === 0) return null;
+                    
+                    return (
+                      <Card key={key} id={key.toLowerCase().replace(/\s/g, '-')} className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl mt-6">
+                        <CardHeader className="pb-6">
+                          <CardTitle className="flex items-center gap-3 text-gray-900 text-xl">
+                            <div className="p-2 bg-sky-500 rounded-lg">
+                              <BookOpen className="h-5 w-5 text-white" />
+                            </div>
+                            {getGroupTitle(key)}
+                          </CardTitle>
+                          <CardDescription className="text-gray-600">
+                            {getGroupTitle(key) === 'Materi Pembelajaran' && "Konten materi pembelajaran yang dapat Anda pelajari."}
+                            {getGroupTitle(key) === 'Latihan Soal' && "Latihan soal untuk menguji pemahaman Anda."}
+                            {getGroupTitle(key) === 'Kuis' && "Kuis untuk evaluasi singkat."}
+                            {getGroupTitle(key) === 'Tugas' && "Tugas yang perlu Anda kumpulkan."}
+                            {userRole === "teacher" && (
+                                `Daftar ${getGroupTitle(key).toLowerCase()} yang telah Anda buat.`
+                            )}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {items.map((content) => {
+                            const attempts = content.jenis_create.toLowerCase() === "latihan soal" ? exerciseAttempts[content.id] : null;
+                            const studentSubmission = content.jenis_create.toLowerCase() === "tugas" ? studentSubmissions[content.id] : null;
+                            
+                            const { cardBorder, cardBg, badgeBg, badgeText, buttonBg, buttonHoverBg, buttonText, highlightColor } = getColorsForType(content.jenis_create);
+
+                            const deadlineBadgeColor = content.deadline
+                              ? studentSubmission
+                                ? "bg-green-50 border-green-200 text-green-700"
+                                : "bg-red-50 border-red-200 text-red-700"
+                              : "";
+                            const isHighlighted = highlightedId === content.id;
+                            return (
+                              <Card 
+                                key={content.id} 
+                                id={`content-${content.id}`} 
+                                className={`bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl border-l-4 ${cardBorder} ${isHighlighted ? `${cardBg} animate-pulse-once` : ''}`}
+                              >
+                                <CardContent className="p-6 flex flex-col justify-between min-h-[180px]">
+                                  <div className="flex-1">
+                                    <h3 className="font-semibold text-lg mb-2 text-gray-900 line-clamp-2">{content.sub_judul}</h3>
+                                    <br />
+                                    <div className="flex items-center gap-3 mb-3 flex-wrap">
+                                      <Badge variant="outline" className={`${badgeBg} ${badgeText} text-xs px-3 py-1`}>
+                                        {getGroupTitle(content.jenis_create)}
+                                      </Badge>
+                                      {content.deadline && (
+                                        <Badge variant="default" className={`${deadlineBadgeColor} text-xs px-3 py-1`}>
+                                          <Clock className="h-3 w-3 mr-1" />
+                                          Deadline: {new Date(content.deadline).toLocaleDateString('id-ID')}
+                                        </Badge>
+                                      )}
+                                      {userRole === "student" && content.jenis_create.toLowerCase() === "tugas" && (
+                                        <Badge
+                                          variant="default"
+                                          className={studentSubmission ? "bg-green-500 text-white" : "bg-red-500 text-white"}
+                                        >
+                                          {studentSubmission ? "Sudah Dikumpulkan" : "Belum Dikumpulkan"}
+                                        </Badge>
+                                      )}
+                                      {attempts && attempts.length > 0 && (
+                                        <Badge variant="secondary" className="bg-green-50 border-green-200 text-green-700 text-xs px-3 py-1">
+                                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                                          Selesai: {attempts[0].percentage.toFixed(0)}%
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="mt-4 flex items-center justify-between">
                                     <p className="text-xs text-gray-500">
-                                        Diselesaikan pada: {new Date(attempt.submitted_at).toLocaleString('id-ID')}
+                                      Dibuat: {new Date(content.created_at).toLocaleString('id-ID', {
+                                        dateStyle: 'full',
+                                        timeStyle: 'short'
+                                      })}
                                     </p>
-                                </div>
-                                <Badge className="bg-sky-100 text-sky-700 font-bold text-base px-4 py-2">
-                                    {attempt.percentage.toFixed(0)}%
-                                </Badge>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-            )}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-              <Button
-                variant="outline"
-                onClick={() => setShowLatihanModal(false)}
-                className="border-gray-300 text-gray-600 shadow-sm hover:bg-gray-50"
-              >
-                Batal
-              </Button>
-              <Button
-                onClick={handleStartNewAttempt}
-                className="bg-sky-500 hover:bg-sky-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Mulai Percobaan Baru
-              </Button>
+                                    <div className="flex items-center gap-3">
+                                      {content.jenis_create.toLowerCase() === "latihan soal" ? (
+                                        <>
+                                          {attempts && attempts.length > 0 ? (
+                                            <Button
+                                              variant="default"
+                                              className={`${buttonBg} ${buttonHoverBg} transition-colors ${buttonText} shadow-md hover:shadow-lg`}
+                                              onClick={() => handleKerjakanLatihan(content)}
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                              Lihat Riwayat
+                                            </Button>
+                                          ) : (
+                                            <Button
+                                              variant="default"
+                                              className={`${buttonBg} ${buttonHoverBg} transition-colors ${buttonText} shadow-md hover:shadow-lg`}
+                                              onClick={() => handleKerjakanLatihan(content)}
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                              Kerjakan
+                                            </Button>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <>
+                                          {userRole === "teacher" && (
+                                            <Button
+                                              variant="outline"
+                                              className="border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm"
+                                              onClick={() => router.push(`/home/classrooms/create?classId=${classId}&contentId=${content.id}`)}
+                                            >
+                                              <Edit className="h-4 w-4 mr-2" />
+                                              Edit
+                                            </Button>
+                                          )}
+                                          <Button
+                                            variant="default"
+                                            className={`${buttonBg} ${buttonHoverBg} transition-colors ${buttonText} shadow-md hover:shadow-lg`}
+                                            onClick={() => router.push(`/home/classrooms/${classId}/${content.id}`)}
+                                          >
+                                            <Eye className="h-4 w-4" />
+                                            {content.jenis_create.toLowerCase() === "tugas" ? "Lihat" : "Review"}
+                                          </Button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                ) : (
+                  <Card className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl">
+                    <CardHeader className="pb-6">
+                      <CardTitle className="flex items-center gap-3 text-gray-900 text-xl">
+                        <div className="p-2 bg-sky-500 rounded-lg">
+                          <BookOpen className="h-5 w-5 text-white" />
+                        </div>
+                        Daftar Konten
+                      </CardTitle>
+                      <CardDescription className="text-gray-600">
+                        {userRole === "teacher"
+                          ? "Kelola konten pembelajaran yang telah Anda buat"
+                          : "Konten pembelajaran yang tersedia di kelas ini"
+                        }
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="text-center py-16">
+                        <div className="p-4 bg-gray-100 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+                          <BookOpen className="h-12 w-12 text-gray-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-700 mb-3">
+                          {userRole === "teacher"
+                            ? "Belum ada konten yang dibuat"
+                            : "Belum ada konten tersedia"
+                          }
+                        </h3>
+                        <p className="text-gray-500 mb-8 max-w-md mx-auto">
+                          {userRole === "teacher"
+                            ? "Mulai dengan membuat konten pembelajaran pertama Anda untuk siswa di kelas ini."
+                            : "Guru belum menambahkan konten pembelajaran di kelas ini. Silakan tunggu atau hubungi guru Anda."
+                          }
+                        </p>
+                        {userRole === "teacher" && (
+                          <Button
+                            onClick={() => setShowContentModal(true)}
+                            className="bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg"
+                            size="lg"
+                          >
+                            <Plus className="h-5 w-5 mr-2" />
+                            Buat Konten Pertama
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </CardContent>
+          </Card>
+        </div>
+
+        <Dialog open={showLatihanModal} onOpenChange={setShowLatihanModal}>
+          <DialogContent className="bg-white border-0 shadow-2xl rounded-2xl max-w-xl">
+            <DialogHeader>
+              <DialogTitle className="text-gray-900 text-xl">Latihan: {currentLatihan?.title}</DialogTitle>
+              <DialogDescription>
+                  {currentLatihan?.attempts && currentLatihan.attempts.length > 0
+                      ? `Anda telah menyelesaikan latihan ini ${currentLatihan.attempts.length} kali.`
+                      : 'Latihan ini belum pernah Anda kerjakan.'
+                  }
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-6">
+              {currentLatihan?.attempts && currentLatihan.attempts.length > 0 && (
+                  <div className="space-y-4">
+                      <h4 className="text-lg font-semibold text-gray-800">Riwayat Pengerjaan</h4>
+                      {currentLatihan.attempts.map((attempt, index) => (
+                          <Card key={attempt.id} className="border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                              <CardContent className="p-4 flex justify-between items-center">
+                                  <div className="space-y-1">
+                                      <p className="text-sm font-medium text-gray-700">Percobaan ke-{attempt.attempt_number}</p>
+                                      <p className="text-xs text-gray-500">
+                                          Diselesaikan pada: {new Date(attempt.submitted_at).toLocaleString('id-ID')}
+                                      </p>
+                                  </div>
+                                  <Badge className="bg-sky-100 text-sky-700 font-bold text-base px-4 py-2">
+                                      {attempt.percentage.toFixed(0)}%
+                                  </Badge>
+                              </CardContent>
+                          </Card>
+                      ))}
+                  </div>
+              )}
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowLatihanModal(false)}
+                  className="border-gray-300 text-gray-600 shadow-sm hover:bg-gray-50"
+                >
+                  Batal
+                </Button>
+                <Button
+                  onClick={handleStartNewAttempt}
+                  className="bg-sky-500 hover:bg-sky-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Mulai Percobaan Baru
+                </Button>
+              </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={showContentModal} onOpenChange={setShowContentModal}>
-        <DialogContent className="bg-white border-0 shadow-3xl rounded-2xl lg:max-w-[960px] w-full">
-          <DialogHeader className="mb-4">
-            <DialogTitle className="text-gray-900 text-2xl font-bold">
-              Buat Konten Baru
-            </DialogTitle>
-            <p className="text-gray-500 text-base">
-              Pilih jenis konten yang ingin Anda buat untuk kelas ini.
-            </p>
-          </DialogHeader>
+          </DialogContent>
+        </Dialog>
+        
+        <Dialog open={showContentModal} onOpenChange={setShowContentModal}>
+          <DialogContent className="bg-white border-0 shadow-3xl rounded-2xl lg:max-w-[960px] w-full">
+            <DialogHeader className="mb-4">
+              <DialogTitle className="text-gray-900 text-2xl font-bold">
+                Buat Konten Baru
+              </DialogTitle>
+              <p className="text-gray-500 text-base">
+                Pilih jenis konten yang ingin Anda buat untuk kelas ini.
+              </p>
+            </DialogHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card
-              className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer rounded-xl"
-              onClick={() => {
-                router.push(`/home/classrooms/create?classId=${classId}`);
-                setShowContentModal(false);
-              }}
-            >
-              <CardHeader className="text-center pb-4">
-                <div className="flex justify-center">
-                  <div className="text-blue-600 p-4 bg-gray-50 rounded-full mb-4">
-                    <BookOpen className="w-10 h-10" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <Card
+                className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer rounded-xl"
+                onClick={() => {
+                  router.push(`/home/classrooms/create?classId=${classId}`);
+                  setShowContentModal(false);
+                }}
+              >
+                <CardHeader className="text-center pb-4">
+                  <div className="flex justify-center">
+                    <div className="text-blue-600 p-4 bg-gray-50 rounded-full mb-4">
+                      <BookOpen className="w-10 h-10" />
+                    </div>
                   </div>
-                </div>
-                <CardTitle className="text-gray-900 text-lg font-semibold">
-                  Materi & Tugas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-center px-6 pb-6">
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  Buat materi pembelajaran atau tugas untuk siswa.
-                </p>
-              </CardContent>
-            </Card>
+                  <CardTitle className="text-gray-900 text-lg font-semibold">
+                    Materi & Tugas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-center px-6 pb-6">
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    Buat materi pembelajaran atau tugas untuk siswa.
+                  </p>
+                </CardContent>
+              </Card>
 
-            <Card
-              className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer rounded-xl"
-              onClick={() => {
-                router.push(`/home/classrooms/latihanSoal?classId=${classId}`);
-                setShowContentModal(false);
-              }}
-            >
-              <CardHeader className="text-center pb-4">
-                <div className="flex justify-center">
-                  <div className="text-green-600 p-4 bg-gray-50 rounded-full mb-4">
-                    <FileText className="w-10 h-10" />
+              <Card
+                className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer rounded-xl"
+                onClick={() => {
+                  router.push(`/home/classrooms/latihanSoal?classId=${classId}`);
+                  setShowContentModal(false);
+                }}
+              >
+                <CardHeader className="text-center pb-4">
+                  <div className="flex justify-center">
+                    <div className="text-green-600 p-4 bg-gray-50 rounded-full mb-4">
+                      <FileText className="w-10 h-10" />
+                    </div>
                   </div>
-                </div>
-                <CardTitle className="text-gray-900 text-lg font-semibold">
-                  Latihan Soal
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-center px-6 pb-6">
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  Buat paket soal latihan untuk menguji pemahaman siswa.
-                </p>
-              </CardContent>
-            </Card>
+                  <CardTitle className="text-gray-900 text-lg font-semibold">
+                    Latihan Soal
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-center px-6 pb-6">
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    Buat paket soal latihan untuk menguji pemahaman siswa.
+                  </p>
+                </CardContent>
+              </Card>
 
-            <Card
-              className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer rounded-xl"
-              onClick={() => {
-                router.push(`/home/classrooms/kuis?classId=${classId}`);
-                setShowContentModal(false);
-              }}
-            >
-              <CardHeader className="text-center pb-4">
-                <div className="flex justify-center">
-                  <div className="text-purple-600 p-4 bg-gray-50 rounded-full mb-4">
-                    <ClipboardList className="w-10 h-10" />
+              <Card
+                className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer rounded-xl"
+                onClick={() => {
+                  router.push(`/home/classrooms/kuis?classId=${classId}`);
+                  setShowContentModal(false);
+                }}
+              >
+                <CardHeader className="text-center pb-4">
+                  <div className="flex justify-center">
+                    <div className="text-purple-600 p-4 bg-gray-50 rounded-full mb-4">
+                      <ClipboardList className="w-10 h-10" />
+                    </div>
                   </div>
-                </div>
-                <CardTitle className="text-gray-900 text-lg font-semibold">
-                  Kuis
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-center px-6 pb-6">
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  Buat kuis evaluasi singkat untuk siswa.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </DialogContent>
-      </Dialog>
+                  <CardTitle className="text-gray-900 text-lg font-semibold">
+                    Kuis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-center px-6 pb-6">
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    Buat kuis evaluasi singkat untuk siswa.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </main>
     </div>
   );
 }
