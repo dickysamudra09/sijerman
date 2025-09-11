@@ -1069,8 +1069,8 @@ export default function ClassroomsPage() {
                             >
                               <CardContent className="p-6 flex flex-col justify-between min-h-[180px]">
                                 <div className="flex-1">
-                                  <h3 className="font-semibold text-lg mb-2 text-gray-900 line-clamp-2">{content.judul}</h3>
-                                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{content.sub_judul}</p>
+                                  <h3 className="font-semibold text-lg mb-2 text-gray-900 line-clamp-2">{content.sub_judul}</h3>
+                                  {/* <p className="text-sm text-gray-600 mb-3 line-clamp-2">{content.sub_judul}</p> */}
                                   <div className="flex items-center gap-3 mb-3 flex-wrap">
                                     <Badge variant="outline" className={`${badgeBg} ${badgeText} text-xs px-3 py-1`}>
                                       {getGroupTitle(content.jenis_create)}
