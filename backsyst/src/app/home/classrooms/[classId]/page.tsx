@@ -29,7 +29,8 @@ import {
   Bell,
   User,
   Home,
-  LogOut
+  LogOut,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -919,107 +920,128 @@ export default function ClassroomsPage() {
     </header>
       <main className="flex-1 pt-20 pb-10 px-4 md:px-6">
         <div className="w-full flex flex-col md:flex-row gap-6 items-start">
-            {/* Sidebar with external heading */}
-            <div className={`sticky top-20 self-start transition-all duration-300 z-10 ${isSidebarOpen ? 'md:w-1/4' : 'md:w-[72px]'}`}>
-                <div className="flex justify-between items-center mb-4 pl-4 pr-2 md:pl-0 md:pr-0 mt-5">
-                    <h2 className="text-2xl font-bold text-gray-900">
-                        <span className={`${!isSidebarOpen && 'hidden'}`}>Daftar Konten</span>
-                    </h2>
-                    <Button
-                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        className="p-2 w-auto h-auto rounded-full bg-white text-gray-500 hover:bg-gray-100 shadow-md"
-                    >
-                        {isSidebarOpen ? <ChevronsLeft className="h-5 w-5" /> : <ChevronsRight className="h-5 w-5" />}
-                    </Button>
-                </div>
-                <Card
-                    className={`bg-white shadow-2xl border-0 rounded-2xl self-start overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'md:w-full' : 'md:w-[72px] md:h-[calc(100vh-6rem)] md:overflow-y-auto'}`}
-                >
-                    <CardContent className="p-0">
-                        <nav className="space-y-1">
-                            {Object.keys(groupedContents).length > 0 ? (
-                                Object.keys(groupedContents).map((key) => {
-                                    const items = groupedContents[key];
-                                    const isOpen = openGroups.has(key);
-                                    const groupColors = getColorsForType(key);
+            {/* Sidebar with new design */}
+            <div className={`sticky top-20 self-start transition-all duration-300 z-10 ${isSidebarOpen ? 'md:w-1/4' : 'md:w-16'}`}>
+                <div className={`bg-white shadow-lg border-0 rounded-lg transition-all duration-300 ${isSidebarOpen ? 'w-full' : 'w-16'} min-h-[600px]`}>
+                    {/* Header with close button */}
+                    <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                        {isSidebarOpen && (
+                            <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-sky-500 rounded-full flex items-center justify-center">
+                                    <GraduationCap className="w-5 h-5 text-white" />
+                                </div>
+                                <span className="text-lg font-semibold text-gray-900">{classroom.name}</span>
+                            </div>
+                        )}
+                        <button
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            className="w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors"
+                        >
+                            <X className="w-4 h-4 text-white" />
+                        </button>
+                    </div>
 
-                                    const materialCount = groupedContents['Materi']?.length || 0;
-                                    const assignmentCount = groupedContents['Tugas']?.length || 0;
-                                    const exerciseCount = groupedContents['Latihan soal']?.length || 0;
-                                    const quizCount = groupedContents['Kuis']?.length || 0;
+                    {/* Content navigation */}
+                    <nav className="py-4">
+                        {Object.keys(groupedContents).length > 0 ? (
+                            Object.keys(groupedContents).map((key) => {
+                                const items = groupedContents[key];
+                                const isOpen = openGroups.has(key);
+                                
+                                const materialCount = groupedContents['Materi']?.length || 0;
+                                const assignmentCount = groupedContents['Tugas']?.length || 0;
+                                const exerciseCount = groupedContents['Latihan soal']?.length || 0;
+                                const quizCount = groupedContents['Kuis']?.length || 0;
 
-                                    const getCount = () => {
-                                        switch(key) {
-                                            case 'Materi': return materialCount;
-                                            case 'Tugas': return assignmentCount;
-                                            case 'Latihan soal': return exerciseCount;
-                                            case 'Kuis': return quizCount;
-                                            default: return 0;
-                                        }
-                                    };
+                                const getCount = () => {
+                                    switch(key) {
+                                        case 'Materi': return materialCount;
+                                        case 'Tugas': return assignmentCount;
+                                        case 'Latihan soal': return exerciseCount;
+                                        case 'Kuis': return quizCount;
+                                        default: return 0;
+                                    }
+                                };
 
-                                    const count = getCount();
+                                const count = getCount();
 
+                                if (!isSidebarOpen) {
                                     return (
-                                        <div key={key}>
-                                            <Button
-                                                variant="ghost"
-                                                onClick={() => toggleGroup(key)}
-                                                className={`w-full justify-between text-left text-base font-medium text-gray-700 ${groupColors.sidebarHoverBg} ${isOpen ? 'bg-gray-100' : ''} px-6 py-3`}
+                                        <div key={key} className="px-2 mb-2">
+                                            <button
+                                                onClick={() => setIsSidebarOpen(true)}
+                                                className="w-12 h-12 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors group relative"
+                                                title={getGroupTitle(key)}
                                             >
-                                                <span className={`flex items-center gap-3 ${!isSidebarOpen && 'justify-center w-full'}`}>
-                                                    {getGroupIcon(key)}
-                                                    <span className={`whitespace-nowrap overflow-hidden ${!isSidebarOpen && 'hidden'}`}>
-                                                        {getGroupTitle(key)}
+                                                {getGroupIcon(key)}
+                                                {count > 0 && (
+                                                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-sky-500 text-white text-xs rounded-full flex items-center justify-center">
+                                                        {count}
                                                     </span>
-                                                </span>
-                                                <div className={`flex items-center gap-2 ${!isSidebarOpen && 'hidden'}`}>
-                                                    {count > 0 && (
-                                                        <Badge className={`${groupColors.sidebarBadgeBg} ${groupColors.sidebarBadgeText} text-xs px-2.5 py-0.5 rounded-full font-normal`}>
-                                                            {count}
-                                                        </Badge>
-                                                    )}
-                                                    {isOpen ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
-                                                </div>
-                                            </Button>
-                                            {isOpen && isSidebarOpen && (
-                                                <div className="pl-8 border-l border-gray-200 ml-6 space-y-0.5">
-                                                    {items.map((content) => {
-                                                        const itemColors = getColorsForType(content.jenis_create);
-                                                        const isActive = activeContentId === content.id;
-                                                        return (
-                                                            <a
-                                                                key={content.id}
-                                                                onClick={() => handleScrollAndHighlight(content.id, content.jenis_create)}
-                                                                className="block cursor-pointer"
-                                                            >
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    className={`w-full justify-start text-left text-sm py-2.5 rounded-lg
-                                                                                ${itemColors.sidebarHoverBg}
-                                                                                ${isActive ? `${itemColors.sidebarActiveBg} ${itemColors.sidebarActiveText}` : 'text-gray-600'}
-                                                                                `}
-                                                                >
-                                                                    <span className="truncate">{content.jenis_create.toLowerCase() === 'latihan soal' || content.jenis_create.toLowerCase() === 'kuis' ? content.sub_judul : content.judul}</span>
-                                                                </Button>
-                                                            </a>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
+                                                )}
+                                            </button>
                                         </div>
                                     );
-                                })
-                            ) : (
-                                <p className={`text-gray-500 text-sm italic p-4 pl-6 ${!isSidebarOpen && 'hidden'}`}>Belum ada konten.</p>
-                            )}
-                        </nav>
-                    </CardContent>
-                </Card>
+                                }
+
+                                return (
+                                    <div key={key}>
+                                        <button
+                                            onClick={() => toggleGroup(key)}
+                                            className={`w-full px-6 py-3 flex items-center justify-between hover:bg-sky-50 transition-colors text-left ${isOpen ? 'bg-sky-50 border-r-2 border-sky-500' : ''}`}
+                                        >
+                                            <div className="flex items-center space-x-3">
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isOpen ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                                                    {getGroupIcon(key)}
+                                                </div>
+                                                <span className={`font-medium ${isOpen ? 'text-sky-700' : 'text-gray-700'}`}>
+                                                    {getGroupTitle(key)}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                {count > 0 && (
+                                                    <span className={`w-6 h-6 rounded-full text-xs flex items-center justify-center ${isOpen ? 'bg-sky-200 text-sky-800' : 'bg-gray-200 text-gray-600'}`}>
+                                                        {count}
+                                                    </span>
+                                                )}
+                                                <ChevronDown className={`w-4 h-4 transform transition-transform ${isOpen ? 'rotate-180' : ''} ${isOpen ? 'text-sky-500' : 'text-gray-400'}`} />
+                                            </div>
+                                        </button>
+                                        
+                                        {isOpen && (
+                                            <div className="py-2 bg-gray-50">
+                                                {items.map((content) => {
+                                                    const isActive = activeContentId === content.id;
+                                                    return (
+                                                        <button
+                                                            key={content.id}
+                                                            onClick={() => handleScrollAndHighlight(content.id, content.jenis_create)}
+                                                            className={`w-full px-12 py-2.5 text-left text-sm hover:bg-white transition-colors ${
+                                                                isActive ? 'bg-white text-sky-700 border-r-2 border-sky-500 font-medium' : 'text-gray-600'
+                                                            }`}
+                                                        >
+                                                            <div className="truncate">
+                                                                {content.jenis_create.toLowerCase() === 'latihan soal' || content.jenis_create.toLowerCase() === 'kuis' ? content.sub_judul : content.judul}
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="px-6 py-8 text-center text-gray-500 text-sm">
+                                {isSidebarOpen ? "Belum ada konten tersedia" : ""}
+                            </div>
+                        )}
+                    </nav>
+                </div>
             </div>
 
             {/* Main Content */}
-            <div className={`w-full transform transition-all duration-300 ${isSidebarOpen ? "md:w-3/4" : "md:w-[calc(100%-72px)]"}`}>
+            <div className={`w-full transform transition-all duration-300 ${isSidebarOpen ? "md:w-3/4" : "md:w-[calc(100%-64px)]"}`}>
                 <div className="sticky top-[64px] z-20 bg-gray-100 px-4 py-4">
                     <div className="flex justify-between items-center w-full">
                         <Breadcrumb>
@@ -1122,7 +1144,7 @@ export default function ClassroomsPage() {
                                     <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
                                         <CardContent className="p-6 flex items-center gap-4 min-h-[112px]">
                                             <Button
-                                                onClick={() => router.push(`/home/classrooms/create?classId=${classId}`)}
+                                                onClick={() => setShowContentModal(true)}
                                                 className="w-full bg-green-600 text-white hover:bg-green-700 shadow-md hover:shadow-lg transition-all duration-200"
                                             >
                                                 <Plus className="h-4 w-4 mr-2" />
