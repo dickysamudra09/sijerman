@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -115,6 +114,39 @@ const initialQuizState: QuizState = {
   hasInitialized: false,
   aiFeedback: null,
   isLoadingFeedback: false,
+};
+
+// Utility function to format explanation text with bullet points
+const formatExplanationText = (text: string) => {
+  if (!text) return text;
+  
+  // Convert bullet points (•) to proper JSX list items
+  const parts = text.split('•').filter(part => part.trim());
+  
+  if (parts.length <= 1) {
+    // No bullet points found, return as paragraph with HTML parsing
+    return (
+      <div 
+        className="text-purple-800 bg-white/80 p-4 rounded-lg border border-purple-200 leading-relaxed"
+        dangerouslySetInnerHTML={{ __html: text }}
+      />
+    );
+  }
+  
+  // Has bullet points, format as list
+  return (
+    <div className="text-purple-800 bg-white/80 p-4 rounded-lg border border-purple-200 leading-relaxed">
+      {parts[0].trim() && <p className="mb-3">{parts[0].trim()}</p>}
+      <ul className="space-y-2 ml-4">
+        {parts.slice(1).map((item, index) => (
+          <li key={index} className="flex items-start gap-2">
+            <span className="text-purple-600 font-bold mt-1 flex-shrink-0">•</span>
+            <span dangerouslySetInnerHTML={{ __html: item.trim() }} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 };
 
 export default function InteractiveQuiz() {
@@ -496,7 +528,6 @@ export default function InteractiveQuiz() {
     }
   };
 
-
   useEffect(() => {
     const fetchQuestions = async () => {
       if (!exerciseSetId || initializedRef.current) {
@@ -683,7 +714,6 @@ export default function InteractiveQuiz() {
     return filledSentence.trim();
   };
 
-
   const handleSubmitAnswer = async () => {
     const currentQuestion = state.questions[state.currentQuestionIndex];
     let isCorrect = false;
@@ -839,6 +869,113 @@ export default function InteractiveQuiz() {
     }
   };
 
+  // Enhanced AI Feedback Display Component
+  const renderAIFeedback = () => {
+    if (state.isLoadingFeedback) {
+      return (
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
+              <div>
+                <h4 className="font-semibold text-blue-900 text-lg">Menghasilkan Feedback AI...</h4>
+                <p className="text-blue-700">Mohon tunggu sebentar</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (!state.aiFeedback) return null;
+
+    const currentQuestion = state.questions[state.currentQuestionIndex];
+
+    return (
+      <Card className="border-purple-200 bg-purple-50/50 shadow-lg">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-500 rounded-lg">
+              <Lightbulb className="h-5 w-5 text-white" />
+            </div>
+            <CardTitle className="text-lg text-purple-900 flex items-center gap-2">
+              AI Feedback 
+              {currentQuestion.question_type === 'essay' && (
+                <Badge className="bg-green-100 text-green-800 border-green-300">
+                  Claude AI
+                </Badge>
+              )}
+              {currentQuestion.question_type !== 'essay' && (
+                <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                  GPT-4o Mini
+                </Badge>
+              )}
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h5 className="font-semibold text-purple-900 mb-3">Feedback:</h5>
+            <p className="text-purple-800 bg-white/80 p-4 rounded-lg border border-purple-200 leading-relaxed">
+              {state.aiFeedback.feedback_text}
+            </p>
+          </div>
+          
+          {state.aiFeedback.explanation && (
+            <div>
+              <h5 className="font-semibold text-purple-900 mb-3">Penjelasan Detail:</h5>
+              {formatExplanationText(state.aiFeedback.explanation)}
+            </div>
+          )}
+
+          {state.aiFeedback.reference_materials && state.aiFeedback.reference_materials.length > 0 && (
+            <div>
+              <h5 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Referensi Belajar:
+              </h5>
+              <div className="space-y-3">
+                {state.aiFeedback.reference_materials.map((ref, index) => (
+                  <div key={index} className="bg-white/90 p-4 rounded-lg border border-purple-200 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <h6 className="font-semibold text-purple-900 mb-1">
+                          {ref.title}
+                        </h6>
+                        <p className="text-sm text-purple-700 leading-relaxed">
+                          {ref.description}
+                        </p>
+                      </div>
+                      {ref.url && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 border-purple-300 text-purple-700 hover:bg-purple-100 shadow-sm"
+                          onClick={() => window.open(ref.url, '_blank')}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {state.aiFeedback.ai_model && process.env.NODE_ENV === 'development' && (
+            <div className="text-xs text-purple-600 pt-3 border-t border-purple-200">
+              Powered by {state.aiFeedback.ai_model}
+              {state.aiFeedback.processing_time_ms && 
+                ` • Generated in ${state.aiFeedback.processing_time_ms}ms`
+              }
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   const renderQuestionContent = (currentQuestion: Question) => {
     if (currentQuestion.question_type === 'essay') {
       return (
@@ -951,7 +1088,7 @@ export default function InteractiveQuiz() {
                 </div>
                 {state.showResult && (
                     <div className="mt-4 text-sm text-gray-600">
-                        Hasil: **{getFilledSentence()}**
+                        <span className="font-medium">Hasil:</span> <span className="font-bold text-lg text-green-700">{getFilledSentence()}</span>
                     </div>
                 )}
               </div>
@@ -1317,7 +1454,7 @@ export default function InteractiveQuiz() {
                     </div>
                     Soal {questionTypeInfo.label}
                   </CardTitle>
-                  <CardDescription className="text-gray-600">
+                                    <CardDescription className="text-gray-600">
                     {currentQuestion.question_type === 'essay' && "Tulis jawaban essay yang lengkap dan jelas"}
                     {currentQuestion.question_type === 'sentence_arrangement' && "Seret dan lepas potongan kata untuk menyusun kalimat yang benar"}
                     {(currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && "Pilih jawaban yang paling tepat untuk soal di bawah ini"}
@@ -1336,94 +1473,7 @@ export default function InteractiveQuiz() {
                     </div>
                   )}
 
-                  {state.showResult && (
-                    <div className="space-y-4">
-                      {state.isLoadingFeedback ? (
-                        <Card className="border-blue-200 bg-blue-50/50">
-                          <CardContent className="p-6">
-                            <div className="flex items-center gap-3">
-                              <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
-                              <div>
-                                <h4 className="font-semibold text-blue-900 text-lg">Menghasilkan Feedback AI...</h4>
-                                <p className="text-blue-700">Mohon tunggu sebentar</p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ) : state.aiFeedback && (
-                        <Card className="border-purple-200 bg-purple-50/50 shadow-lg">
-                          <CardHeader className="pb-4">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-purple-500 rounded-lg">
-                                <Lightbulb className="h-5 w-5 text-white" />
-                              </div>
-                              <CardTitle className="text-lg text-purple-900">AI Feedback</CardTitle>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-4">
-                            <div>
-                              <h5 className="font-semibold text-purple-900 mb-3">Feedback:</h5>
-                              <p className="text-purple-800 bg-white/80 p-4 rounded-lg border border-purple-200 leading-relaxed">
-                                {state.aiFeedback.feedback_text}
-                              </p>
-                            </div>
-                            {state.aiFeedback.explanation && (
-                              <div>
-                                <h5 className="font-semibold text-purple-900 mb-3">Penjelasan Detail:</h5>
-                                <p className="text-purple-800 bg-white/80 p-4 rounded-lg border border-purple-200 leading-relaxed">
-                                  {state.aiFeedback.explanation}
-                                </p>
-                              </div>
-                            )}
-
-                            {state.aiFeedback.reference_materials && state.aiFeedback.reference_materials.length > 0 && (
-                              <div>
-                                <h5 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
-                                  <BookOpen className="h-4 w-4" />
-                                  Referensi Belajar:
-                                </h5>
-                                <div className="space-y-3">
-                                  {state.aiFeedback.reference_materials.map((ref, index) => (
-                                    <div key={index} className="bg-white/90 p-4 rounded-lg border border-purple-200 shadow-sm">
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="flex-1">
-                                          <h6 className="font-semibold text-purple-900 mb-1">
-                                            {ref.title}
-                                          </h6>
-                                          <p className="text-sm text-purple-700 leading-relaxed">
-                                            {ref.description}
-                                          </p>
-                                        </div>
-                                        {ref.url && (
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="shrink-0 border-purple-300 text-purple-700 hover:bg-purple-100 shadow-sm"
-                                            onClick={() => window.open(ref.url, '_blank')}
-                                          >
-                                            <ExternalLink className="h-4 w-4" />
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {state.aiFeedback.ai_model && process.env.NODE_ENV === 'development' && (
-                              <div className="text-xs text-purple-600 pt-3 border-t border-purple-200">
-                                Powered by {state.aiFeedback.ai_model}
-                                {state.aiFeedback.processing_time_ms && 
-                                  ` • Generated in ${state.aiFeedback.processing_time_ms}ms`
-                                }
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  )}
+                  {state.showResult && renderAIFeedback()}
 
                   <div className="pt-6 border-t border-gray-200">
                     <div className="flex justify-end">
@@ -1433,7 +1483,7 @@ export default function InteractiveQuiz() {
                           disabled={
                             (currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && !state.selectedOptionId ||
                             currentQuestion.question_type === 'essay' && !state.essayAnswer.trim() ||
-                            currentQuestion.question_type === 'sentence_arrangement' && blankPositions.some(pos => pos.piece === null) // Cek apakah semua posisi terisi
+                            currentQuestion.question_type === 'sentence_arrangement' && blankPositions.some(pos => pos.piece === null)
                           }
                           className="bg-sky-500 hover:bg-sky-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg font-medium"
                           size="lg"
