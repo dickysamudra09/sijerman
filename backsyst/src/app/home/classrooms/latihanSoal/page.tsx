@@ -177,6 +177,8 @@ export default function LatihanSoalPage() {
         questions: exercise.questions.map((q: any) => ({
           ...q,
           isSaved: true,
+          // Tambahkan config sentence_arrangement dari question_text
+          sentence_arrangement_config: q.question_type === 'sentence_arrangement' ? { complete_sentence: q.question_text } : q.sentence_arrangement_config,
           options: q.options.map((o: any) => ({
             ...o,
             isSaved: true
@@ -372,7 +374,12 @@ export default function LatihanSoalPage() {
   };
 
   const saveQuestion = async (exerciseId: string, question: Question) => {
-    if (!userId || !question.question_text.trim()) {
+    // Validasi dasar
+    if (!userId) {
+      toast.error("User ID tidak ditemukan. Silakan login ulang.");
+      return;
+    }
+    if (!question.question_text.trim()) {
       toast.error("Pertanyaan tidak boleh kosong");
       return;
     }
@@ -384,7 +391,7 @@ export default function LatihanSoalPage() {
         return;
       }
     } else if (question.question_type === 'sentence_arrangement') {
-      if (!question.sentence_arrangement_config?.complete_sentence?.trim()) {
+      if (!question.question_text.trim()) {
         toast.error("Kalimat lengkap harus diisi");
         return;
       }
@@ -498,13 +505,10 @@ export default function LatihanSoalPage() {
         error,
         errorType: typeof error,
         errorConstructor: error?.constructor?.name,
-        // errorMessage: error?.message,
-        // errorStack: error?.stack,
         questionType: question.question_type,
         exerciseId
       });
       
-      // Tampilkan error yang lebih detail
       let errorMessage = "Gagal menyimpan pertanyaan";
       
       if (error instanceof Error) {
@@ -535,7 +539,7 @@ export default function LatihanSoalPage() {
         question_text: question.question_text,
         points: question.points
       };
-
+      
       if (question.question_type === 'essay' && question.essay_config) {
         updateData.essay_config = question.essay_config;
       } else if (question.question_type === 'sentence_arrangement' && question.sentence_arrangement_config) {
@@ -571,7 +575,9 @@ export default function LatihanSoalPage() {
             ? {
                 ...exercise,
                 questions: exercise.questions.map(q => 
-                  q.id === question.id ? { ...q, question_text: question.question_text, points: question.points } : q
+                  q.id === question.id 
+                    ? { ...q, question_text: question.question_text, points: question.points } 
+                    : q
                 )
               }
             : exercise
@@ -735,7 +741,7 @@ export default function LatihanSoalPage() {
               {/* Pertanyaan */}
               <div>
                 <Label className="text-sm font-semibold text-gray-700 mb-3 block">
-                  Pertanyaan
+                  {question.question_type === 'sentence_arrangement' ? 'Kalimat Lengkap' : 'Pertanyaan'}
                 </Label>
                 <Textarea
                   value={question.question_text}
@@ -745,17 +751,25 @@ export default function LatihanSoalPage() {
                         ex.id === exercise.id
                           ? {
                               ...ex,
-                              questions: ex.questions.map(q => 
-                                q.id === question.id 
-                                  ? { ...q, question_text: e.target.value }
-                                  : q
-                              )
+                              questions: ex.questions.map(q => {
+                                if (q.id === question.id) {
+                                  const updatedQuestion = { ...q, question_text: e.target.value };
+                                  if (q.question_type === 'sentence_arrangement') {
+                                    updatedQuestion.sentence_arrangement_config = {
+                                      ...(updatedQuestion.sentence_arrangement_config || { complete_sentence: '', sentence_with_blanks: '', blank_words: [], distractor_words: [] }),
+                                      complete_sentence: e.target.value
+                                    };
+                                  }
+                                  return updatedQuestion;
+                                }
+                                return q;
+                              })
                             }
                           : ex
                       )
                     )
                   }
-                  placeholder="Masukkan pertanyaan di sini..."
+                  placeholder={question.question_type === 'sentence_arrangement' ? "Masukkan kalimat lengkap yang akan dijadikan puzzle..." : "Masukkan pertanyaan di sini..."}
                   className="border-gray-300 focus:border-sky-500 focus:ring-sky-200 bg-white shadow-sm min-h-[100px]"
                   rows={3}
                 />
@@ -833,58 +847,31 @@ export default function LatihanSoalPage() {
                 </div>
               )}
 
+              {question.question_type === 'essay' && (
+                <div className="space-y-4">
+                  {/* Essay config... (kode yang sudah benar) */}
+                </div>
+              )}
+
               {question.question_type === 'sentence_arrangement' && (
                 <div className="space-y-6">
-                  <div>
-                    <Label className="text-sm font-semibold text-gray-700 mb-2 block">
-                      Kalimat Lengkap
-                    </Label>
-                    <Textarea
-                      value={question.sentence_arrangement_config?.complete_sentence || ''}
-                      onChange={(e) => {
-                        setExerciseSets(prev => 
-                          prev.map(ex => 
-                            ex.id === exercise.id 
-                              ? {
-                                  ...ex,
-                                  questions: ex.questions.map(q => 
-                                    q.id === question.id 
-                                      ? {
-                                          ...q,
-                                          sentence_arrangement_config: {
-                                            ...(q.sentence_arrangement_config || { complete_sentence: '', sentence_with_blanks: '', blank_words: [], distractor_words: [] }),
-                                            complete_sentence: e.target.value
-                                          }
-                                        }
-                                      : q
-                                  )
-                                }
-                              : ex
-                          )
-                        );
-                      }}
-                      placeholder="Masukkan kalimat lengkap yang akan dijadikan puzzle..."
-                      className="border-gray-300 focus:border-sky-500 focus:ring-sky-200 bg-white shadow-sm"
-                      rows={3}
-                    />
-                    {question.sentence_arrangement_config?.complete_sentence && (
-                      <div className="mt-3 flex gap-2">
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            if (question.sentence_arrangement_config) {
-                              autoGenerateBlanks(exercise.id, question.id, question.sentence_arrangement_config.complete_sentence);
-                            }
-                          }}
-                          className="bg-purple-500 hover:bg-purple-600 text-white text-sm px-4 py-2"
-                          size="sm"
-                        >
-                          <Square className="h-4 w-4 mr-2" />
-                          Auto Generate Puzzle
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                  {question.question_text && (
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (question.question_text) {
+                            autoGenerateBlanks(exercise.id, question.id, question.question_text);
+                          }
+                        }}
+                        className="bg-purple-500 hover:bg-purple-600 text-white text-sm px-4 py-2"
+                        size="sm"
+                      >
+                        <Square className="h-4 w-4 mr-2" />
+                        Auto Generate Puzzle
+                      </Button>
+                    </div>
+                  )}
 
                   {question.sentence_arrangement_config?.sentence_with_blanks && (
                     <div className="space-y-4">
@@ -1058,7 +1045,7 @@ export default function LatihanSoalPage() {
                     onClick={() => saveQuestion(exercise.id, question)}
                     disabled={isSaving || !question.question_text.trim() || 
                       (question.question_type === 'multiple_choice' && question.options.some(opt => !opt.option_text.trim())) ||
-                      (question.question_type === 'sentence_arrangement' && !question.sentence_arrangement_config?.complete_sentence?.trim())
+                      (question.question_type === 'sentence_arrangement' && !question.question_text.trim())
                     }
                     className="bg-sky-500 hover:bg-sky-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
                   >
