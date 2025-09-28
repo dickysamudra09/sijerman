@@ -3,14 +3,13 @@ import OpenAI from 'openai';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! 
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-// Database referensi yang sudah diverifikasi untuk bahasa Jerman A1-A2
 const GERMAN_REFERENCES = {
   grammar: [
     {
@@ -82,15 +81,26 @@ const GERMAN_REFERENCES = {
   ]
 };
 
-interface Question {
-  id: string;
-  question_text: string;
-}
-
 interface Option {
   id: string;
   option_text: string;
   is_correct: boolean;
+  order_index?: number;
+  sentence_fragment?: string;
+  is_blank_position?: boolean;
+}
+
+interface Question {
+  id: string;
+  question_text: string;
+  question_type: 'multiple_choice' | 'sentence_arrangement' | 'essay' | 'true_false' | string;
+  options: Option[];
+  sentence_arrangement_config?: {
+    complete_sentence?: string;
+    sentence_with_blanks?: string;
+    blank_words?: string[];
+    distractor_words?: string[];
+  } | null;
 }
 
 interface AIFeedbackData {
@@ -112,10 +122,10 @@ interface AIFeedbackResponse {
 }
 
 function selectRelevantReferences(
-  questionText: string, 
-  correctAnswer: string, 
-  selectedAnswer: string
-): Array<{title: string; url: string; description: string}> {
+  questionText: string,
+  correctAnswerText: string,
+  selectedAnswerText: string
+): Array<{ title: string; url: string; description: string }> {
   const allRefs = [
     ...GERMAN_REFERENCES.grammar,
     ...GERMAN_REFERENCES.vocabulary,
@@ -123,9 +133,8 @@ function selectRelevantReferences(
     ...GERMAN_REFERENCES.conjugation
   ];
 
-  const searchTerms = `${questionText} ${correctAnswer} ${selectedAnswer}`.toLowerCase();
-  
-  // Score referensi berdasarkan relevansi keyword
+  const searchTerms = `${questionText} ${correctAnswerText} ${selectedAnswerText}`.toLowerCase();
+
   const scoredRefs = allRefs.map(ref => {
     const score = ref.keywords.reduce((acc, keyword) => {
       return acc + (searchTerms.includes(keyword.toLowerCase()) ? 1 : 0);
@@ -133,27 +142,24 @@ function selectRelevantReferences(
     return { ...ref, score };
   });
 
-  // Urutkan berdasarkan score dan ambil 3 teratas
-  // Jika tidak ada yang cocok, ambil referensi umum
   const sortedRefs = scoredRefs.sort((a, b) => b.score - a.score);
   const selectedRefs = sortedRefs.slice(0, 3);
 
-  // Jika semua score 0, berikan mix referensi umum
   if (selectedRefs.every(ref => ref.score === 0)) {
     return [
       GERMAN_REFERENCES.grammar[0],
       GERMAN_REFERENCES.vocabulary[0],
       GERMAN_REFERENCES.conjugation[0]
-    ].map(({title, url, description}) => ({title, url, description}));
+    ].map(({ title, url, description }) => ({ title, url, description }));
   }
 
-  return selectedRefs.map(({title, url, description}) => ({title, url, description}));
+  return selectedRefs.map(({ title, url, description }) => ({ title, url, description }));
 }
 
 async function generateAIFeedback(
-  question: Question, 
-  selectedAnswer: Option | undefined, 
-  correctAnswer: Option | undefined, 
+  question: Question,
+  studentAnswerText: string,
+  correctAnswerText: string,
   isCorrect: boolean
 ): Promise<AIFeedbackResponse> {
   const startTime = Date.now();
@@ -163,47 +169,76 @@ async function generateAIFeedback(
       throw new Error('OpenAI API key is not configured');
     }
 
-    // Pilih referensi yang relevan berdasarkan konten pertanyaan
     const relevantReferences = selectRelevantReferences(
       question.question_text,
-      correctAnswer?.option_text || '',
-      selectedAnswer?.option_text || ''
+      correctAnswerText,
+      studentAnswerText
     );
 
-    const prompt = `
+    let prompt = '';
+    
+    if (question.question_type === 'sentence_arrangement') {
+      prompt = `
+Sebagai tutor bahasa Jerman yang berpengalaman di level A1-A2, berikan feedback untuk jawaban siswa pada soal Isian Celah:
+
+Pertanyaan: "${question.question_text}"
+Jawaban siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
+Jawaban yang benar: "${correctAnswerText || 'Tidak diketahui'}"
+Status: ${isCorrect ? 'Benar' : 'Salah'}
+
+${isCorrect
+        ? 'Berikan pujian singkat dan penjelasan mengapa jawaban tersebut benar.'
+        : 'Jelaskan mengapa jawaban siswa salah dan berikan pemahaman yang jelas tentang konsep yang benar.'}
+
+PENTING untuk soal Isian Celah:
+- Fokus pada konsep bahasa Jerman yang spesifik (grammar, vocabulary, dll).
+- Jelaskan mengapa kata/urutan yang benar penting dalam konteks kalimat tersebut.
+- Berikan penjelasan yang mudah dipahami untuk level A1-A2.
+- WAJIB: Di bagian explanation, sertakan kalimat lengkap yang benar dengan format: "Kalimat yang benar: **${correctAnswerText}**"
+- Gunakan contoh-contoh sederhana jika memungkinkan.
+- JANGAN menyebutkan URL atau link dalam response.
+
+Format response dalam JSON yang VALID:
+{
+  "feedback_text": "feedback utama dalam bahasa Indonesia (maksimal 100 kata)",
+  "explanation": "penjelasan detail konsep dalam bahasa Indonesia (maksimal 150 kata), WAJIB menyertakan 'Kalimat yang benar: **${correctAnswerText}**' di akhir"
+}`;
+    } else {
+      prompt = `
 Sebagai tutor bahasa Jerman yang berpengalaman di level A1-A2, berikan feedback untuk jawaban siswa:
 
 Pertanyaan: "${question.question_text}"
-Jawaban yang dipilih siswa: "${selectedAnswer?.option_text || 'Tidak ada jawaban'}"
-Jawaban yang benar: "${correctAnswer?.option_text || 'Tidak diketahui'}"
+Jawaban yang dipilih siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
+Jawaban yang benar: "${correctAnswerText || 'Tidak diketahui'}"
 Status: ${isCorrect ? 'Benar' : 'Salah'}
 
-${isCorrect 
-  ? 'Berikan pujian singkat dan penjelasan mengapa jawaban tersebut benar.' 
-  : 'Jelaskan mengapa jawaban siswa salah dan berikan pemahaman yang jelas tentang konsep yang benar.'}
+${isCorrect
+        ? 'Berikan pujian singkat dan penjelasan mengapa jawaban tersebut benar.'
+        : 'Jelaskan mengapa jawaban siswa salah dan berikan pemahaman yang jelas tentang konsep yang benar. Fokus pada mengapa jawaban yang salah tidak cocok dengan struktur kalimat.'}
 
-PENTING: 
-- Fokus pada konsep bahasa Jerman yang spesifik (grammar, vocabulary, pronunciation, dll)
-- Berikan penjelasan yang mudah dipahami untuk level A1-A2
-- Gunakan contoh-contoh sederhana jika memungkinkan
-- JANGAN menyebutkan URL atau link dalam response
+PENTING:
+- Fokus pada konsep bahasa Jerman yang spesifik (grammar, vocabulary, dll).
+- Berikan penjelasan yang mudah dipahami untuk level A1-A2.
+- Gunakan contoh-contoh sederhana jika memungkinkan.
+- JANGAN menyebutkan URL atau link dalam response.
 
 Format response dalam JSON yang VALID:
 {
   "feedback_text": "feedback utama dalam bahasa Indonesia (maksimal 100 kata)",
   "explanation": "penjelasan detail konsep dalam bahasa Indonesia (maksimal 150 kata)"
 }`;
+    }
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
-        { 
-          role: 'system', 
-          content: 'You are an experienced German language tutor specializing in A1-A2 levels. Always respond in valid JSON format without any markdown or additional formatting. Focus on educational content only.' 
+        {
+          role: 'system',
+          content: 'You are an experienced German language tutor specializing in A1-A2 levels. Always respond in valid JSON format without any markdown or additional formatting. Focus on educational content only.'
         },
         { role: 'user', content: prompt },
       ],
-      temperature: 0.3, // Lebih rendah untuk konsistensi
+      temperature: 0.3,
       max_tokens: 500,
     });
 
@@ -214,7 +249,6 @@ Format response dalam JSON yang VALID:
 
     let parsedContent: any;
     try {
-      // Bersihkan response dari markdown atau karakter yang tidak diinginkan
       const cleanContent = aiContent.replace(/```json\s*|\s*```/g, '').trim();
       parsedContent = JSON.parse(cleanContent);
     } catch (parseError) {
@@ -237,14 +271,13 @@ Format response dalam JSON yang VALID:
   } catch (error: unknown) {
     console.error('AI Feedback generation error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    
-    // Fallback referensi jika terjadi error
+
     const fallbackReferences = [
       GERMAN_REFERENCES.grammar[0],
       GERMAN_REFERENCES.vocabulary[0],
       GERMAN_REFERENCES.conjugation[0]
-    ].map(({title, url, description}) => ({title, url, description}));
-    
+    ].map(({ title, url, description }) => ({ title, url, description }));
+
     return {
       success: false,
       error: errorMessage,
@@ -262,34 +295,38 @@ Format response dalam JSON yang VALID:
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const questionId = url.searchParams.get('questionId');
-  
+
   if (!questionId) {
     return Response.json({ error: 'questionId required' });
   }
-  
+
   const { data, error } = await supabaseAdmin
     .from('questions')
-    .select('id, question_text, options(*)')
+    .select('id, question_text, question_type, options(*)')
     .eq('id', questionId)
     .single();
-    
+
   return Response.json({ data, error, questionId });
 }
 
 export async function POST(request: Request): Promise<Response> {
   try {
     const requestBody = await request.json();
-    const { 
-      studentAnswerId, 
-      questionId, 
-      attemptId, 
+    const {
+      studentAnswerId,
+      questionId,
+      attemptId,
       selectedOptionId,
-      isCorrect 
+      textAnswer,
+      selectedOptionsArray, 
+      isCorrect
     }: {
       studentAnswerId: string;
       questionId: string;
       attemptId: string;
       selectedOptionId: string | null;
+      textAnswer: string | null; 
+      selectedOptionsArray: string[] | null;
       isCorrect: boolean;
     } = requestBody;
 
@@ -298,61 +335,103 @@ export async function POST(request: Request): Promise<Response> {
       questionId,
       attemptId,
       selectedOptionId,
+      textAnswer,
+      selectedOptionsArray,
       isCorrect
     });
 
     if (!studentAnswerId || !questionId || !attemptId) {
       console.error('Missing required fields:', { studentAnswerId, questionId, attemptId });
       return Response.json(
-        { error: 'Missing required fields' }, 
+        { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    const { data: questionData, error: questionError } = await supabaseAdmin
+    const { data: rawQuestionData, error: questionError } = await supabaseAdmin
       .from('questions')
       .select(`
         id,
         question_text,
-        options (id, option_text, is_correct)
+        question_type,
+        sentence_arrangement_config,
+        options (id, option_text, is_correct, order_index, sentence_fragment, is_blank_position)
       `)
       .eq('id', questionId)
       .single();
 
-    if (questionError || !questionData) {
+    if (questionError || !rawQuestionData) {
       console.error('Question fetch error:', questionError);
       return Response.json(
-        { 
-          error: 'Failed to fetch question data', 
+        {
+          error: 'Failed to fetch question data',
           details: questionError?.message || 'Question not found',
-          questionId: questionId 
+          questionId: questionId
         },
         { status: 404 }
       );
     }
 
-    const typedQuestionData = questionData as Question & {
-      options: Option[];
-    };
+    const questionData = rawQuestionData as unknown as Question;
 
-    if (!typedQuestionData.options || typedQuestionData.options.length === 0) {
+    let studentAnswerText = '';
+    let correctAnswerText = '';
+    let finalIsCorrect = isCorrect;
+
+    if (questionData.question_type === 'multiple_choice' || questionData.question_type === 'true_false') {
+      const selectedOption = questionData.options.find(opt => opt.id === selectedOptionId);
+      const correctOption = questionData.options.find(opt => opt.is_correct);
+      studentAnswerText = selectedOption?.option_text || 'Tidak ada jawaban';
+      correctAnswerText = correctOption?.option_text || 'Tidak diketahui';
+    } else if (questionData.question_type === 'sentence_arrangement') {
+      
+      studentAnswerText = textAnswer || 'Tidak ada jawaban';
+
+      let correctSentence: string = '';
+      
+      if (questionData.sentence_arrangement_config?.complete_sentence) {
+        correctSentence = questionData.sentence_arrangement_config.complete_sentence;
+      } else {
+        let sentenceWithBlanks = questionData.sentence_arrangement_config?.sentence_with_blanks || "";
+        const correctWords = questionData.sentence_arrangement_config?.blank_words || [];
+        
+        correctSentence = sentenceWithBlanks;
+        correctWords.forEach(word => {
+          correctSentence = correctSentence.replace('___', word);
+        });
+      }
+      
+      correctAnswerText = correctSentence.trim() || 'Tidak diketahui (Konfigurasi tidak lengkap)';
+      
+      console.log('Sentence arrangement processing:', {
+        studentAnswerText,
+        correctAnswerText,
+        isCorrect: finalIsCorrect
+      });
+      
+    } else if (questionData.question_type === 'essay') {
+      studentAnswerText = textAnswer || 'Tidak ada jawaban';
+      correctAnswerText = 'Jawaban ideal bervariasi (Essay)';
+    } else {
+      console.error('Unsupported question type:', questionData.question_type);
       return Response.json(
-        { 
-          error: 'Question options not found', 
-          details: 'Question has no options' 
-        },
-        { status: 404 }
+        { error: 'Unsupported question type' },
+        { status: 400 }
       );
     }
 
-    const selectedOption = typedQuestionData.options.find(opt => opt.id === selectedOptionId);
-    const correctOption = typedQuestionData.options.find(opt => opt.is_correct);
+    console.log('Generating AI feedback with:', {
+      questionType: questionData.question_type,
+      studentAnswerText,
+      correctAnswerText,
+      finalIsCorrect
+    });
 
     const aiResponse = await generateAIFeedback(
-      typedQuestionData,
-      selectedOption,
-      correctOption,
-      isCorrect
+      questionData,
+      studentAnswerText,
+      correctAnswerText,
+      finalIsCorrect
     );
 
     // Simpan ke database
@@ -362,7 +441,7 @@ export async function POST(request: Request): Promise<Response> {
         student_answer_id: studentAnswerId,
         question_id: questionId,
         attempt_id: attemptId,
-        feedback_type: isCorrect ? 'correct' : 'incorrect',
+        feedback_type: finalIsCorrect ? 'correct' : 'incorrect',
         feedback_text: aiResponse.data.feedback_text,
         explanation: aiResponse.data.explanation,
         reference_materials: aiResponse.data.reference_materials,
@@ -392,7 +471,7 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error: unknown) {
     console.error('AI Feedback API error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    
+
     return Response.json(
       { error: 'Internal server error', details: errorMessage },
       { status: 500 }
