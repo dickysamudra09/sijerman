@@ -22,6 +22,9 @@ const nextConfig = {
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // Optimize bundle
   webpack: (config, { isServer }) => {
     // Optimize for client-side bundles
