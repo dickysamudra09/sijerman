@@ -67,7 +67,7 @@ interface StudentStats {
   averageScore: number;
 }
 
-export function StudentMode({ onBack }: StudentModeProps) {
+function StudentMode({ onBack }: StudentModeProps) {
   const [userName, setUserName] = useState<string>("");
   const [userId, setUserId] = useState<string | null>(null);
   const [classrooms, setClassrooms] = useState<ClassRoom[]>([]);
@@ -507,11 +507,11 @@ export function StudentMode({ onBack }: StudentModeProps) {
             </TabsList>
             
             <TabsContent value="classrooms" className="space-y-6 mt-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
                 {classrooms.length > 0 ? (
                   classrooms.map((classroom) => (
-                    <Card key={classroom.id} className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
-                      <CardHeader className="pb-4">
+                    <Card key={classroom.id} className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl flex flex-col">
+                      <CardHeader className="pb-4 flex-grow">
                         <CardTitle className="flex items-center justify-between text-gray-900 text-lg">
                           {classroom.name}
                           <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 px-3 py-1">
@@ -521,7 +521,7 @@ export function StudentMode({ onBack }: StudentModeProps) {
                         <CardDescription className="text-gray-600 text-sm leading-relaxed">{classroom.description}</CardDescription>
                         <p className="text-sm text-muted-foreground">Guru: {classroom.teacherName}</p>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="mt-auto">
                         <div className="space-y-4">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-500">Kode Kelas:</span>

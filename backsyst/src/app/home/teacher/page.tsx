@@ -53,7 +53,7 @@ interface TeacherModeProps {
     onBack: () => void;
 }
 
-export function TeacherMode({ onBack }: TeacherModeProps) {
+function TeacherMode({ onBack }: TeacherModeProps) {
     const [userName, setUserName] = useState<string>("");
     const [initialLoading, setInitialLoading] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);

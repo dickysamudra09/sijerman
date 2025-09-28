@@ -60,7 +60,7 @@ interface TeacherStudentModeProps {
   onBack: () => void;
 }
 
-export function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
+function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
   const [userRole, setUserRole] = useState<"teacher" | "student" | null>(null);
   const [userName, setUserName] = useState<string>("");
   const [userId, setUserId] = useState<string | null>(null);
