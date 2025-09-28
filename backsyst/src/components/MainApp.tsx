@@ -4,22 +4,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Toaster } from "@/components/ui/sonner";
-import { ClassSection } from "@/components/ClassSection";
-import { FAQ } from "@/components/FAQ";
-import { HeroSection } from "@/components/HeroSection";
-import { ClassFilter } from "@/components/ClassFilter";
-import { CourseDetail } from "@/components/CourseDetail";
-import { InteractiveQuiz } from "@/components/InteractiveQuiz";
-import { AIAnalysis } from "@/components/AIAnalysis";
-import { TeacherStudentMode } from "@/components/TeacherStudentMode";
-import { MiniQuizGame } from "@/components/MiniQuizGame";
-import { StatsTracking } from "@/components/StatsTracking";
-import { Forum } from "@/components/Forum";
-import { 
-  GraduationCap, 
-  User, 
-  Search, 
-  Moon, 
+import {
+  GraduationCap,
+  User,
+  Search,
+  Moon,
   Sun,
   Globe,
   Brain,
@@ -27,15 +16,45 @@ import {
   Gamepad2,
   BarChart3,
   Target,
-  Zap,
-  BookOpen,
   MessageSquare,
   Menu,
-  X
+  X,
+  BookOpen,
+  Smile,
+  Compass,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
+import type { User as SupabaseUser } from '@supabase/supabase-js';
+
+// Tipe data untuk prop language
+type LanguageProps = {
+  language: "id" | "de";
+};
 
 // Data course untuk kelas A-1
 const coursesA1 = [
@@ -45,7 +64,7 @@ const coursesA1 = [
     description: "Pelajari konsep dasar matematika dengan pendekatan yang mudah dipahami",
     duration: "8 minggu",
     students: 45,
-    lessons: 24
+    lessons: 24,
   },
   {
     id: "a1-2",
@@ -53,7 +72,7 @@ const coursesA1 = [
     description: "Meningkatkan kemampuan berbahasa Indonesia yang baik dan benar",
     duration: "6 minggu",
     students: 52,
-    lessons: 18
+    lessons: 18,
   },
   {
     id: "a1-3",
@@ -61,8 +80,8 @@ const coursesA1 = [
     description: "Eksplorasi dunia sains melalui eksperimen dan praktik langsung",
     duration: "10 minggu",
     students: 38,
-    lessons: 30
-  }
+    lessons: 30,
+  },
 ];
 
 // Data course untuk kelas A-2
@@ -70,18 +89,18 @@ const coursesA2 = [
   {
     id: "a2-1",
     title: "Mathematik Fortgeschritten",
-    description: "Erweiterte mathematische Konzepte mit praktischen Anwendungen",
+    description: "Erweiterte mathematische Konsepte mit praktischen Anwendungen",
     duration: "10 minggu",
     students: 42,
-    lessons: 28
+    lessons: 28,
   },
   {
     id: "a2-2",
     title: "Deutsche Sprache A2",
-    description: "Lernen Sie Deutsch für den täglichen und akademischen Gebrauch",
+    description: "Lernen Sie Deutsch für den täglichen dan akademischen Gebrauch",
     duration: "8 minggu",
     students: 48,
-    lessons: 32
+    lessons: 32,
   },
   {
     id: "a2-3",
@@ -89,156 +108,586 @@ const coursesA2 = [
     description: "Die Reise der deutschen Geschichte von der Vergangenheit bis zur Moderne verstehen",
     duration: "6 minggu",
     students: 35,
-    lessons: 20
-  }
+    lessons: 20,
+  },
 ];
 
-type ViewType = 'home' | 'course-detail' | 'interactive-quiz' | 'ai-analysis' | 'teacher-student' | 'mini-quiz' | 'stats-tracking' | 'forum';
+type ViewType =
+  | "home"
+  | "course-detail"
+  | "interactive-quiz"
+  | "ai-analysis"
+  | "teacher-student"
+  | "mini-quiz"
+  | "stats-tracking"
+  | "forum";
 
+// Tipe data untuk props UserDropdown
+interface UserDropdownProps {
+  user: SupabaseUser;
+  language: "id" | "de";
+  onLogout: () => void;
+}
+
+// --- Components
+const HeroSection = ({ language }: LanguageProps) => {
+  const getText = (id: string, de: string) => (language === "de" ? de : id);
+
+  return (
+    <section className="relative overflow-hidden px-4">
+      <div className="container mx-auto px-4 lg:px-20">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
+          {/* Text Content */}
+          <div className="text-center lg:text-left flex-1">
+            {/* Judul */}
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-blue-900 leading-snug mb-4 max-w-2xl">
+              {getText("Kembangkan Potensimu, dengan ", "Entwickle dein Potenzial, mit ")}
+              <span className="bg-gradient-to-r from-blue-500 to-blue-800 bg-clip-text text-transparent">
+                Si Jerman.
+              </span>
+            </h2>
+
+            {/* Subjudul */}
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-900 mb-6 max-w-2xl">
+              {getText(
+                "“Temukan fitur yang belum pernah kamu coba.”",
+                "“Entdecke Funktionen, die du noch nie ausprobiert hast.”"
+              )}
+            </p>
+
+            {/* Deskripsi */}
+            <p className="text-gray-800 text-lg max-w-xl">
+              {getText(
+                "Si Jerman, ruang belajar digital dengan latihan soal AI, kuis interaktif, dashboard analisis, forum diskusi, dan course terstruktur untuk belajar cerdas dan kolaboratif.",
+                "Si Jerman, der digitale Lernraum mit KI-Übungsaufgaben, interaktiven Quizzes, Dashboard, Forum und strukturierten Kursen für intelligentes und kollaboratives Lernen."
+              )}
+            </p>
+
+            {/* Buttons */}
+            <div className="mt-8 flex flex-col sm:flex-row items-center lg:justify-start justify-center gap-4">
+              {/* Explore button */}
+              <Button className="w-full sm:w-auto px-6 py-3 font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-colors shadow-lg flex items-center gap-2">
+                <Search className="h-5 w-5" />
+                {getText("Explore Our Fitur", "Unsere Funktionen erkunden")}
+              </Button>
+
+              {/* Phone contact */}
+              <div className="flex items-center gap-2 text-gray-900 font-semibold">
+                <div className="w-10 h-10 flex items-center justify-center bg-yellow-400 rounded-full">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="white"
+                    className="w-5 h-5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M22 16.92v3a2.06 2.06 0 01-2.23 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2.06 2.06 0 014.11 2h3a2.06 2.06 0 012 1.72 12.84 12.84 0 00.7 2.81 2.06 2.06 0 01-.45 2.18L8.09 9.91a16 16 0 006 6l1.2-1.2a2.06 2.06 0 012.18-.45 12.84 12.84 0 002.81.7A2.06 2.06 0 0122 16.92z" />
+                  </svg>
+                </div>
+                <span>087812186453</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Image */}
+          <div className="flex-1 flex justify-center lg:justify-end">
+            <img
+              src="/img/3.png"
+              alt="Black cat character holding a yellow book and pencil"
+              className="w-full max-w-md h-auto object-contain"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const MainFeatures = ({ language }: LanguageProps) => {
+  const getText = (id: string, de: string) => (language === "de" ? de : id);
+
+  return (
+    <section className="py-3">
+      <div className="container mx-auto px-4">
+        <div className="bg-blue-50 rounded-2xl shadow-md p-10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            {/* Card 1 */}
+            <div>
+              <h3 className="text-5xl font-bold text-blue-900">
+                <span className="text-yellow-400">+</span>96
+              </h3>
+              <h4 className="text-xl font-bold mt-2 text-blue-900">
+                Latihan Interaktif
+              </h4>
+              <p className="text-sm text-gray-600 mt-2">
+                Nikmati berbagai latihan soal dengan analisis AI — bukan sekadar teori, tapi praktik bahasa yang nyata.
+              </p>
+            </div>
+
+            {/* Card 2 */}
+            <div>
+              <h3 className="text-5xl font-bold text-blue-900">
+                <span className="text-yellow-400">+</span>4
+              </h3>
+              <h4 className="text-xl font-bold mt-2 text-blue-900">
+                Proyek Tiap Level
+              </h4>
+              <p className="text-sm text-gray-600 mt-2">
+                Setiap level menghadirkan tugas nyata yang melatih kosakata, tata bahasa, serta kreativitas pengguna.
+              </p>
+            </div>
+
+            {/* Card 3 */}
+            <div>
+              <h3 className="text-5xl font-bold text-blue-900">
+                <span className="text-yellow-400">+</span>192
+              </h3>
+              <h4 className="text-xl font-bold mt-2 text-blue-900">
+                Total Jam Belajar
+              </h4>
+              <p className="text-sm text-gray-600 mt-2">
+                Kurikulum dirancang seimbang antara keseruan kuis, forum diskusi, dan pembelajaran mendalam dari materi.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const AboutSection = ({ language }: LanguageProps) => {
+  const getText = (id: string, de: string) => (language === "de" ? de : id);
+
+  return (
+    <section className="py-20 px-4">
+      <div className="container mx-auto">
+        <div className="flex flex-col lg:flex-row items-center justify-center gap-16">
+          {/* Image */}
+          <div className="relative flex-shrink-0 w-full max-w-md">
+            <img
+              src="/img/1.png"
+              alt="Black cat mascot reading a book"
+              className="w-full h-auto object-contain"
+            />
+          </div>
+          {/* Text Content */}
+          <div className="relative z-10 text-center lg:text-left">
+            <span className="text-sm font-semibold uppercase text-blue-200">
+              {getText("Sapa Si Jerman?", "Wer ist Si Jerman?")}
+            </span>
+            <h2 className="text-3xl font-bold text-gray-800 mt-2 mb-4">
+              {getText(
+                "Temui Si Jerman - Tempat Belajar Bahasa Jerman yang Interaktif dan Menyenangkan",
+                "Treffen Sie Si Jerman - Ihr interaktiver und unterhaltsamer Ort, um Deutsch zu lernen"
+              )}
+            </h2>
+            <p className="text-gray-600 mb-6 max-w-xl">
+              {getText(
+                "Si Jerman adalah platform edukasi digital untuk mengembangkan kompetensi bahasa Jerman secara efektif.",
+                "Si Jerman ist eine digitale Bildungsplattform zur effektiven Entwicklung von Deutschkenntnissen."
+              )}
+            </p>
+            <p className="text-gray-500 mb-8 max-w-xl">
+              {getText(
+                "Dengan fitur interaktif seperti latihan soal AI, kuis multiplayer, dashboard, forum, dan course terstruktur, kami membantu Anda membangun keterampilan bahasa, berpikir kritis, dan kepercayaan diri. Mari belajar sekarang!",
+                "Mit interaktiven Funktionen wie KI-Übungsaufgaben, Multiplayer-Quizzes, Dashboard, Forum und strukturierten Kursen helfen wir Ihnen, Ihre Sprachkenntnisse, Ihr kritisches Denken und Ihr Selbstvertrauen aufzubauen. Fangen Sie jetzt an zu lernen!"
+              )}
+            </p>
+            <Button className="px-8 py-3 bg-blue-200 hover:bg-blue-300 text-gray-900 rounded-full font-semibold">
+              {getText("Contact Us", "Kontaktieren Sie uns")}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const WhyChooseSection = ({ language }: LanguageProps) => {
+  const getText = (id: string, de: string) => (language === "de" ? de : id);
+
+  return (
+    <section className="bg-blue-50 py-16 px-6">
+      <div className="container mx-auto">
+        {/* Heading */}
+        <div className="text-center mt-12">
+          <span className="text-sm font-semibold uppercase bg-yellow-400 px-4 py-1 rounded">
+            {getText("Mengapa Si Jerman?", "Warum Si Jerman?")}
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-bold text-blue-900 mt-10">
+            {getText("Belajar. Berlatih. Kuasai. Ulangi.", "Lernen. Üben. Meistern. Wiederholen.")}
+          </h2>
+        </div>
+
+        {/* Grid Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 items-center gap-12">
+          {/* Left cards */}
+          <div className="flex flex-col gap-12">
+            {/* Card 1 */}
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-lg bg-orange-200 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-7 h-7 text-blue-900" />
+              </div>
+              <div>
+                <h3 className="font-bold text-blue-900 text-lg">
+                  {getText("Belajar dengan Praktik", "Lernen durch Übung")}
+                </h3>
+                <p className="text-gray-700 text-sm mt-2">
+                  {getText(
+                    "Tidak ada pembelajaran membosankan — hanya latihan interaktif, analisis AI, dan tantangan bahasa yang kreatif.",
+                    "Kein langweiliges Lernen mehr, nur interaktive Übungen, KI-Analysen und kreative Quizzes."
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Card 2 */}
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-lg bg-purple-200 flex items-center justify-center flex-shrink-0">
+                <Smile className="w-7 h-7 text-blue-900" />
+              </div>
+              <div>
+                <h3 className="font-bold text-blue-900 text-lg">
+                  {getText("Suasana Menyenangkan & Ramah", "Spaßige und freundliche Atmosphäre")}
+                </h3>
+                <p className="text-gray-700 text-sm mt-2">
+                  {getText(
+                    "Dari kuis seru hingga pengajar yang inspiratif, kami membuat belajar Bahasa Jerman terasa seperti bermain.",
+                    "In einer freundlichen und unterstützenden Umgebung helfen wir Ihnen, Deutsch ohne den Druck von Nachhilfe zu lernen."
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Center image */}
+          <div className="flex justify-center order-first lg:order-none">
+            <img
+              src="/img/2.png"
+              alt="Black cat mascot waving"
+              className="w-full max-w-sm h-auto object-contain"
+            />
+          </div>
+
+          {/* Right cards */}
+          <div className="flex flex-col gap-12">
+            {/* Card 3 */}
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-lg bg-blue-200 flex items-center justify-center flex-shrink-0">
+                <Compass className="w-7 h-7 text-blue-900" />
+              </div>
+              <div>
+                <h3 className="font-bold text-blue-900 text-lg">
+                  {getText("Pilih Jalur Belajarmu", "Wählen Sie Ihren Lernpfad")}
+                </h3>
+                <p className="text-gray-700 text-sm mt-2">
+                  {getText(
+                    "Ikuti course sesuai level, tantang diri dengan latihan soal, atau jelajah forum untuk diskusi dan berbagi ide.",
+                    "Folgen Sie Kursen je nach Niveau, legen Sie die Dauer mit Übungsaufgaben fest oder erkunden Sie andere Funktionen."
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Card 4 */}
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-lg bg-pink-200 flex items-center justify-center flex-shrink-0">
+                <Target className="w-7 h-7 text-blue-900" />
+              </div>
+              <div>
+                <h3 className="font-bold text-blue-900 text-lg">
+                  {getText("Keterampilan yang Melekat", "Feste Fähigkeiten")}
+                </h3>
+                <p className="text-gray-700 text-sm mt-2">
+                  {getText(
+                    "Penguasaan kosakata, tata bahasa, percakapan, serta berpikir kritis — semua bekal untuk masa depanmu.",
+                    "Wortschatz, Grammatik, Konversation und Schreibfähigkeiten können Sie sofort im Alltag anwenden."
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// Komponen Dropdown untuk Pengguna
+const UserDropdown = ({ user, language, onLogout }: UserDropdownProps) => {
+  const getText = (id: string, de: string) => (language === "de" ? de : id);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="font-semibold text-gray-900">
+          <User className="mr-2 h-4 w-4" />
+          {user.user_metadata.full_name || user.email?.split("@")[0]}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuLabel>
+          {user.user_metadata.full_name || getText("Akun Saya", "Mein Konto")}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>
+          <a href="/dashboard">
+            {getText("Dashboard", "Dashboard")}
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <a href="/home/teacher">
+            {getText("Beranda", "Startseite")}
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onLogout}>
+          {getText("Keluar", "Abmelden")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+// --- Main App Component
 export default function App() {
-  const [currentView, setCurrentView] = useState<ViewType>('home');
-  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [language, setLanguage] = useState<'id' | 'de'>('id');
+  const [currentView, setCurrentView] = useState<ViewType>("home");
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [language, setLanguage] = useState<"id" | "de">("id");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<SupabaseUser | null>(null); // State untuk menyimpan data user
+  const router = useRouter();
 
-  // Dark mode effect
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
+    // Fungsi untuk mendapatkan sesi saat komponen dimuat
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+    };
+
+    // Panggil fungsi getSession
+    getSession();
+
+    // Dengarkan event perubahan otentikasi Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    // Clean-up function untuk berhenti mendengarkan event
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Logout Error:", error.message);
     } else {
-      document.documentElement.classList.remove('dark');
+      router.push("/"); // Arahkan kembali ke halaman utama setelah logout
     }
-  }, [isDarkMode]);
+  };
 
   const handleCourseSelect = (courseId: string) => {
     setSelectedCourseId(courseId);
-    setCurrentView('course-detail');
+    setCurrentView("course-detail");
   };
 
   const handleBackToHome = () => {
-    setCurrentView('home');
-    setSelectedCourseId('');
+    setCurrentView("home");
+    setSelectedCourseId("");
   };
 
   const handleFilterChange = (filters: any) => {
-    console.log('Filters changed:', filters);
+    console.log("Filters changed:", filters);
   };
 
   const toggleLanguage = () => {
-    setLanguage(language === 'id' ? 'de' : 'id');
+    setLanguage(language === "id" ? "de" : "id");
   };
 
-  const getText = (id: string, de: string) => {
-    return language === 'de' ? de : id;
-  };
+  const getText = (id: string, de: string) => (language === "de" ? de : id);
 
-  // Feature navigation handlers
   const navigateToFeature = (feature: ViewType) => {
     setCurrentView(feature);
-    setIsMobileMenuOpen(false); // Close mobile menu after navigation
+    setIsMobileMenuOpen(false);
   };
 
-  // Render current view
   const renderCurrentView = () => {
     switch (currentView) {
-      case 'course-detail':
+      case "course-detail":
+        // Placeholder, implement as needed
         return (
-          <CourseDetail 
-            courseId={selectedCourseId}
-            onBack={handleBackToHome}
-          />
+          <div className="container mx-auto py-12 text-center">
+            <h2 className="text-2xl font-bold">Course Detail for {selectedCourseId}</h2>
+            <p className="text-gray-500 mt-4">
+              {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht implementiert.")}
+            </p>
+            <Button onClick={handleBackToHome} className="mt-8">
+              {getText("Kembali ke Beranda", "Zurück zur Startseite")}
+            </Button>
+          </div>
         );
-      case 'interactive-quiz':
-        return <InteractiveQuiz onBack={handleBackToHome} />;
-      case 'ai-analysis':
-        return <AIAnalysis onBack={handleBackToHome} />;
-      case 'teacher-student':
-        return <TeacherStudentMode onBack={handleBackToHome} />;
-      case 'mini-quiz':
-        return <MiniQuizGame onBack={handleBackToHome} />;
-      case 'stats-tracking':
-        return <StatsTracking onBack={handleBackToHome} />;
-      case 'forum':
-        return <Forum onBack={handleBackToHome} language={language} />;
+      case "interactive-quiz":
+        return (
+          <div className="container mx-auto py-12 text-center">
+            <h2 className="text-2xl font-bold">Interactive Quiz</h2>
+            <p className="text-gray-500 mt-4">
+              {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht implementiert.")}
+            </p>
+            <Button onClick={handleBackToHome} className="mt-8">
+              {getText("Kembali ke Beranda", "Zurück zur Startseite")}
+            </Button>
+          </div>
+        );
+      case "ai-analysis":
+        return (
+          <div className="container mx-auto py-12 text-center">
+            <h2 className="text-2xl font-bold">AI Analysis</h2>
+            <p className="text-gray-500 mt-4">
+              {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht implementiert.")}
+            </p>
+            <Button onClick={handleBackToHome} className="mt-8">
+              {getText("Kembali ke Beranda", "Zurück zur Startseite")}
+            </Button>
+          </div>
+        );
+      case "teacher-student":
+        return (
+          <div className="container mx-auto py-12 text-center">
+            <h2 className="text-2xl font-bold">Teacher & Student Mode</h2>
+            <p className="text-gray-500 mt-4">
+              {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht implementiert.")}
+            </p>
+            <Button onClick={handleBackToHome} className="mt-8">
+              {getText("Kembali ke Beranda", "Zurück zur Startseite")}
+            </Button>
+          </div>
+        );
+      case "mini-quiz":
+        return (
+          <div className="container mx-auto py-12 text-center">
+            <h2 className="text-2xl font-bold">Mini Quiz Game</h2>
+            <p className="text-gray-500 mt-4">
+              {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht diimplementasikan.")}
+            </p>
+            <Button onClick={handleBackToHome} className="mt-8">
+              {getText("Kembali ke Beranda", "Zurück zur Startseite")}
+            </Button>
+          </div>
+        );
+      case "stats-tracking":
+        return (
+          <div className="container mx-auto py-12 text-center">
+            <h2 className="text-2xl font-bold">Statistics & Tracking</h2>
+            <p className="text-gray-500 mt-4">
+              {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht implementiert.")}
+            </p>
+            <Button onClick={handleBackToHome} className="mt-8">
+              {getText("Kembali ke Beranda", "Zurück zur Startseite")}
+            </Button>
+          </div>
+        );
+      case "forum":
+        return (
+          <div className="container mx-auto py-12 text-center">
+            <h2 className="text-2xl font-bold">Forum Discussion</h2>
+            <p className="text-gray-500 mt-4">
+              {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht diimplementasikan.")}
+            </p>
+            <Button onClick={handleBackToHome} className="mt-8">
+              {getText("Kembali ke Beranda", "Zurück zur Startseite")}
+            </Button>
+          </div>
+        );
       default:
         return renderHomePage();
     }
   };
 
   const renderHomePage = () => (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-white text-gray-900">
       {/* Header */}
-      <header className="border-b bg-white/95 dark:bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+      <header className="bg-blue-50 border-b bg-white backdrop-blur supports-[backdrop-filter]:bg-white/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             {/* Logo */}
             <div className="flex items-center gap-3">
-              <GraduationCap className="h-8 w-8 text-primary" />
+              <img
+                src="/img/1.png"
+                alt="Logo"
+                className="h-12 w-auto mr-2"
+              />
               <div>
-                <h1 className="text-xl font-bold">EduPlatform</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-xl font-bold text-blue-700">Si Jerman</h1>
+                <p className="text-sm text-gray-500">
                   {getText("Belajar tanpa batas", "Lernen ohne Grenzen")}
                 </p>
               </div>
             </div>
-            
-            {/* Search Bar - Desktop */}
-            <div className="hidden lg:flex items-center gap-4 flex-1 max-w-md mx-8">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder={getText("Cari course, materi, atau topik...", "Kurse, Materialien oder Themen suchen...")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
 
             {/* Navigation - Desktop */}
-            <div className="hidden md:flex items-center gap-3">
-              {/* Forum Button - Prominent */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateToFeature('forum')}
-                className="flex items-center gap-2 border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground"
-              >
-                <MessageSquare className="h-4 w-4" />
+            <nav className="hidden md:flex items-center gap-6">
+              <Button variant="ghost" className="font-semibold text-gray-900">
+                {getText("Home", "Startseite")}
+              </Button>
+              <Button variant="ghost" className="font-semibold text-gray-900">
+                {getText("Fitur", "Funktionen")}
+              </Button>
+              <Button variant="ghost" className="font-semibold text-gray-900">
                 {getText("Forum", "Forum")}
               </Button>
+              <Button variant="ghost" className="font-semibold text-gray-900">
+                {getText("Contact Us", "Kontakt")}
+              </Button>
+            </nav>
 
-              {/* Language Toggle */}
+            {/* Action Buttons & Language/Theme - Desktop */}
+            <div className="hidden lg:flex items-center gap-4">
+              <div className="relative flex items-center">
+                <Input
+                  placeholder={getText("Cari course...", "Kurse suchen...")}
+                  className="pl-8 w-48 bg-gray-100 text-gray-900"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={toggleLanguage}
-                className="flex items-center gap-2"
+                className="flex items-center gap-1 text-gray-900"
               >
                 <Globe className="h-4 w-4" />
-                {language.toUpperCase()}
+                {language === "id" ? "ID" : "DE"}
               </Button>
-
-              {/* Dark Mode Toggle */}
-              <div className="flex items-center gap-2">
-                <Sun className="h-4 w-4" />
-                <Switch
-                  checked={isDarkMode}
-                  onCheckedChange={setIsDarkMode}
+              {user ? (
+                <UserDropdown
+                  user={user}
+                  language={language}
+                  onLogout={handleLogout}
                 />
-                <Moon className="h-4 w-4" />
-              </div>
-
-              {/* Auth Buttons */}
-              <Button variant="ghost" size="sm" onClick={() => window.location.href = '/auth/login'}>
-                <User className="h-4 w-4 mr-2" />
-                {getText("Masuk", "Anmelden")}
-              </Button>
-              <Button size="sm" onClick={() => window.location.href = '/auth/register'}>
-                {getText("Daftar Gratis", "Kostenlos registrieren")}
-              </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => (window.location.href = "/auth/login")}
+                    className="bg-gray-100 text-gray-900 border-gray-200"
+                  >
+                    {getText("Login", "Anmelden")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => (window.location.href = "/auth/register")}
+                    className="bg-blue-200 hover:bg-blue-300 text-gray-900"
+                  >
+                    {getText("Register", "Registrieren")}
+                  </Button>
+                </>
+              )}
             </div>
 
             {/* Mobile Menu */}
@@ -246,20 +695,22 @@ export default function App() {
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="sm">
-                    <Menu className="h-5 w-5" />
+                    <Menu className="h-5 w-5 text-gray-900" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent>
                   <SheetHeader>
                     <SheetTitle>Menu</SheetTitle>
                     <SheetDescription>
-                      {getText("Akses fitur dan navigasi", "Zugang zu Funktionen und Navigation")}
+                      {getText(
+                        "Akses fitur dan navigasi",
+                        "Zugang zu Funktionen und Navigation"
+                      )}
                     </SheetDescription>
                   </SheetHeader>
                   <div className="mt-6 space-y-4">
-                    {/* Search Mobile */}
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
                       <Input
                         placeholder={getText("Cari course...", "Kurse suchen...")}
                         value={searchQuery}
@@ -267,101 +718,85 @@ export default function App() {
                         className="pl-10"
                       />
                     </div>
-
-                    {/* Forum Button Mobile - Prominent */}
                     <Button
-                      variant="outline"
-                      onClick={() => navigateToFeature('forum')}
-                      className="w-full justify-start gap-2 border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground"
+                      variant="ghost"
+                      onClick={() => navigateToFeature("home")}
+                      className="w-full justify-start"
                     >
-                      <MessageSquare className="h-4 w-4" />
-                      {getText("Forum Diskusi", "Diskussionsforum")}
+                      {getText("Home", "Startseite")}
                     </Button>
-
-                    {/* Other Features */}
-                    <div className="space-y-2">
-                      <Button
-                        variant="ghost"
-                        onClick={() => navigateToFeature('interactive-quiz')}
-                        className="w-full justify-start gap-2"
-                      >
-                        <Target className="h-4 w-4" />
-                        {getText("Latihan Interaktif", "Interaktive Übungen")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() => navigateToFeature('ai-analysis')}
-                        className="w-full justify-start gap-2"
-                      >
-                        <Brain className="h-4 w-4" />
-                        {getText("Analisis AI", "KI-Analyse")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() => navigateToFeature('teacher-student')}
-                        className="w-full justify-start gap-2"
-                      >
-                        <Users className="h-4 w-4" />
-                        {getText("Mode Guru & Siswa", "Lehrer- & Schülermodus")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() => navigateToFeature('mini-quiz')}
-                        className="w-full justify-start gap-2"
-                      >
-                        <Gamepad2 className="h-4 w-4" />
-                        {getText("Mini Quiz Game", "Mini-Quiz-Spiel")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() => navigateToFeature('stats-tracking')}
-                        className="w-full justify-start gap-2"
-                      >
-                        <BarChart3 className="h-4 w-4" />
-                        {getText("Statistik", "Statistiken")}
-                      </Button>
-                    </div>
-
-                    {/* Settings */}
-                    <div className="pt-4 border-t space-y-4">
+                    <Button
+                      variant="ghost"
+                      onClick={() => navigateToFeature("forum")}
+                      className="w-full justify-start"
+                    >
+                      {getText("Forum", "Forum")}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => navigateToFeature("home")}
+                      className="w-full justify-start"
+                    >
+                      {getText("Contact Us", "Kontakt")}
+                    </Button>
+                    <div className="pt-4 border-t space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">
                           {getText("Bahasa", "Sprache")}
                         </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={toggleLanguage}
-                        >
+                        <Button variant="ghost" size="sm" onClick={toggleLanguage}>
                           <Globe className="h-4 w-4 mr-2" />
                           {language.toUpperCase()}
                         </Button>
                       </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">
-                          {getText("Mode Gelap", "Dunkler Modus")}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <Sun className="h-4 w-4" />
-                          <Switch
-                            checked={isDarkMode}
-                            onCheckedChange={setIsDarkMode}
-                          />
-                          <Moon className="h-4 w-4" />
-                        </div>
-                      </div>
                     </div>
-
-                    {/* Auth Buttons Mobile */}
                     <div className="pt-4 border-t space-y-2">
-                      <Button variant="ghost" className="w-full justify-start" onClick={() => { setIsMobileMenuOpen(false); window.location.href = '/auth/login'; }}>
-                        <User className="h-4 w-4 mr-2" />
-                        {getText("Masuk", "Anmelden")}
-                      </Button>
-                      <Button className="w-full" onClick={() => { setIsMobileMenuOpen(false); window.location.href = '/auth/register'; }}>
-                        {getText("Daftar Gratis", "Kostenlos registrieren")}
-                      </Button>
+                      {user ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              router.push("/dashboard");
+                            }}
+                          >
+                            <User className="h-4 w-4 mr-2" />
+                            {getText("Dashboard", "Dashboard")}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={handleLogout}
+                          >
+                            <User className="h-4 w-4 mr-2" />
+                            {getText("Keluar", "Abmelden")}
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              router.push("/auth/login");
+                            }}
+                          >
+                            <User className="h-4 w-4 mr-2" />
+                            {getText("Login", "Anmelden")}
+                          </Button>
+                          <Button
+                            className="w-full bg-blue-200 hover:bg-blue-300 text-gray-900"
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              router.push("/auth/register");
+                            }}
+                          >
+                            {getText("Register", "Registrieren")}
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </SheetContent>
@@ -374,242 +809,29 @@ export default function App() {
       {/* Hero Section */}
       <HeroSection language={language} />
 
-      {/* Features Section */}
-      <section className="container mx-auto px-4 py-12">
-        <div className="text-center mb-12">
-          <h2 className="mb-4">
-            {getText("Fitur Pembelajaran Interaktif", "Interaktive Lernfunktionen")}
-          </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            {getText(
-              "Jelajahi berbagai fitur canggih yang dirancang untuk meningkatkan pengalaman belajar Anda",
-              "Entdecken Sie verschiedene fortschrittliche Funktionen, die entwickelt wurden, um Ihre Lernerfahrung zu verbessern"
-            )}
-          </p>
-        </div>
+      {/* Main Features */}
+      <MainFeatures language={language} />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-          {/* Interactive Quiz */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => navigateToFeature('interactive-quiz')}>
-            <CardHeader>
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                <Target className="h-6 w-6 text-primary" />
-              </div>
-              <CardTitle className="flex items-center gap-2">
-                {getText("Latihan Interaktif A2", "Interaktive Übungen A2")}
-              </CardTitle>
-              <CardDescription>
-                {getText(
-                  "Soal pilihan ganda dengan timer, skor, dan pembahasan detail",
-                  "Multiple-Choice-Fragen mit Timer, Punktzahl und detaillierter Erklärung"
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="ghost" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                {getText("Mulai Latihan", "Übung starten")}
-              </Button>
-            </CardContent>
-          </Card>
+      {/* About Section */}
+      <AboutSection language={language} />
 
-          {/* AI Analysis */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => navigateToFeature('ai-analysis')}>
-            <CardHeader>
-              <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-colors">
-                <Brain className="h-6 w-6 text-accent" />
-              </div>
-              <CardTitle>
-                {getText("Analisis AI", "KI-Analyse")}
-              </CardTitle>
-              <CardDescription>
-                {getText(
-                  "Feedback otomatis dan penjelasan grammar dengan teknologi AI",
-                  "Automatisches Feedback und Grammatikerklärungen mit KI-Technologie"
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="ghost" className="w-full group-hover:bg-accent group-hover:text-accent-foreground transition-colors">
-                {getText("Analisis Teks", "Text analysieren")}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Forum Discussion - Highlighted */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer group border-orange-200 bg-orange-50/30 dark:bg-orange-900/10" onClick={() => navigateToFeature('forum')}>
-            <CardHeader>
-              <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-200 dark:group-hover:bg-orange-800/30 transition-colors">
-                <MessageSquare className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-              </div>
-              <CardTitle className="text-orange-900 dark:text-orange-100">
-                {getText("Forum Diskusi", "Diskussionsforum")}
-              </CardTitle>
-              <CardDescription>
-                {getText(
-                  "Bergabung dengan komunitas, tanya jawab, dan berbagi pengetahuan",
-                  "Treten Sie der Community bei, stellen Sie Fragen und teilen Sie Wissen"
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="ghost" className="w-full group-hover:bg-orange-600 group-hover:text-white transition-colors">
-                {getText("Buka Forum", "Forum öffnen")}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Teacher Student Mode */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => navigateToFeature('teacher-student')}>
-            <CardHeader>
-              <div className="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-secondary/20 transition-colors">
-                <Users className="h-6 w-6 text-secondary-foreground" />
-              </div>
-              <CardTitle>
-                {getText("Mode Guru & Siswa", "Lehrer- & Schülermodus")}
-              </CardTitle>
-              <CardDescription>
-                {getText(
-                  "Buat kelas, bagikan latihan, dan pantau progres siswa",
-                  "Klassen erstellen, Übungen teilen und Schülerfortschritt verfolgen"
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="ghost" className="w-full group-hover:bg-secondary group-hover:text-secondary-foreground transition-colors">
-                {getText("Masuk Kelas", "Klasse betreten")}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Mini Quiz Game */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => navigateToFeature('mini-quiz')}>
-            <CardHeader>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-green-200 transition-colors">
-                <Gamepad2 className="h-6 w-6 text-green-600" />
-              </div>
-              <CardTitle>
-                {getText("Mini Quiz Game", "Mini-Quiz-Spiel")}
-              </CardTitle>
-              <CardDescription>
-                {getText(
-                  "Multiplayer quiz realtime dengan leaderboard seperti Kahoot",
-                  "Multiplayer-Echtzeit-Quiz mit Bestenliste wie Kahoot"
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="ghost" className="w-full group-hover:bg-green-600 group-hover:text-white transition-colors">
-                {getText("Main Sekarang", "Jetzt spielen")}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Stats Tracking */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => navigateToFeature('stats-tracking')}>
-            <CardHeader>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-200 transition-colors">
-                <BarChart3 className="h-6 w-6 text-blue-600" />
-              </div>
-              <CardTitle>
-                {getText("Statistik & Tracking", "Statistik & Verfolgung")}
-              </CardTitle>
-              <CardDescription>
-                {getText(
-                  "Grafik progres harian/mingguan dan rekomendasi pembelajaran",
-                  "Tägliche/wöchentliche Fortschrittsgrafiken und Lernempfehlungen"
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="ghost" className="w-full group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                {getText("Lihat Statistik", "Statistiken anzeigen")}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-12">
-        {/* Classes Section */}
-        <section className="space-y-8">
-          <div className="text-center">
-            <h2 className="mb-4">
-              {getText("Jelajahi Course Kami", "Entdecken Sie unsere Kurse")}
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              {getText(
-                "Kami menyediakan course yang disesuaikan dengan tingkat kelas. Pilih kelas Anda dan mulai perjalanan belajar yang menarik.",
-                "Wir bieten Kurse an, die auf das Klassenniveau zugeschnitten sind. Wählen Sie Ihre Klasse und beginnen Sie eine spannende Lernreise."
-              )}
-            </p>
-          </div>
-          
-          <div className="flex gap-8">
-            {/* Sidebar Filter */}
-            <div className="hidden lg:block flex-shrink-0">
-              <ClassFilter onFilterChange={handleFilterChange} />
-            </div>
-
-            {/* Main Content Area */}
-            <div className="flex-1">
-              <Tabs defaultValue="a1" className="w-full">
-                <div className="flex justify-center mb-8">
-                  <TabsList className="grid w-full max-w-md grid-cols-2">
-                    <TabsTrigger value="a1">
-                      {getText("Kelas A-1", "Klasse A-1")}
-                    </TabsTrigger>
-                    <TabsTrigger value="a2">
-                      {getText("Kelas A-2", "Klasse A-2")}
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
-                
-                <TabsContent value="a1">
-                  <ClassSection 
-                    className="A-1" 
-                    courses={coursesA1} 
-                    onCourseSelect={handleCourseSelect}
-                  />
-                </TabsContent>
-                <TabsContent value="a2">
-                  <ClassSection 
-                    className="A-2" 
-                    courses={language === 'de' ? coursesA2 : coursesA2.map(course => ({
-                      ...course,
-                      title: course.id === 'a2-1' ? 'Matematika Lanjutan' :
-                             course.id === 'a2-2' ? 'Bahasa Inggris' :
-                             'Sejarah Indonesia',
-                      description: course.id === 'a2-1' ? 'Konsep matematika tingkat menengah dengan aplikasi praktis' :
-                                  course.id === 'a2-2' ? 'Pelajari bahasa Inggris untuk komunikasi sehari-hari dan akademik' :
-                                  'Memahami perjalanan sejarah bangsa Indonesia dari masa ke masa'
-                    }))}
-                    onCourseSelect={handleCourseSelect}
-                  />
-                </TabsContent>
-              </Tabs>
-            </div>
-          </div>
-        </section>
-
-        {/* FAQ Section */}
-        <section className="bg-muted/30 -mx-4 px-4 py-16 mt-20">
-          <div className="container mx-auto">
-            <FAQ />
-          </div>
-        </section>
-      </main>
+      {/* Why Choose Section */}
+      <WhyChooseSection language={language} />
 
       {/* Footer */}
-      <footer className="border-t bg-muted/30 py-12">
+      <footer className="border-t bg-gray-50 py-12">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <GraduationCap className="h-6 w-6 text-primary" />
-                <span className="font-bold">EduPlatform</span>
+                <img
+                  src="/img/1.png"
+                  alt="Logo"
+                  className="h-12 w-auto mr-2"
+                />
+                <span className="font-bold text-gray-700">Si Jerman</span>
               </div>
-              <p className="text-muted-foreground text-sm">
+              <p className="text-gray-500 text-sm">
                 {getText(
                   "Platform pembelajaran online terbaik untuk siswa Indonesia",
                   "Die beste Online-Lernplattform für indonesische Studenten"
@@ -617,10 +839,10 @@ export default function App() {
               </p>
             </div>
             <div>
-              <h4 className="font-medium mb-4">
+              <h4 className="font-medium mb-4 text-gray-900">
                 {getText("Course", "Kurse")}
               </h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+              <ul className="space-y-2 text-sm text-gray-500">
                 <li>{getText("Kelas A-1", "Klasse A-1")}</li>
                 <li>{getText("Kelas A-2", "Klasse A-2")}</li>
                 <li>{getText("Course Gratis", "Kostenlose Kurse")}</li>
@@ -628,17 +850,17 @@ export default function App() {
               </ul>
             </div>
             <div>
-              <h4 className="font-medium mb-4">
+              <h4 className="font-medium mb-4 text-gray-900">
                 {getText("Dukungan", "Unterstützung")}
               </h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+              <ul className="space-y-2 text-sm text-gray-500">
                 <li>FAQ</li>
                 <li>{getText("Bantuan", "Hilfe")}</li>
                 <li>{getText("Kontak", "Kontakt")}</li>
                 <li>
-                  <button 
-                    onClick={() => navigateToFeature('forum')}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  <button
+                    onClick={() => navigateToFeature("forum")}
+                    className="text-gray-500 hover:text-gray-900 transition-colors"
                   >
                     Forum
                   </button>
@@ -646,10 +868,10 @@ export default function App() {
               </ul>
             </div>
             <div>
-              <h4 className="font-medium mb-4">
+              <h4 className="font-medium mb-4 text-gray-900">
                 {getText("Perusahaan", "Unternehmen")}
               </h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+              <ul className="space-y-2 text-sm text-gray-500">
                 <li>{getText("Tentang Kami", "Über uns")}</li>
                 <li>{getText("Karir", "Karriere")}</li>
                 <li>Blog</li>
@@ -657,8 +879,8 @@ export default function App() {
               </ul>
             </div>
           </div>
-          <div className="border-t mt-8 pt-8 text-center text-muted-foreground text-sm">
-            <p>&copy; 2025 EduPlatform. {getText("Semua hak dilindungi.", "Alle Rechte vorbehalten.")}</p>
+          <div className="border-t mt-8 pt-8 text-center text-gray-500 text-sm">
+            <p>&copy; 2025 Si. {getText("Semua hak dilindungi.", "Alle Rechte vorbehalten.")}</p>
           </div>
         </div>
       </footer>
