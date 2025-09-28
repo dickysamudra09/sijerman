@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -8,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import {
@@ -27,6 +29,10 @@ import {
   Target,
   Timer,
   Award,
+  Move,
+  Edit3,
+  FileText,
+  Puzzle,
 } from "lucide-react";
 
 interface Option {
@@ -34,6 +40,11 @@ interface Option {
   option_text: string;
   is_correct: boolean;
   order_index: number;
+  is_puzzle_piece?: boolean;
+  puzzle_order?: number;
+  is_blank_position?: boolean;
+  sentence_fragment?: string;
+  correct_order?: number;
 }
 
 interface Question {
@@ -43,6 +54,14 @@ interface Question {
   points: number;
   explanation: string;
   options: Option[];
+  essay_subtype?: string;
+  essay_config?: any;
+  sentence_arrangement_config?: {
+    complete_sentence?: string;
+    sentence_with_blanks?: string;
+    blank_words?: string[]; 
+    distractor_words?: string[];
+  };
 }
 
 interface AIFeedback {
@@ -58,10 +77,18 @@ interface AIFeedback {
   ai_model?: string;
 }
 
+interface BlankPositionState {
+    piece: Option | null;
+    isCorrect: boolean | null; 
+    correctWord: string; 
+}
+
 interface QuizState {
   questions: Question[];
   currentQuestionIndex: number;
   selectedOptionId: string | null;
+  essayAnswer: string;
+  sentenceArrangement: string[];
   showResult: boolean;
   score: number;
   quizCompleted: boolean;
@@ -77,6 +104,8 @@ const initialQuizState: QuizState = {
   questions: [],
   currentQuestionIndex: 0,
   selectedOptionId: null,
+  essayAnswer: "",
+  sentenceArrangement: [],
   showResult: false,
   score: 0,
   quizCompleted: false,
@@ -95,6 +124,9 @@ export default function InteractiveQuiz() {
   const [state, setState] = useState<QuizState>(initialQuizState);
   const [timeLeft, setTimeLeft] = useState(30);
   const [startTime, setStartTime] = useState<Date | null>(null);
+  const [draggedItem, setDraggedItem] = useState<string | null>(null);
+  const [availablePieces, setAvailablePieces] = useState<Option[]>([]);
+  const [blankPositions, setBlankPositions] = useState<BlankPositionState[]>([]);
   const initializedRef = useRef(false);
 
   useEffect(() => {
@@ -111,6 +143,45 @@ export default function InteractiveQuiz() {
     };
   }, [state.showResult, timeLeft, state.quizCompleted]);
 
+  useEffect(() => {
+    const currentQuestion = state.questions[state.currentQuestionIndex];
+    if (currentQuestion?.question_type === 'sentence_arrangement') {
+      console.log('Setting up sentence arrangement (Fill-in-the-Blank) for question:', currentQuestion);
+      
+      if (currentQuestion.sentence_arrangement_config) {
+        const config = currentQuestion.sentence_arrangement_config;
+        const correctWords = config.blank_words || [];
+        const distractorWords = config.distractor_words || [];
+        
+        const allWords = [...correctWords, ...distractorWords];
+        const pieces = allWords.map((word, index) => ({
+          id: `word-${index}-${word.replace(/\s/g, '-')}`, 
+          option_text: word,
+          is_correct: correctWords.includes(word),
+          order_index: index + 1,
+        } as Option));
+        
+        const initialBlankPositions: BlankPositionState[] = correctWords.map((word) => ({
+            piece: null,
+            isCorrect: null,
+            correctWord: word 
+        }));
+        
+        setAvailablePieces(pieces);
+        setBlankPositions(initialBlankPositions);
+        setState(s => ({ ...s, sentenceArrangement: [] }));
+        
+        console.log('Loaded question config:', currentQuestion); 
+      } else {
+        console.warn('No sentence_arrangement_config found for sentence_arrangement question');
+      }
+    } else {
+      setAvailablePieces([]);
+      setBlankPositions([]);
+      setState(s => ({ ...s, sentenceArrangement: [] }));
+    }
+  }, [state.currentQuestionIndex, state.questions]);
+  
   const createExerciseAttempt = async (userId: string) => {
     try {
       if (!exerciseSetId) {
@@ -215,21 +286,37 @@ export default function InteractiveQuiz() {
     }
   };
 
-  const saveStudentAnswer = async (questionId: string, selectedOptionId: string | null, isCorrect: boolean, pointsEarned: number) => {
+  const saveStudentAnswer = async (questionId: string, selectedOptionId: string | null, isCorrect: boolean, pointsEarned: number, textAnswer?: string, selectedOptionsArray?: string[]) => {
     if (!state.attemptId) {
       console.error("No attempt ID available for saving answer");
       return null;
     }
 
     try {
-      const answerData = {
+      const answerData: any = {
         attempt_id: state.attemptId,
         question_id: questionId,
-        selected_option_id: selectedOptionId,
         is_correct: isCorrect,
         points_earned: pointsEarned,
         answered_at: new Date().toISOString(),
       };
+
+      if (selectedOptionId) {
+        answerData.selected_option_id = selectedOptionId;
+      }
+
+      if (textAnswer) {
+        answerData.text_answer = textAnswer;
+        
+        const currentQuestion = state.questions.find(q => q.id === questionId);
+        if (currentQuestion?.question_type === 'essay') {
+            answerData.essay_response = textAnswer;
+        }
+      }
+      
+      if (selectedOptionsArray) {
+        answerData.sentence_arrangement_answer = JSON.stringify(selectedOptionsArray);
+      }
 
       const { data, error } = await supabase
         .from("student_answers")
@@ -252,75 +339,79 @@ export default function InteractiveQuiz() {
     }
   };
 
-  const generateAIFeedback = async (studentAnswerId: string, questionId: string, selectedOptionId: string | null, isCorrect: boolean) => {
+  const generateAIFeedback = async (
+    studentAnswerId: string, 
+    questionId: string, 
+    selectedOptionId: string | null, 
+    isCorrect: boolean, 
+    textAnswer?: string, 
+    selectedOptionsArray?: string[]
+  ) => {
     if (!studentAnswerId) return;
 
-  setState(s => ({ ...s, isLoadingFeedback: true }));
+    setState(s => ({ ...s, isLoadingFeedback: true }));
 
-  try {
-    const payload = {
-      studentAnswerId,
-      questionId,
-      attemptId: state.attemptId,
-      selectedOptionId,
-      isCorrect,
-    };
-    
-    console.log('Sending AI feedback request with payload:', payload);
-
-    const response = await fetch('/api/ai-feedback', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    console.log('AI feedback response status:', response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`API error: ${response.status} - ${errorText}`);
+    try {
+      const payload: any = {
+        studentAnswerId,
+        questionId,
+        attemptId: state.attemptId,
+        selectedOptionId: selectedOptionId || null,
+        isCorrect,
+        textAnswer: textAnswer || null,
+        selectedOptionsArray: selectedOptionsArray || null,
+      };
       
-      // Parse error jika JSON
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { error: errorText };
+      console.log('Sending AI feedback request with payload:', payload);
+
+      const response = await fetch('/api/ai-feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log('AI feedback response status:', response.status);
+      const result = await response.json();
+      console.log('AI feedback result:', result);
+
+      if (result.success) {
+        setState(s => ({ 
+          ...s, 
+          aiFeedback: result.data,
+          isLoadingFeedback: false 
+        }));
+        
+        if (result.warning) {
+          console.warn('AI Feedback warning:', result.warning);
+        }
+      } else {
+        // Fallback saat AI gagal
+        const fallbackReferences = [
+            { title: "Deutsche Grammatik - Goethe Institut", url: "https://www.goethe.de/de/spr/ueb/gram.html", description: "Panduan tata bahasa Jerman resmi dari Goethe Institut" },
+            { title: "Leo Dictionary - Deutsch-Englisch", url: "https://dict.leo.org/german-english/", description: "Kamus online Jerman-Inggris yang komprehensif" },
+            { title: "Verbformen.de", url: "https://www.verbformen.de/", description: "Database konjugasi lengkap untuk semua kata kerja Jerman" }
+        ];
+
+        setState(s => ({ 
+            ...s, 
+            aiFeedback: {
+                feedback_text: result.data?.feedback_text || "Maaf, feedback AI tidak dapat dimuat saat ini.",
+                explanation: result.data?.explanation || "Silakan lanjutkan dengan pertanyaan berikutnya.",
+                reference_materials: result.data?.reference_materials || fallbackReferences
+            },
+            isLoadingFeedback: false 
+        }));
+        toast.error(result.error || "Gagal memuat feedback AI");
       }
-      
-      throw new Error(`HTTP error! status: ${response.status}, details: ${JSON.stringify(errorData)}`);
-    }
 
-    const result = await response.json();
-    console.log('AI feedback result:', result);
-
-    if (result.success) {
-      setState(s => ({ 
-        ...s, 
-        aiFeedback: result.data,
-        isLoadingFeedback: false 
-      }));
-      
-      if (result.warning) {
-        console.warn('AI Feedback warning:', result.warning);
-      }
-    } else {
-      throw new Error(result.error || 'Failed to generate AI feedback');
-    }
-
-  } catch (error: unknown) {
+    } catch (error: unknown) {
       console.error('Error generating AI feedback:', error);
       
       let errorMessage = 'Unknown error occurred';
-      
       if (error instanceof Error) {
-          errorMessage = error.message;
-      } else if (typeof error === 'string') {
-          errorMessage = error;
-      } else if (error && typeof error === 'object' && 'message' in error) {
-          errorMessage = String((error as any).message);
+        errorMessage = error.message;
       }
       
       setState(s => ({ 
@@ -334,10 +425,9 @@ export default function InteractiveQuiz() {
       }));
       
       toast.error("Gagal memuat feedback AI: " + errorMessage);
-  }
-};
+    }
+  };
 
-  
   const completeExerciseAttempt = async () => {
     if (!state.attemptId) {
       console.error("Missing attempt ID for completion");
@@ -406,6 +496,7 @@ export default function InteractiveQuiz() {
     }
   };
 
+
   useEffect(() => {
     const fetchQuestions = async () => {
       if (!exerciseSetId || initializedRef.current) {
@@ -446,7 +537,10 @@ export default function InteractiveQuiz() {
             question_type,
             points,
             explanation,
-            options (id, option_text, is_correct, order_index)
+            essay_subtype,
+            essay_config,
+            sentence_arrangement_config,
+            options (id, option_text, is_correct, order_index, is_puzzle_piece, puzzle_order, is_blank_position, sentence_fragment, correct_order)
           `)
           .eq("exercise_set_id", exerciseSetId)
           .order('order_index', { ascending: true });
@@ -469,6 +563,8 @@ export default function InteractiveQuiz() {
           options: (question.options as Option[]).sort((a, b) => a.order_index - b.order_index)
         })) as Question[];
         
+        console.log('Loaded questions:', questionsData);
+        
         setState(s => ({ ...s, questions: questionsData, isLoading: false }));
       } catch (err: any) {
         console.error("Unexpected error in fetchQuestions:", err.message);
@@ -480,26 +576,198 @@ export default function InteractiveQuiz() {
     fetchQuestions();
   }, [exerciseSetId]);
 
-  const handleSubmitAnswer = async () => {
-    const currentQuestion = state.questions[state.currentQuestionIndex];
+  const handleDragStart = (e: React.DragEvent, item: Option) => {
+    setDraggedItem(item.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDropOnBlank = (e: React.DragEvent, blankIndex: number) => {
+    e.preventDefault();
     
-    let selectedOptionId = state.selectedOptionId;
-    if (!selectedOptionId) {
-      if (timeLeft === 0) {
-        selectedOptionId = currentQuestion.options[0]?.id || null;
-        setState(s => ({ ...s, selectedOptionId }));
-        toast.info("Waktu habis! Jawaban otomatis dipilih.");
-      } else {
-        toast.warning("Silakan pilih salah satu jawaban.");
+    if (!draggedItem) return;
+    
+    const draggedPiece = availablePieces.find(piece => piece.id === draggedItem);
+    
+    if (!draggedPiece) {
+        const sourceBlankIndex = blankPositions.findIndex(pos => pos.piece?.id === draggedItem);
+        
+        if (sourceBlankIndex !== -1) {
+            const sourcePiece = blankPositions[sourceBlankIndex].piece;
+            if (!sourcePiece) return;
+            
+            const existingTargetPiece = blankPositions[blankIndex].piece;
+            const newBlankPositions = [...blankPositions];
+            
+            if (existingTargetPiece) {
+                newBlankPositions[sourceBlankIndex].piece = existingTargetPiece;
+                newBlankPositions[sourceBlankIndex].isCorrect = null; 
+            } else {
+                newBlankPositions[sourceBlankIndex].piece = null;
+                newBlankPositions[sourceBlankIndex].isCorrect = null; 
+            }
+            
+            newBlankPositions[blankIndex].piece = sourcePiece;
+            newBlankPositions[blankIndex].isCorrect = null; 
+            
+            setBlankPositions(newBlankPositions);
+            setDraggedItem(null);
+            return;
+        }
         return;
-      }
     }
     
-    const selectedOption = currentQuestion.options.find(opt => opt.id === selectedOptionId);
-    const isCorrect = selectedOption?.is_correct ?? false;
-    const pointsEarned = isCorrect ? currentQuestion.points : 0;
+    setAvailablePieces(prev => prev.filter(piece => piece.id !== draggedItem));
+    
+    const existingTargetPiece = blankPositions[blankIndex].piece;
+    if (existingTargetPiece) {
+      setAvailablePieces(prev => [...prev, existingTargetPiece]);
+    }
+    
+    const newBlankPositions = [...blankPositions];
+    newBlankPositions[blankIndex].piece = draggedPiece;
+    newBlankPositions[blankIndex].isCorrect = null; 
+    setBlankPositions(newBlankPositions);
+    
+    setDraggedItem(null);
+  };
 
-    const studentAnswerId = await saveStudentAnswer(currentQuestion.id, selectedOptionId, isCorrect, pointsEarned);
+  const handleDropOnAvailable = (e: React.DragEvent) => {
+    e.preventDefault();
+    
+    if (!draggedItem) return;
+    
+    const blankIndex = blankPositions.findIndex(pos => pos.piece?.id === draggedItem);
+    
+    if (blankIndex === -1) return;
+    
+    const draggedPiece = blankPositions[blankIndex].piece;
+    if (!draggedPiece) return;
+    
+    const newBlankPositions = [...blankPositions];
+    newBlankPositions[blankIndex].piece = null;
+    newBlankPositions[blankIndex].isCorrect = null;
+    setBlankPositions(newBlankPositions);
+    
+    setAvailablePieces(prev => [...prev, draggedPiece]);
+    
+    setDraggedItem(null);
+  };
+  
+  const getFilledSentence = () => {
+    const currentQuestion = state.questions[state.currentQuestionIndex];
+    let sentenceWithBlanks = currentQuestion.sentence_arrangement_config?.sentence_with_blanks || "";
+    const blankWords = blankPositions.map(pos => pos.piece?.option_text || '___');
+    let filledSentence = sentenceWithBlanks;
+    blankWords.forEach(word => {
+        filledSentence = filledSentence.replace('___', word); 
+    });
+    if (sentenceWithBlanks === filledSentence) {
+        let parts = sentenceWithBlanks.split('_'); 
+        if (parts.length > 1) {
+            let finalSentence = '';
+            for (let i = 0; i < parts.length; i++) {
+                finalSentence += parts[i];
+                if (i < blankWords.length) {
+                    finalSentence += blankWords[i];
+                }
+            }
+            return finalSentence.trim();
+        }
+    }
+
+    return filledSentence.trim();
+  };
+
+
+  const handleSubmitAnswer = async () => {
+    const currentQuestion = state.questions[state.currentQuestionIndex];
+    let isCorrect = false;
+    let pointsEarned = 0;
+    let selectedOptionId: string | null = null;
+    let textAnswer: string | undefined;
+    let selectedOptionsArray: string[] | undefined;
+
+    if (currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') {
+      if (!state.selectedOptionId) {
+        if (timeLeft === 0) {
+          selectedOptionId = currentQuestion.options[0]?.id || null;
+          setState(s => ({ ...s, selectedOptionId }));
+          toast.info("Waktu habis! Jawaban otomatis dipilih.");
+        } else {
+          toast.warning("Silakan pilih salah satu jawaban.");
+          return;
+        }
+      } else {
+        selectedOptionId = state.selectedOptionId;
+      }
+      
+      const selectedOption = currentQuestion.options.find(opt => opt.id === selectedOptionId);
+      isCorrect = selectedOption?.is_correct ?? false;
+      pointsEarned = isCorrect ? currentQuestion.points : 0;
+      
+    } else if (currentQuestion.question_type === 'essay') {
+      if (!state.essayAnswer.trim()) {
+        if (timeLeft === 0) {
+          toast.info("Waktu habis! Jawaban kosong akan disubmit.");
+        } else {
+          toast.warning("Silakan isi jawaban essay.");
+          return;
+        }
+      }
+      
+      textAnswer = state.essayAnswer.trim();
+      isCorrect = textAnswer.length > 0;
+      pointsEarned = isCorrect ? currentQuestion.points * 0.8 : 0;
+      
+    } else if (currentQuestion.question_type === 'sentence_arrangement') {
+      
+      if (blankPositions.some(pos => pos.piece === null)) {
+        if (timeLeft === 0) {
+          toast.info("Waktu habis! Susunan kalimat yang belum lengkap akan disubmit.");
+        } else {
+          toast.warning("Silakan lengkapi susunan kalimat.");
+          return;
+        }
+      }
+      
+      let totalCorrectPieces = 0;
+      let newBlankPositions = [...blankPositions];
+
+      newBlankPositions.forEach((pos, index) => {
+          const userWord = pos.piece?.option_text.trim().toLowerCase();
+          const correctWord = pos.correctWord.trim().toLowerCase();
+
+          if (userWord === correctWord) {
+              pos.isCorrect = true;
+              totalCorrectPieces++;
+          } else {
+              pos.isCorrect = false;
+          }
+      });
+      
+      setBlankPositions(newBlankPositions); 
+
+      const totalBlanks = blankPositions.length;
+      isCorrect = totalCorrectPieces === totalBlanks;
+      pointsEarned = isCorrect ? currentQuestion.points : Math.round((totalCorrectPieces / totalBlanks) * currentQuestion.points * 0.8); // Skor parsial
+      
+      textAnswer = getFilledSentence(); 
+      selectedOptionsArray = blankPositions.map(pos => pos.piece?.id || ''); 
+    }
+
+    const studentAnswerId = await saveStudentAnswer(
+      currentQuestion.id, 
+      selectedOptionId, 
+      isCorrect, 
+      pointsEarned, 
+      textAnswer, 
+      selectedOptionsArray
+    );
 
     setState(s => ({
       ...s,
@@ -509,7 +777,14 @@ export default function InteractiveQuiz() {
     }));
 
     if (studentAnswerId) {
-      await generateAIFeedback(studentAnswerId, currentQuestion.id, selectedOptionId, isCorrect);
+      await generateAIFeedback(
+        studentAnswerId, 
+        currentQuestion.id, 
+        selectedOptionId, 
+        isCorrect,
+        textAnswer, 
+        selectedOptionsArray
+      );
     }
   };
 
@@ -519,9 +794,13 @@ export default function InteractiveQuiz() {
         ...s,
         currentQuestionIndex: s.currentQuestionIndex + 1,
         selectedOptionId: null,
+        essayAnswer: "",
+        sentenceArrangement: [],
         showResult: false,
         aiFeedback: null, 
       }));
+      setBlankPositions([]);
+      setAvailablePieces([]);
       setTimeLeft(30);
     } else {
       await completeExerciseAttempt();
@@ -534,6 +813,8 @@ export default function InteractiveQuiz() {
     setState(initialQuizState);
     setTimeLeft(30);
     setStartTime(null);
+    setAvailablePieces([]);
+    setBlankPositions([]);
     router.refresh();
   };
 
@@ -541,6 +822,231 @@ export default function InteractiveQuiz() {
     if (percentage >= 80) return 'text-green-600';
     if (percentage >= 60) return 'text-yellow-600';
     return 'text-red-600';
+  };
+
+  const getQuestionTypeInfo = (type: string) => {
+    switch (type) {
+      case 'essay':
+        return { icon: FileText, label: 'Essay', color: 'text-green-700 bg-green-50 border-green-200' };
+      case 'sentence_arrangement':
+        return { icon: Puzzle, label: 'Isian Celah', color: 'text-purple-700 bg-purple-50 border-purple-200' };
+      case 'multiple_choice':
+        return { icon: Brain, label: 'Pilihan Ganda', color: 'text-blue-700 bg-blue-50 border-blue-200' };
+      case 'true_false':
+        return { icon: Brain, label: 'Benar/Salah', color: 'text-orange-700 bg-orange-50 border-orange-200' };
+      default:
+        return { icon: Brain, label: type, color: 'text-purple-700 bg-purple-50 border-purple-200' };
+    }
+  };
+
+  const renderQuestionContent = (currentQuestion: Question) => {
+    if (currentQuestion.question_type === 'essay') {
+      return (
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+          <h2 className="mb-6 text-lg font-medium text-gray-900 leading-relaxed">
+            {currentQuestion.question_text}
+          </h2>
+          
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Edit3 className="h-4 w-4" />
+              <span>Tulis jawaban essay Anda di bawah ini:</span>
+            </div>
+            
+            <Textarea
+              placeholder="Tulis jawaban Anda di sini..."
+              value={state.essayAnswer}
+              onChange={(e) => setState(s => ({ ...s, essayAnswer: e.target.value }))}
+              disabled={state.showResult}
+              className="min-h-[200px] text-base leading-relaxed resize-none border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+            />
+            
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>{state.essayAnswer.length} karakter</span>
+              <span>Minimum: 10 karakter</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    if (currentQuestion.question_type === 'sentence_arrangement') {
+      const config = currentQuestion.sentence_arrangement_config;
+      const sentenceParts = config?.sentence_with_blanks?.split('___') || [currentQuestion.question_text];
+      
+      const sentenceElements: React.ReactNode[] = [];
+      sentenceParts.forEach((part, index) => {
+          sentenceElements.push(
+              <span key={`text-${index}`} className="whitespace-pre-wrap">{part}</span>
+          );
+          
+          if (index < blankPositions.length) {
+              const blankState = blankPositions[index];
+              const item = blankState.piece;
+              
+              let borderClass = 'border-gray-300 bg-gray-50';
+              let content = <span>&nbsp;&nbsp;&nbsp;&nbsp;</span>; 
+              let dropProps = { onDragOver: handleDragOver, onDrop: (e: React.DragEvent) => handleDropOnBlank(e, index) };
+              
+              if (state.showResult) {
+                  if (blankState.isCorrect === true) {
+                      borderClass = 'border-green-500 bg-green-100 shadow-lg';
+                      content = <CheckCircle2 className="h-4 w-4 text-green-700" />;
+                  } else if (blankState.isCorrect === false) {
+                      borderClass = 'border-red-500 bg-red-100 shadow-lg';
+                      content = (
+                          <div className="text-red-700 text-xs text-center">
+                              <XCircle className="h-4 w-4 mx-auto" />
+                              <span className="font-semibold">{blankState.correctWord}</span>
+                          </div>
+                      );
+                  }
+              }
+              
+              if (item) {
+                  content = (
+                      <div
+                          draggable={!state.showResult}
+                          onDragStart={(e) => handleDragStart(e, item)}
+                          className={`cursor-move px-3 py-1 rounded border-2 font-medium text-sm transition-colors shadow-md ${
+                              state.showResult 
+                                ? blankState.isCorrect ? 'bg-green-300 border-green-500 text-gray-900' : 'bg-red-300 border-red-500 text-gray-900'
+                                : 'bg-white/90 border-sky-400 text-gray-900 hover:bg-white'
+                          }`}
+                      >
+                          {item.option_text}
+                      </div>
+                  );
+              } else if (!state.showResult) {
+                  content = <span className="text-gray-500 text-sm">Celah {index + 1}</span>;
+              }
+              sentenceElements.push(
+                  <span 
+                      key={`blank-${index}`}
+                      className={`inline-flex items-center justify-center min-w-[100px] h-10 mx-1 p-1 rounded-lg border-2 border-dashed transition-colors align-middle ${
+                          !state.showResult ? 'hover:border-sky-500' : ''
+                      } ${borderClass}`}
+                      {...dropProps}
+                  >
+                      {content}
+                  </span>
+              );
+          }
+      });
+      
+      return (
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+          <h2 className="mb-6 text-lg font-medium text-gray-900 leading-relaxed">
+            {currentQuestion.question_text}
+          </h2>
+          
+          {config && (
+            <div className="space-y-6">
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <Label className="text-sm font-semibold text-blue-800 mb-2 block">
+                  Kalimat yang harus dilengkapi:
+                </Label>
+                <div className="text-xl text-blue-900 font-medium leading-relaxed flex flex-wrap items-center">
+                  {sentenceElements}
+                </div>
+                {state.showResult && (
+                    <div className="mt-4 text-sm text-gray-600">
+                        Hasil: **{getFilledSentence()}**
+                    </div>
+                )}
+              </div>
+              
+              {/* AVAILABLE PIECES AREA */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-gray-700">Potongan Kata Tersedia ({availablePieces.length}):</h4>
+                <div 
+                  className="min-h-[80px] border-2 border-dashed border-blue-300 bg-blue-50 rounded-lg p-4 flex flex-wrap gap-3 items-start"
+                  onDragOver={handleDragOver}
+                  onDrop={handleDropOnAvailable}
+                >
+                  {availablePieces.length > 0 ? (
+                    availablePieces.map((piece) => (
+                      <div
+                        key={piece.id}
+                        draggable={!state.showResult}
+                        onDragStart={(e) => handleDragStart(e, piece)}
+                        className={`px-4 py-2 border border-blue-300 rounded-lg cursor-move transition-colors shadow-sm font-medium ${
+                            !state.showResult ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' : 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Move className="h-4 w-4" />
+                          {piece.option_text}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-gray-500 italic">Semua potongan sudah digunakan</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {!config && (
+            <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div className="text-yellow-800">
+                Konfigurasi pertanyaan menyusun kalimat belum lengkap.
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Default multiple choice rendering
+    return (
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <h2 className="mb-6 text-lg font-medium text-gray-900 leading-relaxed">
+          {currentQuestion.question_text}
+        </h2>
+        
+        <RadioGroup 
+          value={state.selectedOptionId ?? ""} 
+          onValueChange={(value) => setState(s => ({ ...s, selectedOptionId: value }))}
+          disabled={state.showResult}
+          className="space-y-3"
+        >
+          {currentQuestion.options.map((option, index) => (
+            <div 
+              key={option.id} 
+              className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all duration-200 ${
+                state.showResult 
+                  ? option.is_correct 
+                    ? 'bg-green-50 border-green-300 shadow-sm' 
+                    : state.selectedOptionId === option.id
+                      ? 'bg-red-50 border-red-300 shadow-sm'
+                      : 'bg-gray-50 border-gray-200'
+                  : state.selectedOptionId === option.id
+                    ? 'bg-sky-50 border-sky-300 shadow-md'
+                    : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300 hover:shadow-sm'
+              }`}
+            >
+              <RadioGroupItem value={option.id} id={`option-${option.id}`} />
+              <Label htmlFor={`option-${option.id}`} className="flex-1 cursor-pointer text-gray-800 font-medium">
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-sm font-semibold text-gray-500 bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center">
+                    {String.fromCharCode(65 + index)}
+                  </span>
+                  {option.option_text}
+                </span>
+              </Label>
+              {state.showResult && option.is_correct && (
+                <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+              )}
+              {state.showResult && state.selectedOptionId === option.id && !option.is_correct && (
+                <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+              )}
+            </div>
+          ))}
+        </RadioGroup>
+      </div>
+    );
   };
 
   if (state.isLoading) {
@@ -681,6 +1187,8 @@ export default function InteractiveQuiz() {
   }
 
   const progress = ((state.currentQuestionIndex + 1) / totalQuestions) * 100;
+  const questionTypeInfo = getQuestionTypeInfo(currentQuestion.question_type);
+  const QuestionIcon = questionTypeInfo.icon;
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
@@ -730,9 +1238,9 @@ export default function InteractiveQuiz() {
                       <p className="text-gray-600">Skor saat ini: {state.score} poin</p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700">
-                        <Brain className="h-4 w-4 mr-1" />
-                        {currentQuestion.question_type}
+                      <Badge variant="outline" className={`${questionTypeInfo.color} border-2`}>
+                        <QuestionIcon className="h-4 w-4 mr-1" />
+                        {questionTypeInfo.label}
                       </Badge>
                       <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
                         {currentQuestion.points} Poin
@@ -805,60 +1313,18 @@ export default function InteractiveQuiz() {
                 <CardHeader className="pb-6">
                   <CardTitle className="flex items-center gap-3 text-gray-900 text-xl">
                     <div className="p-2 bg-sky-500 rounded-lg">
-                      <Brain className="h-5 w-5 text-white" />
+                      <QuestionIcon className="h-5 w-5 text-white" />
                     </div>
-                    Soal Latihan
+                    Soal {questionTypeInfo.label}
                   </CardTitle>
                   <CardDescription className="text-gray-600">
-                    Pilih jawaban yang paling tepat untuk soal di bawah ini
+                    {currentQuestion.question_type === 'essay' && "Tulis jawaban essay yang lengkap dan jelas"}
+                    {currentQuestion.question_type === 'sentence_arrangement' && "Seret dan lepas potongan kata untuk menyusun kalimat yang benar"}
+                    {(currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && "Pilih jawaban yang paling tepat untuk soal di bawah ini"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h2 className="mb-6 text-lg font-medium text-gray-900 leading-relaxed">
-                      {currentQuestion.question_text}
-                    </h2>
-                    
-                    <RadioGroup 
-                      value={state.selectedOptionId ?? ""} 
-                      onValueChange={(value) => setState(s => ({ ...s, selectedOptionId: value }))}
-                      disabled={state.showResult}
-                      className="space-y-3"
-                    >
-                      {currentQuestion.options.map((option, index) => (
-                        <div 
-                          key={option.id} 
-                          className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all duration-200 ${
-                            state.showResult 
-                              ? option.is_correct 
-                                ? 'bg-green-50 border-green-300 shadow-sm' 
-                                : state.selectedOptionId === option.id
-                                  ? 'bg-red-50 border-red-300 shadow-sm'
-                                  : 'bg-gray-50 border-gray-200'
-                              : state.selectedOptionId === option.id
-                                ? 'bg-sky-50 border-sky-300 shadow-md'
-                                : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                          }`}
-                        >
-                          <RadioGroupItem value={option.id} id={`option-${option.id}`} />
-                          <Label htmlFor={`option-${option.id}`} className="flex-1 cursor-pointer text-gray-800 font-medium">
-                            <span className="inline-flex items-center gap-2">
-                              <span className="text-sm font-semibold text-gray-500 bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center">
-                                {String.fromCharCode(65 + index)}
-                              </span>
-                              {option.option_text}
-                            </span>
-                          </Label>
-                          {state.showResult && option.is_correct && (
-                            <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-                          )}
-                          {state.showResult && state.selectedOptionId === option.id && !option.is_correct && (
-                            <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
-                          )}
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  </div>
+                  {renderQuestionContent(currentQuestion)}
 
                   {state.showResult && currentQuestion.explanation && (
                     <div className="bg-blue-50 border border-blue-200 p-6 rounded-xl">
@@ -964,7 +1430,11 @@ export default function InteractiveQuiz() {
                       {!state.showResult ? (
                         <Button 
                           onClick={handleSubmitAnswer} 
-                          disabled={!state.selectedOptionId}
+                          disabled={
+                            (currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && !state.selectedOptionId ||
+                            currentQuestion.question_type === 'essay' && !state.essayAnswer.trim() ||
+                            currentQuestion.question_type === 'sentence_arrangement' && blankPositions.some(pos => pos.piece === null) // Cek apakah semua posisi terisi
+                          }
                           className="bg-sky-500 hover:bg-sky-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg font-medium"
                           size="lg"
                         >
