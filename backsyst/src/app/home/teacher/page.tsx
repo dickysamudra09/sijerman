@@ -128,7 +128,6 @@ function TeacherMode({ onBack }: TeacherModeProps) {
             if (classError) throw classError;
     
             // Fetch total class exercises
-            // Assuming exercise_sets with a non-null kelas_id are class-specific
             const { count: totalClassExercises, error: classExerciseError } = await supabase
                 .from('exercise_sets')
                 .select('*', { count: 'exact', head: true })
@@ -138,7 +137,6 @@ function TeacherMode({ onBack }: TeacherModeProps) {
             if (classExerciseError) throw classExerciseError;
     
             // Fetch total public exercises
-            // Assuming exercise_sets with a null kelas_id are public
             const { count: totalPublicExercises, error: publicExerciseError } = await supabase
                 .from('exercise_sets')
                 .select('*', { count: 'exact', head: true })
@@ -302,12 +300,12 @@ function TeacherMode({ onBack }: TeacherModeProps) {
 
     if (initialLoading) {
         return (
-            <div className="min-h-screen bg-gray-100 p-6">
-                <div className="max-w-screen-2xl mx-auto">
-                    <Card className="bg-white shadow-2xl border-0 rounded-2xl">
+            <div className="min-h-screen bg-gray-50 p-6">
+                <div className="max-w-7xl mx-auto">
+                    <Card className="bg-white shadow-lg border-0 rounded-xl">
                         <CardContent className="flex items-center justify-center p-16">
                             <div className="text-center">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mx-auto mb-4"></div>
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                                 <p className="text-gray-600 text-lg">Memuat...</p>
                             </div>
                         </CardContent>
@@ -319,15 +317,15 @@ function TeacherMode({ onBack }: TeacherModeProps) {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gray-100 p-6">
-                <div className="max-w-screen-2xl mx-auto">
-                    <Card className="bg-white shadow-2xl border-0 rounded-2xl">
+            <div className="min-h-screen bg-gray-50 p-6">
+                <div className="max-w-7xl mx-auto">
+                    <Card className="bg-white shadow-lg border-0 rounded-xl">
                         <CardHeader>
                             <CardTitle className="text-red-600 text-xl">Error</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <p className="text-red-600 mb-6">{error}</p>
-                            <Button onClick={() => router.push("/auth/login")} className="bg-sky-500 hover:bg-sky-600 text-white shadow-md">
+                            <Button onClick={() => router.push("/auth/login")} className="bg-blue-600 hover:bg-blue-700 text-white">
                                 Ke Halaman Masuk
                             </Button>
                         </CardContent>
@@ -337,238 +335,261 @@ function TeacherMode({ onBack }: TeacherModeProps) {
         );
     }
 
-    const createOrUpdateUserProfile = async (name: string, role: "teacher" | "student") => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            console.error("Tidak ada pengguna terautentikasi ditemukan.");
-            return;
-        }
-
-        const { error } = await supabase.from("users").upsert(
-            {
-                id: user.id,
-                name,
-                email: user.email || "",
-                role,
-            },
-            { onConflict: "id" }
-        );
-
-        if (error) {
-            console.error("Gagal membuat/memperbarui profil:", error.message);
-        } else {
-            console.log("Profil berhasil dibuat/diperbarui.");
-        }
-    };
-
     return (
-        <div className="flex justify-center items-center min-h-screen bg-gray-100 p-6">
-            <Card className="w-full h-[calc(100vh-48px)] max-w-screen-2xl bg-white shadow-2xl border-0 rounded-2xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100 p-8">
-                  <div className="flex items-center justify-between">
-                    {/* Kiri: Icon + Nama */}
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-sky-500 rounded-full shadow-lg">
-                        <GraduationCap className="h-6 w-6 text-white" />
-                      </div>
-                      <h1 className="text-2xl font-bold text-gray-900">
-                        Selamat Datang, {userName}
-                      </h1>
+        <div className="min-h-screen bg-gray-50">
+            {/* Header dengan gradient biru */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-8 shadow-lg">
+                <div className="max-w-7xl mx-auto">
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h1 className="text-2xl font-bold mb-1">Selamat Datang, {userName}!</h1>
+                            <p className="text-blue-100 text-sm">Kelola kelas dan materi pembelajaran Anda dengan mudah</p>
+                        </div>
+                        <Button 
+                            variant="secondary" 
+                            onClick={handleLogout} 
+                            className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm"
+                        >
+                            Keluar
+                        </Button>
                     </div>
 
-                    {/* Kanan: Tombol Home + Keluar */}
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={() => router.push(`/`)}
-                        className="border-blue-500 text-blue-600 hover:bg-blue-50 shadow-sm"
-                      >
-                        Home
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={handleLogout}
-                        className="border-red-500 text-red-600 hover:bg-red-50 shadow-sm"
-                      >
-                        Keluar
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-8 overflow-y-auto h-full space-y-8">
-                    {/* Statistik Ringkasan */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <Card className="bg-white border-0 shadow-lg rounded-xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500">Kelas yang dibuat</CardTitle>
-                        <Target className="h-5 w-5 text-gray-400" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold text-sky-600">{stats?.totalClasses ?? 0}</div>
-                        <p className="text-xs text-muted-foreground">Kelas</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-white border-0 shadow-lg rounded-xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500">Latihan Soal yang dibuat</CardTitle>
-                        <CheckCircle2 className="h-5 w-5 text-gray-400" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold text-green-600">{stats?.totalClassExercises ?? 0}</div>
-                        <p className="text-xs text-muted-foreground">Latihan</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-white border-0 shadow-lg rounded-xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500">Latihan Soal umum</CardTitle>
-                        {/* <TrendingUp className="h-5 w-5 text-gray-400" /> */}
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold text-purple-600">{stats?.totalPublicExercises ?? 0}</div>
-                        <p className="text-xs text-muted-foreground">Dari semua latihan</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                    <Tabs defaultValue="classes" className="w-full">
-                        <TabsList className="bg-gray-100 border-0 rounded-xl p-1 shadow-inner">
-                            <TabsTrigger value="classes" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">Kelas Saya</TabsTrigger>
-                            <TabsTrigger value="create" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">Kelas Baru</TabsTrigger>
-                        </TabsList>
-
-                        <TabsContent value="classes" className="space-y-6 mt-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {classrooms.map((classroom) => (
-                                    <Card
-                                        key={classroom.id}
-                                        className="h-full flex flex-col bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl"
-                                    >
-                                        <CardHeader className="pb-4">
-                                            <CardTitle className="flex items-center justify-between text-gray-900 text-lg">
-                                                {classroom.name}
-                                                <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700 px-3 py-1">
-                                                    {classroom.students.length} Siswa
-                                                </Badge>
-                                            </CardTitle>
-                                            <CardDescription className="text-gray-600 text-sm leading-relaxed">{classroom.description}</CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="flex flex-col flex-1">
-                                            <div className="flex-1">
-                                                {/* Konten yang bisa memanjang di sini */}
-                                            </div>
-                                            <div className="flex flex-col space-y-4 pt-4 border-t border-gray-100 mt-auto">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-sm font-medium text-gray-500">Kode Kelas:</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <code className="bg-gray-100 px-3 py-2 rounded-lg text-sm font-mono text-gray-700 border">{classroom.code}</code>
-                                                        <Button 
-                                                            size="sm" 
-                                                            variant="ghost" 
-                                                            onClick={() => copyClassCode(classroom.code)}
-                                                            className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 p-2"
-                                                        >
-                                                            <Copy className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-3">
-                                                    <Button 
-                                                        size="sm" 
-                                                        className="flex-1 bg-sky-500 hover:bg-sky-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
-                                                        onClick={() => {
-                                                            console.log("Navigating to classroom with id:", classroom.id);
-                                                            router.push(`/home/classrooms/${classroom.id}`);
-                                                        }}
-                                                    >
-                                                        <Eye className="h-4 w-4 mr-2" />
-                                                        Lihat
-                                                    </Button>
-                                                    <Button size="sm" variant="outline" className="border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm">
-                                                        <Share2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))}
+                    {/* Stats Cards di dalam header biru */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Card 1 - Kelas yang dibuat */}
+                        <div className="bg-white/10 backdrop-blur-md rounded-xl p-5 border border-white/20">
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                    <p className="text-blue-100 text-sm mb-2">Kelas yang Dibuat</p>
+                                    <p className="text-4xl font-bold text-white mb-1">{stats?.totalClasses ?? 0}</p>
+                                    <p className="text-blue-200 text-xs">+2 kelas baru bulan ini</p>
+                                </div>
+                                <div className="bg-white/20 p-3 rounded-lg">
+                                    <BookOpen className="h-6 w-6 text-white" />
+                                </div>
                             </div>
-                        </TabsContent>
+                        </div>
 
-                        <TabsContent value="create" className="space-y-6 mt-8">
-                            <Card className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl">
-                                <CardHeader className="pb-6">
-                                    <CardTitle className="flex items-center gap-3 text-gray-900 text-xl">
-                                        <div className="p-2 bg-sky-500 rounded-lg">
-                                            <Plus className="h-5 w-5 text-white" />
+                        {/* Card 2 - Latihan yang Dibuat */}
+                        <div className="bg-white/10 backdrop-blur-md rounded-xl p-5 border border-white/20">
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                    <p className="text-blue-100 text-sm mb-2">Latihan yang Dibuat</p>
+                                    <p className="text-4xl font-bold text-white mb-1">{stats?.totalClassExercises ?? 0}</p>
+                                    <p className="text-blue-200 text-xs">+5 latihan minggu ini</p>
+                                </div>
+                                <div className="bg-green-500/80 p-3 rounded-lg">
+                                    <BookOpen className="h-6 w-6 text-white" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Card 3 - Latihan Soal Umum */}
+                        <div className="bg-white/10 backdrop-blur-md rounded-xl p-5 border border-white/20">
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                    <p className="text-blue-100 text-sm mb-2">Latihan Soal Umum</p>
+                                    <p className="text-4xl font-bold text-white mb-1">{stats?.totalPublicExercises ?? 0}</p>
+                                    <p className="text-blue-200 text-xs">Untuk publik</p>
+                                </div>
+                                <div className="bg-purple-500/80 p-3 rounded-lg">
+                                    <Users className="h-6 w-6 text-white" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-6 py-6">
+                {/* Section Title */}
+                <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-1">Daftar Kelas Anda</h2>
+                    <p className="text-gray-600 text-sm">Kelola dan pantau semua kelas yang Anda buat</p>
+                </div>
+
+                {/* Tabs */}
+                <Tabs defaultValue="classes" className="w-full">
+                    <div className="flex items-center justify-between mb-6">
+                        <TabsList className="bg-transparent border-0 p-0">
+                            <TabsTrigger 
+                                value="classes" 
+                                className="data-[state=active]:bg-transparent data-[state=active]:text-gray-900 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 py-2 font-semibold transition-all mr-6 text-gray-500"
+                            >
+                                Kelas Saya
+                            </TabsTrigger>
+                            {/* <TabsTrigger 
+                                value="create" 
+                                className="data-[state=active]:bg-transparent data-[state=active]:text-gray-900 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 py-2 font-semibold transition-all text-gray-500"
+                            >
+                                Kelas Baru
+                            </TabsTrigger> */}
+                        </TabsList>
+                        
+                        <Button 
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            onClick={() => setIsModalOpen(true)}
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Buat Kelas Baru
+                        </Button>
+                    </div>
+
+                    <TabsContent value="classes" className="space-y-6 mt-0">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {classrooms.map((classroom) => (
+                                <Card 
+                                    key={classroom.id} 
+                                    className="bg-white border-l-4 border-l-blue-600 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-lg flex flex-col"
+                                >
+                                    <CardHeader className="pb-3 flex-shrink-0">
+                                        <div className="flex items-start justify-between mb-3">
+                                            <CardTitle className="text-xl font-bold text-gray-900 flex-1 pr-2">
+                                                {classroom.name}
+                                            </CardTitle>
+                                            <Badge className="bg-green-100 text-green-700 border-0 px-3 py-1 text-xs font-medium flex-shrink-0">
+                                                Aktif
+                                            </Badge>
                                         </div>
-                                        Buat Kelas Baru
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div>
-                                        <label className="block mb-3 text-sm font-semibold text-gray-700">Nama Kelas</label>
-                                        <Input
-                                            placeholder="Contoh: Bahasa Indonesia A2 - Lanjutan"
-                                            value={newClassName}
-                                            onChange={(e) => setNewClassName(e.target.value)}
-                                            className="border-gray-300 focus:border-sky-500 focus:ring-sky-200 bg-white shadow-sm text-lg py-3"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block mb-3 text-sm font-semibold text-gray-700">Deskripsi</label>
-                                        <Textarea
-                                            placeholder="Deskripsi singkat kelas..."
-                                            value={newClassDescription}
-                                            onChange={(e) => setNewClassDescription(e.target.value)}
-                                            className="border-gray-300 focus:border-sky-500 focus:ring-sky-200 bg-white shadow-sm min-h-[120px]"
-                                        />
-                                    </div>
-                                    <Button 
-                                        onClick={() => setIsModalOpen(true)} 
-                                        disabled={!newClassName.trim()} 
-                                        className="bg-sky-500 hover:bg-sky-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg"
-                                    >
-                                        <Plus className="h-5 w-5 mr-2" />
-                                        Buat Kelas
-                                    </Button>
-                                    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                                        <DialogContent className="bg-white border-0 shadow-2xl rounded-2xl max-w-md">
-                                            <DialogHeader>
-                                                <DialogTitle className="text-gray-900 text-xl">Kelas Baru</DialogTitle>
-                                                <DialogDescription className="text-gray-600">
-                                                    Tambahkan kelas baru untuk memulai sesi belajar Anda
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <div className="space-y-4">
-                                                <Input
-                                                    placeholder="Nama Kelas"
-                                                    value={newClassName}
-                                                    onChange={(e) => setNewClassName(e.target.value)}
-                                                    className="border-gray-300 focus:border-sky-500 focus:ring-sky-200 shadow-sm"
-                                                />
-                                                <Textarea
-                                                    placeholder="Deskripsi Kelas (Opsional)"
-                                                    value={newClassDescription}
-                                                    onChange={(e) => setNewClassDescription(e.target.value)}
-                                                    className="border-gray-300 focus:border-sky-500 focus:ring-sky-200 shadow-sm"
-                                                />
-                                                <Button 
-                                                    onClick={createNewClass} 
-                                                    disabled={isLoading} 
-                                                    className="bg-sky-500 hover:bg-sky-600 text-white w-full shadow-md"
+                                        <CardDescription className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                                            {classroom.description}
+                                        </CardDescription>
+                                    </CardHeader>
+                                    
+                                    <CardContent className="space-y-3 pt-0 mt-auto flex-shrink-0">
+                                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                                            <Users className="h-4 w-4" />
+                                            <span>{classroom.students.length} Siswa</span>
+                                        </div>
+                                        
+                                        <div className="bg-gray-50 rounded-lg p-3">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-xs text-gray-500 mb-1">Kode Kelas</p>
+                                                    <code className="text-sm font-mono font-semibold text-gray-900">
+                                                        {classroom.code}
+                                                    </code>
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => copyClassCode(classroom.code)}
+                                                    className="text-gray-600 hover:text-gray-900 hover:bg-gray-200 p-2 h-8 w-8"
                                                 >
-                                                    <Plus className="h-4 w-4 mr-2" />
-                                                    Buat Kelas
+                                                    <Copy className="h-4 w-4" />
                                                 </Button>
                                             </div>
-                                        </DialogContent>
-                                    </Dialog>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                    </Tabs>
-                </CardContent>
-            </Card>
+                                        </div>
+                                        
+                                        <div className="flex gap-2 pt-2">
+                                            <Button
+                                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                                onClick={() => {
+                                                    console.log("Navigating to classroom with id:", classroom.id);
+                                                    router.push(`/home/classrooms/${classroom.id}`);
+                                                }}
+                                            >
+                                                <Eye className="h-4 w-4 mr-2" />
+                                                Lihat Kelas
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                variant="outline" 
+                                                className="border-gray-300 text-gray-600 hover:bg-gray-50 px-4"
+                                            >
+                                                Kelola
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="create" className="space-y-6 mt-0">
+                        <Card className="bg-white border-0 shadow-sm rounded-lg">
+                            <CardHeader className="pb-4">
+                                <CardTitle className="flex items-center gap-3 text-gray-900 text-lg">
+                                    <div className="p-2 bg-blue-100 rounded-lg">
+                                        <Plus className="h-5 w-5 text-blue-600" />
+                                    </div>
+                                    Buat Kelas Baru
+                                </CardTitle>
+                                <CardDescription className="text-gray-600">
+                                    Tambahkan kelas baru untuk memulai sesi belajar Anda
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div>
+                                    <label className="block mb-2 text-sm font-semibold text-gray-700">Nama Kelas</label>
+                                    <Input
+                                        placeholder="Contoh: Bahasa Indonesia A2 - Lanjutan"
+                                        value={newClassName}
+                                        onChange={(e) => setNewClassName(e.target.value)}
+                                        className="border-gray-300 focus:border-blue-500 focus:ring-blue-200 bg-white h-11"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block mb-2 text-sm font-semibold text-gray-700">Deskripsi</label>
+                                    <Textarea
+                                        placeholder="Deskripsi singkat kelas..."
+                                        value={newClassDescription}
+                                        onChange={(e) => setNewClassDescription(e.target.value)}
+                                        className="border-gray-300 focus:border-blue-500 focus:ring-blue-200 bg-white min-h-[120px]"
+                                    />
+                                </div>
+                                <Button 
+                                    onClick={createNewClass} 
+                                    disabled={!newClassName.trim() || isLoading} 
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Buat Kelas
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+
+                <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                    <DialogContent className="bg-white border-0 shadow-xl rounded-xl max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="text-gray-900 text-xl">Kelas Baru</DialogTitle>
+                            <DialogDescription className="text-gray-600">
+                                Tambahkan kelas baru untuk memulai sesi belajar Anda
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block mb-2 text-sm font-semibold text-gray-700">Nama Kelas</label>
+                                <Input
+                                    placeholder="Nama Kelas"
+                                    value={newClassName}
+                                    onChange={(e) => setNewClassName(e.target.value)}
+                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                                />
+                            </div>
+                            <div>
+                                <label className="block mb-2 text-sm font-semibold text-gray-700">Deskripsi</label>
+                                <Textarea
+                                    placeholder="Deskripsi Kelas (Opsional)"
+                                    value={newClassDescription}
+                                    onChange={(e) => setNewClassDescription(e.target.value)}
+                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                                />
+                            </div>
+                            <Button 
+                                onClick={createNewClass} 
+                                disabled={isLoading} 
+                                className="bg-blue-600 hover:bg-blue-700 text-white w-full"
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Buat Kelas
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div>
         </div>
     );
 }

@@ -6,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, Edit, BookOpen, Clock, FileText, UserCircle, UploadCloud, CheckCircle2, Download as DownloadIcon } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Trash2, Edit, BookOpen, Clock, FileText, UserCircle, MoreVertical, Download as DownloadIcon, GraduationCap, Bell, User, Home, LogOut, UploadCloud, CheckCircle2, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 
 interface ContentItem {
   id: string;
@@ -31,6 +32,7 @@ interface StudentSubmission {
   student_id: string;
   file_url: string;
   submitted_at: string;
+  status: string;
 }
 
 interface SubmissionWithStudentName extends StudentSubmission {
@@ -43,15 +45,19 @@ export default function ContentDetailPage() {
   const [content, setContent] = useState<ContentItem | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("");
   const [creatorName, setCreatorName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [submissionStatus, setSubmissionStatus] = useState<StudentSubmission | null>(null);
   const [submissions, setSubmissions] = useState<SubmissionWithStudentName[] | null>(null);
   const [selectedSubmissionIds, setSelectedSubmissionIds] = useState<string[]>([]);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  
+  // State untuk upload tugas
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<StudentSubmission | null>(null);
+  
   const router = useRouter();
   const params = useParams();
   const classId = params.classId as string;
@@ -82,7 +88,7 @@ export default function ContentDetailPage() {
 
       const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("role")
+        .select("name, role")
         .eq("id", currentUserId)
         .single();
 
@@ -93,6 +99,7 @@ export default function ContentDetailPage() {
       }
 
       setUserRole(userData.role);
+      setUserName(userData.name || "");
 
       let contentData: ContentItem | null = null;
       let creator: string | null = null;
@@ -155,17 +162,20 @@ export default function ContentDetailPage() {
         }
         fetchError = fetchErr;
 
-        const { data: submissionData, error: submissionError } = await supabase
-          .from("student_submissions")
-          .select("*")
-          .eq("assignment_id", contentId)
-          .eq("student_id", currentUserId)
-          .single();
+        // Fetch submission status untuk student
+        if (contentData && contentData.jenis_create.toLowerCase() === "tugas") {
+          const { data: submissionData, error: submissionError } = await supabase
+            .from("student_submissions")
+            .select("*")
+            .eq("assignment_id", contentId)
+            .eq("student_id", currentUserId)
+            .single();
 
-        if (submissionError && submissionError.code !== 'PGRST116') {
-          console.error("Error fetching submission status:", submissionError);
-        } else {
-          setSubmissionStatus(submissionData || null);
+          if (submissionError && submissionError.code !== 'PGRST116') {
+            console.error("Error fetching submission status:", submissionError);
+          } else {
+            setSubmissionStatus(submissionData || null);
+          }
         }
       } else {
         setError("Role pengguna tidak valid.");
@@ -267,9 +277,20 @@ export default function ContentDetailPage() {
 
   const handleUpdate = () => {
     if (!content || userRole !== "teacher" || content.pembuat !== userId) return;
-    toast.info("Fitur update akan segera tersedia!");
+    router.push(`/home/classrooms/create?classId=${classId}&contentId=${content.id}`);
   };
 
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Logout Error:", error.message);
+      toast.error("Gagal keluar. Silakan coba lagi.");
+    } else {
+      router.push("/auth/login");
+    }
+  };
+
+  // Fungsi untuk upload tugas
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -349,6 +370,7 @@ export default function ContentDetailPage() {
         student_id: userId,
         file_url: fileUrlData.publicUrl,
         submitted_at: new Date().toISOString(),
+        status: 'submitted'
       });
       setSelectedFile(null);
 
@@ -361,323 +383,604 @@ export default function ContentDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 p-6 flex items-center justify-center">
-        <Card className="w-full max-w-screen-2xl bg-white shadow-2xl border-0 rounded-2xl">
-          <CardContent className="flex items-center justify-center p-16">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mx-auto mb-4"></div>
-              <p className="text-gray-600 text-lg">Memuat konten...</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+            <CardContent className="flex items-center justify-center p-16">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600 text-lg">Memuat konten...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
   if (error || !content) {
     return (
-      <div className="min-h-screen bg-gray-100 p-6 flex items-center justify-center">
-        <Card className="w-full max-w-screen-2xl bg-white shadow-2xl border-0 rounded-2xl">
-          <CardHeader>
-            <CardTitle className="text-red-600 text-xl">Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-red-600 mb-6">{error || "Konten tidak ditemukan"}</p>
-            <Button onClick={() => router.push(`/home/classrooms/${classId}`)} className="bg-sky-500 hover:bg-sky-600 text-white shadow-md">
-              Kembali
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+            <CardHeader>
+              <CardTitle className="text-red-600 text-xl">Error</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-red-600 mb-6">{error || "Konten tidak ditemukan"}</p>
+              <Button 
+                onClick={() => router.push(`/home/classrooms/${classId}`)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Kembali ke Kelas
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
   const isContentCreator = userRole === "teacher" && content.pembuat === userId;
   const isAssignment = content.jenis_create.toLowerCase() === "tugas";
+  const isLate = content.deadline && new Date() > new Date(content.deadline);
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100 p-6">
-      <Card className="w-full h-[calc(100vh-48px)] max-w-screen-2xl bg-white shadow-2xl border-0 rounded-2xl overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100 p-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => router.push(`/home/classrooms/${classId}`)} className="text-gray-600 hover:text-gray-900">
-                ← Kembali ke Kelas
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* Header Menu */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm px-6 py-4 flex items-center justify-between border-b border-gray-200">
+        <div className="flex items-center space-x-4">
+          <Link href="/home" className="flex items-center space-x-2">
+            <GraduationCap className="h-8 w-8 text-blue-600" />
+            <span className="text-xl font-semibold text-gray-900">
+              Si Jerman
+            </span>
+          </Link>
+        </div>
+
+        <div className="flex items-center space-x-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative rounded-full hover:bg-gray-100"
+          >
+            <Bell className="h-5 w-5 text-gray-600" />
+            <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full border border-white"></span>
+          </Button>
+
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="flex items-center justify-center rounded-full transition-colors hover:bg-gray-100"
+              >
+                <User className="h-5 w-5 text-gray-600" />
               </Button>
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-blue-500 rounded-full shadow-lg">
-                  <BookOpen className="h-6 w-6 text-white" />
-                </div>
-                <h1 className="text-2xl font-bold text-gray-900">{content.judul}</h1>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+              align="end"
+              sideOffset={8}
+              className="w-56 rounded-lg shadow-lg bg-white border border-gray-200"
+            >
+              <DropdownMenuLabel className="font-semibold text-gray-900">
+                {userName}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/home"
+                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors rounded-md"
+                >
+                  <Home className="mr-2 h-4 w-4" />
+                  Home
+                </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/home/latihan-soal"
+                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors rounded-md"
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Latihan Soal
+                </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors rounded-md"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Keluar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 pt-20 pb-10 px-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <Button
+              variant="ghost"
+              onClick={() => router.push(`/home/classrooms/${classId}`)}
+              className="mb-4 text-gray-600 hover:text-gray-900 px-0"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Kembali ke Kelas
+            </Button>
+            <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">{content.judul}</h1>
+                <p className="text-gray-600 text-lg">{content.sub_judul}</p>
               </div>
+              {isContentCreator && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleUpdate}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Update Konten
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={handleDelete}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Hapus Konten
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
-            {isContentCreator && (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleUpdate} disabled={isLoading} className="border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm">
-                  <Edit className="h-4 w-4 mr-2" />
-                  Update
-                </Button>
-                <Button variant="destructive" onClick={handleDelete} disabled={isLoading} className="bg-red-500 hover:bg-red-600 text-white shadow-sm">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-8 overflow-y-auto h-full">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <Card className="bg-white border-0 shadow-lg rounded-xl transition-all duration-300">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Jenis Konten</CardTitle>
-                <BookOpen className="h-5 w-5 text-gray-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold text-sky-600">{content.jenis_create}</div>
-              </CardContent>
-            </Card>
-            <Card className="bg-white border-0 shadow-lg rounded-xl transition-all duration-300">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Pembuat</CardTitle>
-                <UserCircle className="h-5 w-5 text-gray-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold text-green-600">
-                  {creatorName}
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-white border-0 shadow-lg rounded-xl transition-all duration-300">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Batas Waktu</CardTitle>
-                <Clock className="h-5 w-5 text-gray-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold text-purple-600">
-                  {content.deadline ? new Date(content.deadline).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : "Tidak Ada"}
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
-          <Tabs defaultValue="content" className="w-full">
-            <TabsList className="bg-gray-100 border-0 rounded-xl p-1 shadow-inner">
-              <TabsTrigger value="content" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">Isi Konten</TabsTrigger>
-              <TabsTrigger value="attachments" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">Dokumen Pendukung</TabsTrigger>
-              {isAssignment && userRole === "student" && (
-                <TabsTrigger value="submission" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">
-                  Kumpulkan Tugas
-                  {submissionStatus ? (
-                    <CheckCircle2 className="h-4 w-4 ml-2 text-green-500" />
-                  ) : (
-                    <Clock className="h-4 w-4 ml-2 text-red-500" />
-                  )}
-                </TabsTrigger>
-              )}
-              {isAssignment && isContentCreator && (
-                <TabsTrigger value="submissions" className="data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-sky-600 rounded-lg px-8 py-3 font-medium">
-                  Daftar Pengumpulan
-                </TabsTrigger>
-              )}
-            </TabsList>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Sidebar Info */}
+            <div className="lg:col-span-1 space-y-6">
+              {/* Card Informasi */}
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                <CardContent className="p-6">
+                  <div className="space-y-6">
+                    {/* Jenis Konten */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-500 mb-2">Jenis Konten</h3>
+                      <div className="flex items-center gap-3">
+                        <BookOpen className="h-5 w-5 text-blue-600" />
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                          {content.jenis_create}
+                        </Badge>
+                      </div>
+                    </div>
 
-            <TabsContent value="content" className="space-y-6 mt-8">
-              <Card className="bg-white border border-gray-100 shadow-lg rounded-xl p-6">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg text-gray-900">{content.sub_judul}</CardTitle>
-                  <CardDescription className="text-sm text-gray-600">
-                    Dibuat pada: {new Date(content.created_at).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="prose max-w-none break-words" dangerouslySetInnerHTML={{ __html: content.konten }} />
+                    {/* Pembuat */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-500 mb-2">Pembuat</h3>
+                      <div className="flex items-center gap-3">
+                        <UserCircle className="h-5 w-5 text-green-600" />
+                        <span className="font-medium text-gray-900">{creatorName}</span>
+                      </div>
+                    </div>
+
+                    {/* Batas Waktu */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-500 mb-2">Batas Waktu</h3>
+                      <div className="flex items-center gap-3">
+                        <Clock className="h-5 w-5 text-purple-600" />
+                        <span className="font-medium text-gray-900">
+                          {content.deadline 
+                            ? new Date(content.deadline).toLocaleDateString('id-ID', { 
+                                day: 'numeric', 
+                                month: 'short', 
+                                year: 'numeric'
+                              })
+                            : "Tidak Ada"
+                          }
+                        </span>
+                      </div>
+                      {isAssignment && content.deadline && (
+                        <div className="mt-2">
+                          <Badge className={isLate ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}>
+                            {isLate ? "Terlambat" : "Aktif"}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Status Pengumpulan untuk Siswa */}
+                    {isAssignment && userRole === "student" && (
+                      <div className="pt-4 border-t border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-500 mb-2">Status Tugas</h3>
+                        <div className="flex items-center gap-3">
+                          {submissionStatus ? (
+                            <>
+                              <CheckCircle2 className="h-5 w-5 text-green-600" />
+                              <Badge className="bg-green-100 text-green-700">
+                                Sudah Dikumpulkan
+                              </Badge>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="h-5 w-5 text-yellow-600" />
+                              <Badge className="bg-yellow-100 text-yellow-700">
+                                Belum Dikumpulkan
+                              </Badge>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="attachments" className="space-y-6 mt-8">
-              <Card className="bg-white border border-gray-100 shadow-lg rounded-xl p-6">
-                <CardHeader>
-                  <CardTitle>Dokumen Pendukung</CardTitle>
+              {/* Dokumen Pendukung */}
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg font-semibold">Dokumen Pendukung</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {content.documents && content.documents.length > 0 ? (
-                    <ul className="list-disc pl-6 space-y-2">
-                      {content.documents.map((doc, index) => (
-                        <li key={index}>
-                          <button onClick={() => handleDownload(doc.url, doc.name)} className="text-blue-600 hover:underline flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-blue-500" />
-                            {doc.name}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="space-y-3">
+                      {content.documents.map((doc, index) => {
+                        const fileExtension = doc.name.split('.').pop()?.toLowerCase();
+                        let badgeVariant = "secondary";
+                        let badgeText = "Dokumen";
+                        
+                        if (fileExtension === 'pdf') {
+                          badgeVariant = "secondary";
+                          badgeText = "PDF";
+                        } else if (['mp4', 'mov', 'avi'].includes(fileExtension || '')) {
+                          badgeVariant = "secondary";
+                          badgeText = "Video";
+                        }
+
+                        return (
+                          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <FileText className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-700 truncate">{doc.name}</p>
+                                <Badge variant="secondary" className="bg-gray-200 text-gray-700 text-xs">
+                                  {badgeText}
+                                </Badge>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDownload(doc.url, doc.name)}
+                              className="text-blue-600 hover:text-blue-700 flex-shrink-0 ml-2"
+                            >
+                              <DownloadIcon className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : (
-                    <p className="text-muted-foreground">Tidak ada dokumen pendukung yang dilampirkan.</p>
+                    <div className="text-center py-4">
+                      <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">Tidak ada dokumen pendukung</p>
+                    </div>
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </div>
 
-            {isAssignment && userRole === "student" && (
-              <TabsContent value="submission" className="space-y-6 mt-8">
-                <Card className="bg-white border border-gray-100 shadow-lg rounded-xl p-6">
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      Kumpulkan Tugas
-                      {submissionStatus ? (
-                        <Badge className="bg-green-500 text-white">Sudah Dikumpulkan</Badge>
-                      ) : (
-                        <Badge className="bg-red-500 text-white">Belum Dikumpulkan</Badge>
-                      )}
-                    </CardTitle>
-                    <CardDescription>Unggah file tugas Anda. Maksimal 12MB.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                      className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-sky-500 transition-colors"
-                    >
-                      <UploadCloud className="w-12 h-12 text-gray-400 mb-4" />
-                      <p className="text-sm text-gray-500 mb-2">Drag and drop file di sini, atau</p>
-                      <label htmlFor="file-upload" className="text-sky-600 font-medium hover:underline cursor-pointer">
-                        Pilih file
-                      </label>
-                      <input
-                        id="file-upload"
-                        type="file"
-                        className="hidden"
-                        onChange={handleFileChange}
-                      />
+            {/* Main Content */}
+            <div className="lg:col-span-3 space-y-6">
+              {/* Materi Pembelajaran */}
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                {/* <CardHeader className="border-b border-gray-200 pb-6">
+                  <CardTitle className="text-2xl font-bold text-gray-900">
+                    {content.jenis_create === "Materi" ? "Materi Pembelajaran" : "Detail Tugas"}
+                  </CardTitle>
+                </CardHeader> */}
+                <CardContent className="p-6">
+                  <div className="prose max-w-none">
+                    {/* Header dengan judul utama */}
+                    <div className="mb-8">
+                      <h1 className="text-3xl font-bold text-gray-900 mb-4">{content.judul}</h1>
+                      <div className="border-t border-gray-200 pt-4">
+                        <p className="text-lg text-gray-700 leading-relaxed">
+                          <strong>Tema:</strong> {content.sub_judul}
+                        </p>
+                      </div>
                     </div>
-                    {selectedFile && (
-                      <div className="mt-4 p-3 bg-gray-100 rounded-md flex items-center justify-between">
-                        <span className="text-sm text-gray-700">{selectedFile.name}</span>
-                        <Button
-                          variant="ghost"
-                          onClick={() => setSelectedFile(null)}
-                          className="h-6 w-6 p-0 text-red-500 hover:bg-red-50"
+
+                    {/* Konten utama */}
+                    <div 
+                      className="text-gray-700 leading-relaxed space-y-6 text-base"
+                      dangerouslySetInnerHTML={{ 
+                        __html: content.konten || `
+                          <div class="space-y-6">
+                            <section>
+                              <h2 class="text-xl font-semibold text-gray-900 mb-4">Pengenalan Materi</h2>
+                              <p class="text-gray-700">Selamat datang di kursus <strong>${content.judul}</strong>! Dalam materi ini, kita akan mempelajari konsep-konsep dasar yang penting untuk dipahami.</p>
+                            </section>
+
+                            <section>
+                              <h2 class="text-xl font-semibold text-gray-900 mb-4">Topik Pembelajaran</h2>
+                              <ul class="list-disc pl-6 space-y-2 text-gray-700">
+                                <li>Pengenalan konsep dasar dan terminologi</li>
+                                <li>Fundamental principles and core concepts</li>
+                                <li>Practical applications and real-world examples</li>
+                                <li>Tools and environment setup</li>
+                                <li>Best practices and next steps</li>
+                              </ul>
+                            </section>
+
+                            <section>
+                              <h2 class="text-xl font-semibold text-gray-900 mb-4">Contoh Penerapan</h2>
+                              <div class="bg-gray-50 border-l-4 border-blue-500 p-4">
+                                <p class="text-gray-700"><strong>Contoh:</strong> Berikut adalah contoh penerapan dalam kehidupan sehari-hari...</p>
+                              </div>
+                            </section>
+                          </div>
+                        `
+                      }} 
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Bagian Kumpulkan Tugas untuk Siswa */}
+              {isAssignment && userRole === "student" && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                  <CardHeader className="border-b border-gray-200 pb-6">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-2xl font-bold text-gray-900">
+                        Kumpulkan Tugas
+                      </CardTitle>
+                      {submissionStatus ? (
+                        <Badge className="bg-green-100 text-green-700 text-sm">
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Sudah Dikumpulkan
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-yellow-100 text-yellow-700 text-sm">
+                          <Clock className="h-4 w-4 mr-1" />
+                          Belum Dikumpulkan
+                        </Badge>
+                      )}
+                    </div>
+                    <CardDescription>
+                      Unggah file tugas Anda. Maksimal ukuran file 12MB.
+                      {content.deadline && (
+                        <span className="block mt-1">
+                          Batas waktu: {new Date(content.deadline).toLocaleDateString('id-ID', { 
+                            weekday: 'long',
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric'
+                          })}
+                        </span>
+                      )}
+                    </CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="p-6">
+                    {!submissionStatus ? (
+                      <>
+                        <div
+                          onDragOver={handleDragOver}
+                          onDrop={handleDrop}
+                          className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors mb-4"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <UploadCloud className="w-12 h-12 text-gray-400 mb-4" />
+                          <p className="text-sm text-gray-500 mb-2">Drag and drop file di sini, atau</p>
+                          <label htmlFor="file-upload" className="text-blue-600 font-medium hover:underline cursor-pointer">
+                            Pilih file dari komputer
+                          </label>
+                          <input
+                            id="file-upload"
+                            type="file"
+                            className="hidden"
+                            onChange={handleFileChange}
+                          />
+                        </div>
+                        
+                        {selectedFile && (
+                          <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <FileText className="h-4 w-4 text-blue-600" />
+                              <span className="text-sm font-medium text-gray-700">{selectedFile.name}</span>
+                              <span className="text-xs text-gray-500">
+                                ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedFile(null)}
+                              className="h-6 w-6 p-0 text-red-500 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+
+                        <Button
+                          onClick={handleFileUpload}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-6"
+                          disabled={!selectedFile || isUploading}
+                        >
+                          {isUploading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Mengunggah...
+                            </>
+                          ) : (
+                            <>
+                              <UploadCloud className="h-4 w-4 mr-2" />
+                              Kumpulkan Tugas
+                            </>
+                          )}
                         </Button>
+                      </>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <CheckCircle2 className="h-6 w-6 text-green-600" />
+                            <div>
+                              <h4 className="font-semibold text-green-800">Tugas berhasil dikumpulkan!</h4>
+                              <p className="text-green-700 text-sm mt-1">
+                                Dikumpulkan pada: {new Date(submissionStatus.submitted_at).toLocaleString('id-ID', { 
+                                  dateStyle: 'full', 
+                                  timeStyle: 'short' 
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm font-medium text-gray-700">
+                              File tugas Anda
+                            </span>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownload(submissionStatus.file_url, "Tugas_Saya")}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <DownloadIcon className="h-4 w-4 mr-1" />
+                            Unduh
+                          </Button>
+                        </div>
                       </div>
                     )}
-                    <Button
-                      onClick={handleFileUpload}
-                      className="w-full bg-sky-500 text-white hover:bg-sky-600 mt-6"
-                      disabled={!selectedFile || isUploading}
-                    >
-                      {isUploading ? "Mengunggah..." : "Kumpulkan Tugas"}
-                    </Button>
                   </CardContent>
                 </Card>
-                {submissionStatus && (
-                  <Card className="bg-white border border-gray-100 shadow-lg rounded-xl p-6">
-                    <CardHeader>
-                      <CardTitle>Detail Pengumpulan Anda</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium text-gray-900">File: </span>
-                        <button onClick={() => handleDownload(submissionStatus.file_url, "Tugas Anda")} className="text-blue-600 hover:underline">
-                          Lihat dan Unduh File Tugas
-                        </button>
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium text-gray-900">Waktu Pengumpulan: </span>
-                        {new Date(submissionStatus.submitted_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            )}
+              )}
 
-            {isAssignment && isContentCreator && (
-              <TabsContent value="submissions" className="space-y-6 mt-8">
-                <Card className="bg-white border border-gray-100 shadow-lg rounded-xl p-6">
-                  <CardHeader className="flex flex-row justify-between items-center">
-                    <div className="space-y-1">
-                      <CardTitle>Daftar Pengumpulan Siswa</CardTitle>
-                      <CardDescription>
-                        {submissions && submissions.length > 0
-                          ? `Total ${submissions.length} siswa sudah mengumpulkan.`
-                          : "Belum ada siswa yang mengumpulkan tugas ini."}
-                      </CardDescription>
+              {/* Daftar Pengumpulan untuk Teacher */}
+              {isAssignment && isContentCreator && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                  <CardHeader className="border-b border-gray-200 pb-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-2xl font-bold text-gray-900">
+                          Daftar Pengumpulan Siswa
+                        </CardTitle>
+                        <CardDescription className="mt-2">
+                          {submissions && submissions.length > 0
+                            ? `Total ${submissions.length} siswa sudah mengumpulkan tugas`
+                            : "Belum ada siswa yang mengumpulkan tugas ini"
+                          }
+                        </CardDescription>
+                      </div>
+                      {submissions && submissions.length > 0 && (
+                        <Button
+                          onClick={handleDownloadSelected}
+                          disabled={selectedSubmissionIds.length === 0 || isDownloadingAll}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          <DownloadIcon className="h-4 w-4 mr-2" />
+                          {isDownloadingAll ? "Mengunduh..." : `Unduh Terpilih (${selectedSubmissionIds.length})`}
+                        </Button>
+                      )}
                     </div>
-                    <Button
-                      onClick={handleDownloadSelected}
-                      disabled={selectedSubmissionIds.length === 0 || isDownloadingAll}
-                      className="bg-sky-500 hover:bg-sky-600 text-white shadow-md transition-all duration-200 ease-in-out"
-                    >
-                      <DownloadIcon className="h-4 w-4 mr-2" />
-                      {isDownloadingAll ? "Mengunduh..." : `Unduh Dokumen Terpilih (${selectedSubmissionIds.length})`}
-                    </Button>
                   </CardHeader>
-                  <CardContent>
+
+                  <CardContent className="p-6">
                     {submissions && submissions.length > 0 ? (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[50px]">
-                              <Checkbox
-                                checked={selectedSubmissionIds.length === submissions.length}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedSubmissionIds(submissions.map(sub => sub.id));
-                                  } else {
-                                    setSelectedSubmissionIds([]);
-                                  }
-                                }}
-                              />
-                            </TableHead>
-                            <TableHead>Nama Siswa</TableHead>
-                            <TableHead>Status Pengumpulan</TableHead>
-                            <TableHead>Waktu Pengumpulan</TableHead>
-                            <TableHead className="text-right">Dokumen</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {submissions.map((submission) => {
-                            const isLate = content.deadline && new Date(submission.submitted_at) > new Date(content.deadline);
-                            return (
-                              <TableRow key={submission.id}>
-                                <TableCell>
-                                  <Checkbox
-                                    checked={selectedSubmissionIds.includes(submission.id)}
-                                    onCheckedChange={(checked) => handleCheckboxChange(submission.id, checked as boolean)}
-                                  />
-                                </TableCell>
-                                <TableCell className="font-medium">{submission.users?.name || 'Nama Tidak Ditemukan'}</TableCell>
-                                <TableCell>
-                                  <Badge className={isLate ? "bg-red-500 text-white hover:bg-red-500/80" : "bg-green-500 text-white hover:bg-green-500/80"}>
-                                    {isLate ? "Terlambat" : "Tepat Waktu"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>{new Date(submission.submitted_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</TableCell>
-                                <TableCell className="text-right">
-                                  <button onClick={() => handleDownload(submission.file_url, `${submission.users?.name || "siswa"}_${submission.file_url.substring(submission.file_url.lastIndexOf('/') + 1)}`)} className="inline-flex items-center gap-2 text-sky-600 hover:underline">
-                                    <DownloadIcon className="h-4 w-4" />
-                                    Unduh
-                                  </button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
+                      <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader className="bg-gray-50">
+                            <TableRow>
+                              <TableHead className="w-[50px]">
+                                <Checkbox
+                                  checked={selectedSubmissionIds.length === submissions.length}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedSubmissionIds(submissions.map(sub => sub.id));
+                                    } else {
+                                      setSelectedSubmissionIds([]);
+                                    }
+                                  }}
+                                />
+                              </TableHead>
+                              <TableHead className="font-semibold text-gray-900">Nama Siswa</TableHead>
+                              <TableHead className="font-semibold text-gray-900">Status</TableHead>
+                              <TableHead className="font-semibold text-gray-900">Waktu Pengumpulan</TableHead>
+                              <TableHead className="text-right font-semibold text-gray-900">Aksi</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {submissions.map((submission) => {
+                              const isLate = content.deadline && new Date(submission.submitted_at) > new Date(content.deadline);
+                              return (
+                                <TableRow key={submission.id} className="hover:bg-gray-50">
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={selectedSubmissionIds.includes(submission.id)}
+                                      onCheckedChange={(checked) => handleCheckboxChange(submission.id, checked as boolean)}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-medium text-gray-900">
+                                    {submission.users?.name || 'Nama Tidak Ditemukan'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge className={isLate ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}>
+                                      {isLate ? "Terlambat" : "Tepat Waktu"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-gray-700">
+                                    {new Date(submission.submitted_at).toLocaleString('id-ID', { 
+                                      dateStyle: 'medium', 
+                                      timeStyle: 'short' 
+                                    })}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDownload(
+                                        submission.file_url, 
+                                        `${submission.users?.name || "siswa"}_${submission.file_url.substring(submission.file_url.lastIndexOf('/') + 1)}`
+                                      )}
+                                      className="text-blue-600 hover:text-blue-700"
+                                    >
+                                      <DownloadIcon className="h-4 w-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
                     ) : (
-                      <p className="text-muted-foreground text-center">Belum ada pengumpulan tugas.</p>
+                      <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                        <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500">Belum ada pengumpulan tugas</p>
+                        <p className="text-gray-400 text-sm mt-1">Siswa belum mengumpulkan tugas ini</p>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
-              </TabsContent>
-            )}
-          </Tabs>
-        </CardContent>
-      </Card>
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
