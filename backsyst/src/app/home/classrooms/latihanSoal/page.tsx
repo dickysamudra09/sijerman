@@ -82,6 +82,7 @@ interface ExerciseSet {
   time_limit_minutes: number | null;
   shuffle_questions: boolean;
   shuffle_options: boolean;
+  pertemuan?: number;
   questions: Question[];
 }
 
@@ -89,6 +90,8 @@ export default function LatihanSoalPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const classId = searchParams.get("classId");
+  const exerciseIdToEdit = searchParams.get("exerciseId");
+  const pertemuanParam = searchParams.get("pertemuan") ? parseInt(searchParams.get("pertemuan")!) : null;
 
   const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -100,6 +103,8 @@ export default function LatihanSoalPage() {
   const [classroomName, setClassroomName] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [editingExercise, setEditingExercise] = useState<string | null>(null);
+  const [selectedPertemuan, setSelectedPertemuan] = useState<number | null>(pertemuanParam);
+  const [availablePertemuan, setAvailablePertemuan] = useState<number[]>([]);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -115,7 +120,6 @@ export default function LatihanSoalPage() {
         const userId = sessionData.session.user.id;
         setUserId(userId);
 
-        // Fetch user data
         const { data: userData, error: userError } = await supabase
           .from("users")
           .select("name")
@@ -126,7 +130,6 @@ export default function LatihanSoalPage() {
           setUserName(userData.name);
         }
 
-        // Fetch classroom name
         if (classId) {
           const { data: classroomData, error: classroomError } = await supabase
             .from("classrooms")
@@ -155,6 +158,59 @@ export default function LatihanSoalPage() {
     }
   }, [classId, router]);
 
+  useEffect(() => {
+    const autoExpandExercise = async () => {
+      if (!exerciseIdToEdit || exerciseSets.length === 0 || isLoading) return;
+
+      let targetExercise = exerciseSets.find(ex => ex.id === exerciseIdToEdit);
+
+      if (!targetExercise) {
+        try {
+          const { data: contentData } = await supabase
+            .from("teacher_create")
+            .select("id, sub_judul, judul")
+            .eq("id", exerciseIdToEdit)
+            .eq("kelas", classId)
+            .single();
+          
+          if (contentData) {
+            const searchTitle = contentData.sub_judul || contentData.judul;
+            targetExercise = exerciseSets.find(ex => 
+              ex.judul_latihan.toLowerCase().includes(searchTitle.toLowerCase()) ||
+              searchTitle.toLowerCase().includes(ex.judul_latihan.toLowerCase())
+            );
+
+            if (!targetExercise && exerciseSets.length > 0) {
+              targetExercise = exerciseSets[0];
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching content for matching:", err);
+          if (exerciseSets.length > 0) {
+            targetExercise = exerciseSets[0];
+          }
+        }
+      }
+      
+      if (targetExercise) {
+        if (targetExercise.pertemuan) {
+          setSelectedPertemuan(targetExercise.pertemuan);
+        }
+
+        setEditingExercise(targetExercise.id);
+
+        setTimeout(() => {
+          const element = document.getElementById(`exercise-${targetExercise.id}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 500);
+      }
+    };
+    
+    autoExpandExercise();
+  }, [exerciseIdToEdit, exerciseSets, isLoading, classId]);
+
   const fetchExerciseSets = async (userId: string) => {
     try {
       const { data: exerciseData, error } = await supabase
@@ -174,10 +230,10 @@ export default function LatihanSoalPage() {
 
       const formattedData = exerciseData.map(exercise => ({
         ...exercise,
+        pertemuan: exercise.pertemuan || 1,
         questions: exercise.questions.map((q: any) => ({
           ...q,
           isSaved: true,
-          // Tambahkan config sentence_arrangement dari question_text
           sentence_arrangement_config: q.question_type === 'sentence_arrangement' ? { complete_sentence: q.question_text } : q.sentence_arrangement_config,
           options: q.options.map((o: any) => ({
             ...o,
@@ -187,6 +243,13 @@ export default function LatihanSoalPage() {
       }));
 
       setExerciseSets(formattedData || []);
+
+      const pertemuanNumbers = Array.from(new Set(formattedData.map(ex => ex.pertemuan))).sort();
+      setAvailablePertemuan(pertemuanNumbers);
+
+      if (!selectedPertemuan && pertemuanNumbers.length > 0) {
+        setSelectedPertemuan(pertemuanNumbers[0]);
+      }
     } catch (error) {
       console.error("Error fetching exercise sets:", error);
       toast.error("Gagal memuat latihan soal");
@@ -212,14 +275,14 @@ export default function LatihanSoalPage() {
           max_attempts: 1,
           shuffle_questions: false,
           shuffle_options: false,
-          is_active: true
+          is_active: true,
+          pertemuan: selectedPertemuan ?? pertemuanParam ?? 1
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // Tambahkan ini untuk menyimpan ke teacher_create
       const { error: teacherCreateError } = await supabase
         .from("teacher_create")
         .insert({
@@ -228,7 +291,8 @@ export default function LatihanSoalPage() {
           kelas: classId,
           pembuat: userId,
           jenis_create: "Latihan soal",
-          konten: ""
+          konten: "",
+          pertemuan: selectedPertemuan ?? pertemuanParam ?? 1
         });
 
       if (teacherCreateError) throw teacherCreateError;
@@ -265,7 +329,6 @@ export default function LatihanSoalPage() {
       options: []
     };
 
-    // Setup berdasarkan tipe pertanyaan
     if (questionType === 'multiple_choice') {
       newQuestion.options = Array.from({ length: 4 }, (_, index) => ({
         id: `temp-opt-${Date.now()}-${index}`,
@@ -299,7 +362,6 @@ export default function LatihanSoalPage() {
     );
   };
 
-  // Fungsi untuk mengcreate sentence dengan blanks dan extract kata-kata yang kosong
   const createSentenceWithBlanks = (completeSentence: string, blankPositions: number[]): { 
     sentenceWithBlanks: string; 
     blankWords: string[]; 
@@ -320,7 +382,6 @@ export default function LatihanSoalPage() {
     };
   };
 
-  // Fungsi untuk auto-generate blanks dari kalimat
   const autoGenerateBlanks = (exerciseId: string, questionId: string, completeSentence: string) => {
     const words = completeSentence.split(' ').filter(word => word.trim().length > 0);
     
@@ -329,7 +390,6 @@ export default function LatihanSoalPage() {
       return;
     }
 
-    // Ambil 2-3 kata secara acak untuk dijadikan blank (tapi tidak lebih dari 50% kata)
     const maxBlanks = Math.min(3, Math.floor(words.length / 2));
     const blankCount = Math.max(1, Math.min(maxBlanks, 2));
     
@@ -342,8 +402,7 @@ export default function LatihanSoalPage() {
     }
     
     const { sentenceWithBlanks, blankWords } = createSentenceWithBlanks(completeSentence, blankPositions);
-    
-    // Generate beberapa distractor words
+
     const commonWords = ['dan', 'atau', 'tetapi', 'karena', 'jika', 'maka', 'untuk', 'dari', 'ke', 'di', 'pada'];
     const distractorWords = commonWords.filter(word => 
       !blankWords.includes(word) && !words.includes(word)
@@ -374,7 +433,6 @@ export default function LatihanSoalPage() {
   };
 
   const saveQuestion = async (exerciseId: string, question: Question) => {
-    // Validasi dasar
     if (!userId) {
       toast.error("User ID tidak ditemukan. Silakan login ulang.");
       return;
@@ -384,7 +442,6 @@ export default function LatihanSoalPage() {
       return;
     }
 
-    // Validasi berdasarkan tipe pertanyaan
     if (question.question_type === 'multiple_choice') {
       if (question.options.some(opt => !opt.option_text.trim())) {
         toast.error("Semua pilihan jawaban harus diisi");
@@ -431,7 +488,6 @@ export default function LatihanSoalPage() {
 
       let savedOptions: any[] = [];
 
-      // Save options berdasarkan tipe pertanyaan
       if (question.question_type === 'multiple_choice' && question.options.length > 0) {
         const optionsToCreate = question.options.map(opt => ({
           question_id: savedQuestion.id,
@@ -451,7 +507,6 @@ export default function LatihanSoalPage() {
         }
         savedOptions = optionsData || [];
       } else if (question.question_type === 'sentence_arrangement' && question.sentence_arrangement_config) {
-        // Buat options untuk blank words dan distractor words
         const config = question.sentence_arrangement_config;
         const allWords = [...(config.blank_words || []), ...(config.distractor_words || [])];
         
@@ -605,7 +660,6 @@ export default function LatihanSoalPage() {
   };
 
   const deleteQuestion = async (exerciseId: string, questionId: string) => {
-    // Find the exercise and the question to delete
     const exerciseToUpdate = exerciseSets.find(ex => ex.id === exerciseId);
     const questionToDelete = exerciseToUpdate?.questions.find(q => q.id === questionId);
 
@@ -614,7 +668,6 @@ export default function LatihanSoalPage() {
       return;
     }
 
-    // If the question is not saved, remove it from local state only
     if (!questionToDelete.isSaved) {
       setExerciseSets(prev =>
         prev.map(ex =>
@@ -630,7 +683,6 @@ export default function LatihanSoalPage() {
       return;
     }
 
-    // If the question is saved, delete from the database
     setIsSaving(true);
     const { error } = await supabase.from('questions').delete().eq('id', questionId).single();
     setIsSaving(false);
@@ -641,7 +693,6 @@ export default function LatihanSoalPage() {
       return;
     }
 
-    // On successful deletion from DB, remove from local state
     setExerciseSets(prev =>
       prev.map(ex =>
         ex.id === exerciseId
@@ -706,7 +757,7 @@ export default function LatihanSoalPage() {
                   <span className="ml-1 capitalize">
                     {question.question_type === 'multiple_choice' && 'Pilihan Ganda'}
                     {question.question_type === 'essay' && 'Essay'}
-                    {question.question_type === 'sentence_arrangement' && 'Puzzle Kalimat'}
+                    {question.question_type === 'sentence_arrangement' && 'Lengkapi Kalimat'}
                   </span>
                 </Badge>
                 <div className="flex items-center gap-2">
@@ -849,7 +900,7 @@ export default function LatihanSoalPage() {
 
               {question.question_type === 'essay' && (
                 <div className="space-y-4">
-                  {/* Essay config... (kode yang sudah benar) */}
+                  {/* Essay config */}
                 </div>
               )}
 
@@ -1047,7 +1098,7 @@ export default function LatihanSoalPage() {
                       (question.question_type === 'multiple_choice' && question.options.some(opt => !opt.option_text.trim())) ||
                       (question.question_type === 'sentence_arrangement' && !question.question_text.trim())
                     }
-                    className="bg-sky-500 hover:bg-sky-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     {isSaving ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
@@ -1060,7 +1111,7 @@ export default function LatihanSoalPage() {
                   <Button
                     onClick={() => updateQuestion(exercise.id, question)}
                     disabled={isSaving}
-                    className="bg-sky-500 hover:bg-sky-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     {isSaving ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
@@ -1090,218 +1141,221 @@ export default function LatihanSoalPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 p-6">
-        <div className="max-w-7xl mx-auto">
-          <Card className="bg-white shadow-2xl border-0 rounded-2xl">
-            <CardContent className="flex items-center justify-center p-16">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mx-auto mb-4"></div>
-                <p className="text-gray-600 text-lg">Memuat latihan soal...</p>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Memuat latihan soal...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Main Card Container */}
-        <Card className="bg-white shadow-2xl border-0 rounded-2xl overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100 p-8">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => router.back()}
-                  className="hover:bg-white/50 transition-colors border-gray-300 text-gray-600 shadow-sm"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Kembali
-                </Button>
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-sky-500 rounded-full shadow-lg">
-                    <GraduationCap className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Latihan Soal</h1>
-                    <p className="text-gray-600">
-                      Buat dan kelola latihan soal untuk kelas{" "}
-                      <span className="font-semibold text-gray-800">
-                        {classroomName || "..."}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Hero Section */}
+      <div className="bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-lg">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+          <div className="flex items-center gap-4 mb-6">
+            <Button 
+              variant="ghost" 
+              onClick={() => router.back()}
+              className="hover:bg-white/20 transition-colors text-white border-0"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-3xl sm:text-4xl font-bold">Latihan Soal</h1>
+              <p className="text-blue-100 text-sm sm:text-base mt-1">
+                Kelas: <span className="font-semibold">{classroomName || "..."}</span>
+              </p>
             </div>
-          </CardHeader>
+          </div>
+        </div>
+      </div>
 
-          <CardContent className="p-8">
-            {/* Create New Exercise Section */}
-            <Card className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl mb-8">
-              <CardContent className="p-6">
-                {!isCreating ? (
-                  <div className="flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Main Content Container */}
+        <div>
+        {/* Create New Exercise Section */}
+            {!isCreating ? (
+              <Card className="bg-white border border-gray-200 shadow-sm rounded-lg mb-8 overflow-hidden">
+                <CardContent className="p-0">
+                  <button 
+                    onClick={() => setIsCreating(true)}
+                    className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-colors"
+                  >
                     <div className="flex items-center gap-4">
-                      <div className="p-3 bg-sky-500 rounded-lg shadow-md">
-                        <Plus className="h-6 w-6 text-white" />
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <Plus className="h-6 w-6 text-blue-600" />
                       </div>
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Buat Latihan Soal Baru</h3>
-                        <p className="text-gray-600">Mulai membuat set latihan soal untuk siswa</p>
+                      <div className="text-left">
+                        <h3 className="text-lg font-semibold text-gray-900">Buat Latihan Soal Baru</h3>
+                        <p className="text-sm text-gray-500 mt-1">Mulai membuat set latihan soal untuk siswa</p>
                       </div>
                     </div>
+                    <Plus className="h-5 w-5 text-gray-400" />
+                  </button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="bg-white border border-gray-200 shadow-sm rounded-lg mb-8">
+                <CardHeader className="border-b border-gray-200 pb-4">
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Plus className="h-5 w-5 text-blue-600" />
+                    </div>
+                    Buat Latihan Soal Baru
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-6">
+                  <div>
+                    <Label htmlFor="exercise-title" className="text-sm font-semibold text-gray-700 mb-2 block">
+                      Judul Latihan Soal <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="exercise-title"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="Contoh: Latihan Soal Kosakata Bab 1"
+                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-200 bg-white shadow-sm"
+                      onKeyPress={(e) => e.key === 'Enter' && createNewExercise()}
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-4 border-t border-gray-200">
                     <Button 
-                      onClick={() => setIsCreating(true)}
-                      className="bg-sky-500 hover:bg-sky-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg"
-                      size="lg"
+                      onClick={createNewExercise}
+                      disabled={!newTitle.trim() || isSaving}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
-                      <Plus className="h-5 w-5 mr-2" />
-                      Buat Baru
+                      {isSaving ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      {isSaving ? "Menyimpan..." : "Buat"}
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        setIsCreating(false);
+                        setNewTitle("");
+                      }}
+                      variant="outline"
+                      className="border-gray-300 text-gray-600 hover:bg-gray-50"
+                    >
+                      Batal
                     </Button>
                   </div>
-                ) : (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-sky-500 rounded-lg">
-                        <Plus className="h-5 w-5 text-white" />
-                      </div>
-                      <h3 className="text-xl font-semibold text-gray-900">Buat Latihan Soal Baru</h3>
-                    </div>
-                    <div>
-                      <Label className="block mb-3 text-sm font-semibold text-gray-700">Judul Latihan Soal</Label>
-                      <Input
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                        placeholder="Contoh: Latihan Soal Matematika Bab 1"
-                        className="border-gray-300 focus:border-sky-500 focus:ring-sky-200 bg-white shadow-sm text-lg py-3"
-                        onKeyPress={(e) => e.key === 'Enter' && createNewExercise()}
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <Button 
-                        onClick={createNewExercise}
-                        disabled={!newTitle.trim() || isSaving}
-                        className="bg-sky-500 hover:bg-sky-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3"
-                      >
-                        {isSaving ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        ) : (
-                          <Save className="h-4 w-4 mr-2" />
-                        )}
-                        {isSaving ? "Menyimpan..." : "Simpan"}
-                      </Button>
-                      <Button 
-                        onClick={() => {
-                          setIsCreating(false);
-                          setNewTitle("");
-                        }}
-                        variant="outline"
-                        className="border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm px-8 py-3"
-                      >
-                        Batal
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Exercise Sets List */}
-            <div className="space-y-6">
+            <div className="space-y-4">
+              {/* Filter Pertemuan */}
+              {availablePertemuan.length > 0 && (
+                <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border-2 border-blue-300 shadow-md">
+                  <Label className="font-bold text-blue-900">Pertemuan:</Label>
+                  <Select value={selectedPertemuan?.toString()} onValueChange={(val) => setSelectedPertemuan(Number(val))}>
+                    <SelectTrigger className="w-56 bg-white border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-50 cursor-pointer shadow-sm transition-all duration-200">
+                      <SelectValue placeholder="Pilih pertemuan" className="text-gray-700 font-medium" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-2 border-blue-300 shadow-lg">
+                      {availablePertemuan.map((num) => (
+                        <SelectItem 
+                          key={num} 
+                          value={num.toString()}
+                          className="cursor-pointer hover:bg-blue-100 py-2 px-3 transition-colors duration-150"
+                        >
+                          <span className="font-medium text-gray-800">Pertemuan {num}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {exerciseSets.length === 0 ? (
-                <Card className="bg-white border border-gray-100 shadow-lg rounded-xl">
+                <Card className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                   <CardContent className="p-12 text-center">
-                    <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <AlertCircle className="h-12 w-12 text-gray-400" />
+                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <AlertCircle className="h-10 w-10 text-gray-400" />
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
                       Belum Ada Latihan Soal
                     </h3>
-                    <p className="text-gray-600 mb-6">
+                    <p className="text-gray-600">
                       Mulai dengan membuat latihan soal pertama untuk siswa Anda
                     </p>
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 gap-6">
-                  {exerciseSets.map((exercise) => (
-                    <Card key={exercise.id} className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl overflow-hidden">
+                <div className="space-y-4">
+                  {exerciseSets
+                    .filter((exercise) => !selectedPertemuan || exercise.pertemuan === selectedPertemuan)
+                    .map((exercise) => (
+                    <Card key={exercise.id} id={`exercise-${exercise.id}`} className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all duration-200">
                       <div className="relative">
-                        {/* Button Delete terpisah dari AccordionTrigger */}
+                        {/* Delete button outside the clickable area */}
                         <div className="absolute top-4 right-4 z-10">
-                          <Button
-                            variant="outline"
-                            size="sm"
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteExerciseSet(exercise.id);
                             }}
-                            className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                            className="p-2 text-red-600 bg-white hover:bg-gray-100 hover:text-red-700 border border-red-200 rounded-lg transition-colors shadow-sm"
                           >
                             <Trash2 className="h-4 w-4" />
-                          </Button>
+                          </button>
                         </div>
 
-                        {/* Custom Accordion-like behavior */}
+                        {/* Clickable header */}
                         <button
-                          className="w-full text-left focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset"
+                          className="w-full text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
                           onClick={() => setEditingExercise(editingExercise === exercise.id ? null : exercise.id)}
                         >
-                          <CardHeader className="p-6 pr-16 hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-sky-100 rounded-lg flex items-center justify-center">
-                                <CheckCircle className="h-6 w-6 text-sky-600" />
+                          <CardHeader className="pb-4 pr-16 bg-gradient-to-r from-sky-600 to-blue-600 text-white hover:from-sky-700 hover:to-blue-700 transition-colors">
+                            <div className="flex items-start gap-4">
+                              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <CheckCircle className="h-6 w-6 text-white" />
                               </div>
-                              <div className="flex-1">
-                                <CardTitle className="text-xl font-semibold text-gray-900 mb-2">
+                              <div className="flex-1 min-w-0">
+                                <CardTitle className="text-lg font-semibold text-white mb-3">
                                   {exercise.judul_latihan}
                                 </CardTitle>
-                                <div className="flex items-center gap-4 flex-wrap">
-                                  <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700 px-3 py-1">
-                                    <Users className="h-4 w-4 mr-1" />
-                                    {exercise.questions.length} Pertanyaan
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge className="bg-white text-blue-600 border-0 shadow-sm font-medium">
+                                    <Users className="h-3 w-3 mr-1" />
+                                    {exercise.questions.length} Soal
                                   </Badge>
-                                  {/* Badge untuk total poin */}
-                                  <Badge variant="outline" className="border-yellow-200 bg-yellow-50 text-yellow-700 px-3 py-1">
-                                    <Star className="h-4 w-4 mr-1" />
+                                  <Badge className="bg-white text-amber-600 border-0 shadow-sm font-medium">
+                                    <Star className="h-3 w-3 mr-1" />
                                     {exercise.questions.reduce((total, q) => total + q.points, 0)} Poin
                                   </Badge>
-                                  {/* Badge untuk tipe pertanyaan */}
                                   {exercise.questions.some(q => q.question_type === 'multiple_choice') && (
-                                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 px-2 py-1">
+                                    <Badge className="bg-white text-blue-600 border-0 text-xs shadow-sm font-medium">
                                       <CheckCircle className="h-3 w-3 mr-1" />
                                       PG
                                     </Badge>
                                   )}
                                   {exercise.questions.some(q => q.question_type === 'essay') && (
-                                    <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 px-2 py-1">
+                                    <Badge className="bg-white text-green-600 border-0 text-xs shadow-sm font-medium">
                                       <FileText className="h-3 w-3 mr-1" />
                                       Essay
                                     </Badge>
                                   )}
                                   {exercise.questions.some(q => q.question_type === 'sentence_arrangement') && (
-                                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 px-2 py-1">
+                                    <Badge className="bg-white text-purple-600 border-0 text-xs shadow-sm font-medium">
                                       <Square className="h-3 w-3 mr-1" />
                                       Puzzle
                                     </Badge>
                                   )}
                                   {exercise.deadline_enabled && exercise.deadline && (
-                                    <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700 px-3 py-1">
-                                      <Clock className="h-4 w-4 mr-1" />
-                                      Deadline: {new Date(exercise.deadline).toLocaleDateString('id-ID')}
+                                    <Badge className="bg-white text-orange-600 border-0 shadow-sm font-medium">
+                                      <Clock className="h-3 w-3 mr-1" />
+                                      {new Date(exercise.deadline).toLocaleDateString('id-ID')}
                                     </Badge>
                                   )}
                                 </div>
-                              </div>
-                              <div className="text-right">
-                                <Badge className="bg-sky-500 text-white">
-                                  <Edit3 className="h-4 w-4 mr-1" />
-                                  Edit
-                                </Badge>
                               </div>
                             </div>
                           </CardHeader>
@@ -1309,7 +1363,7 @@ export default function LatihanSoalPage() {
                       </div>
                       
                       {editingExercise === exercise.id && (
-                        <CardContent className="px-6 pb-6 bg-gray-50">
+                        <CardContent className="px-6 pb-6 bg-gray-50 border-t border-gray-200">
                           <div className="space-y-6">
                             {/* Existing Questions */}
                             {exercise.questions.map((question, qIndex) => 
@@ -1317,10 +1371,10 @@ export default function LatihanSoalPage() {
                             )}
 
                             {/* Add Question Section */}
-                            <Card className="bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-xl">
+                            <Card className="bg-white border-2 border-dashed border-gray-300 rounded-lg shadow-sm">
                               <CardContent className="p-6">
                                 <div className="text-center">
-                                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Tambah Pertanyaan Baru</h4>
+                                  <h4 className="text-base font-semibold text-gray-900 mb-4">Tambah Pertanyaan Baru</h4>
                                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                                     <Button
                                       onClick={() => {
@@ -1332,7 +1386,7 @@ export default function LatihanSoalPage() {
                                         addQuestion(exercise.id, 'multiple_choice');
                                       }}
                                       disabled={isSaving || exercise.questions.some(q => !q.isSaved)}
-                                      className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex-1 sm:flex-none"
+                                      className="bg-blue-600 hover:bg-blue-700 text-white flex-1 sm:flex-none"
                                     >
                                       <CheckCircle className="h-4 w-4 mr-2" />
                                       Pilihan Ganda
@@ -1347,7 +1401,7 @@ export default function LatihanSoalPage() {
                                         addQuestion(exercise.id, 'essay');
                                       }}
                                       disabled={isSaving || exercise.questions.some(q => !q.isSaved)}
-                                      className="bg-green-500 hover:bg-green-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex-1 sm:flex-none"
+                                      className="bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none"
                                     >
                                       <FileText className="h-4 w-4 mr-2" />
                                       Essay
@@ -1362,14 +1416,14 @@ export default function LatihanSoalPage() {
                                         addQuestion(exercise.id, 'sentence_arrangement');
                                       }}
                                       disabled={isSaving || exercise.questions.some(q => !q.isSaved)}
-                                      className="bg-purple-500 hover:bg-purple-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex-1 sm:flex-none"
+                                      className="bg-purple-600 hover:bg-purple-700 text-white flex-1 sm:flex-none"
                                     >
                                       <Square className="h-4 w-4 mr-2" />
-                                      Puzzle Kalimat
+                                      Lengkapi Kalimat Rumpang
                                     </Button>
                                   </div>
                                   {exercise.questions.some(q => !q.isSaved) && (
-                                    <p className="text-sm text-orange-600 mt-2">
+                                    <p className="text-sm text-orange-600 mt-3">
                                       Simpan semua pertanyaan terlebih dahulu sebelum menambah pertanyaan baru
                                     </p>
                                   )}
@@ -1384,8 +1438,7 @@ export default function LatihanSoalPage() {
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+        </div>
       </div>
     </div>
   );
