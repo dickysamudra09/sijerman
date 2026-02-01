@@ -24,6 +24,7 @@ import {
   Edit,
   Trash2,
   ArrowLeft,
+  AlertCircle,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
@@ -54,6 +55,7 @@ export default function CreateContentPage() {
   const searchParams = useSearchParams();
   const classIdParam = searchParams.get("classId");
   const contentIdParam = searchParams.get("contentId");
+  const pertemuanParam = searchParams.get("pertemuan");
   const isEditing = !!contentIdParam;
 
   const [initialLoading, setInitialLoading] = useState(true);
@@ -68,6 +70,8 @@ export default function CreateContentPage() {
   const [editorReady, setEditorReady] = useState(false);
   const [initialKonten, setInitialKonten] = useState<string>("");
   const [initialDocuments, setInitialDocuments] = useState<{ name: string; url: string }[]>([]);
+  const [pertemuan, setPertemuan] = useState<number | null>(pertemuanParam ? parseInt(pertemuanParam) : null);
+  const [showConfirmBack, setShowConfirmBack] = useState(false);
 
   const jenis_create = watch("jenis_create");
   
@@ -232,6 +236,7 @@ export default function CreateContentPage() {
           konten: data.konten,
           documents: allDocuments,
           deadline: deadlineValue,
+          pertemuan: pertemuan || 1,
           updated_at: new Date().toISOString(),
         })
         .eq("id", contentIdParam)
@@ -256,6 +261,7 @@ export default function CreateContentPage() {
           konten: data.konten,
           documents: allDocuments,
           deadline: deadlineValue,
+          pertemuan: pertemuan || 1,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
@@ -321,38 +327,38 @@ export default function CreateContentPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header dengan gradient biru */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-6 shadow-lg">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 sm:px-6 py-4 sm:py-6 shadow-lg">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
               <Button 
-                variant="secondary" 
-                onClick={() => router.back()} 
-                className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm"
+                variant="ghost" 
+                onClick={() => setShowConfirmBack(true)} 
+                className="text-white hover:bg-white/20 h-10 w-10 p-0 flex-shrink-0"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Kembali
+                <ArrowLeft className="h-5 w-5" />
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold mb-1">{isEditing ? "Edit Konten" : "Buat Konten Baru"}</h1>
-                <p className="text-blue-100 text-sm">{className || `Kelas ${classId}`}</p>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold">{isEditing ? "Edit Konten" : "Buat Konten"}</h1>
+                <p className="text-xs sm:text-sm text-blue-100 truncate">{className}</p>
               </div>
             </div>
             {classCode && (
-              <Badge className="bg-white/20 text-white border-0 px-4 py-2 text-sm backdrop-blur-sm">
-                Kode: {classCode}
+              <Badge className="bg-white/20 text-white border-0 px-3 py-1.5 text-xs sm:text-sm flex-shrink-0 backdrop-blur-sm">
+                {classCode}
               </Badge>
             )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Button
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Quick Info Bar */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            {/* Tipe Konten */}
+            <button
               type="button"
               onClick={() => {
                 if (!isEditing) {
@@ -361,205 +367,226 @@ export default function CreateContentPage() {
                   toast.info("Tipe konten tidak dapat diubah saat mode edit.");
                 }
               }}
-              className={`w-full h-auto p-6 flex flex-col items-center justify-center text-center border-l-4 ${
-                jenis_create 
-                  ? 'bg-white border-l-blue-600 shadow-sm hover:shadow-md' 
-                  : 'bg-blue-50 border-l-blue-500 shadow-sm hover:shadow-md animate-pulse'
-              } rounded-lg transition-all duration-200`}
-              disabled={isEditing}
+              className="flex items-center gap-3 hover:bg-blue-50 p-2 rounded-lg transition-colors flex-1 sm:flex-auto text-left"
             >
-              <div className={`p-3 rounded-lg mb-3 ${jenis_create ? 'bg-blue-100' : 'bg-blue-200'}`}>
-                <FileText className={`h-6 w-6 ${jenis_create ? 'text-blue-600' : 'text-blue-700'}`} />
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <FileText className="h-5 w-5 text-blue-600" />
               </div>
-              <div className={`text-lg font-bold ${jenis_create ? 'text-blue-600' : 'text-gray-900'}`}>
-                {jenis_create || "Pilih jenis konten"}
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Tipe Konten</p>
+                <p className="text-sm font-semibold text-gray-900">{jenis_create || "Belum dipilih"}</p>
               </div>
-              <p className={`text-sm mt-1 ${jenis_create ? 'text-gray-600' : 'text-gray-700'}`}>
-                {jenis_create ? 'Tipe konten' : 'Klik untuk memilih'}
-              </p>
-            </Button>
+            </button>
 
-            <Card className="bg-white border-l-4 border-l-green-600 shadow-sm rounded-lg">
-              <CardContent className="p-6 text-center">
-                <div className="p-3 bg-green-100 rounded-lg w-fit mx-auto mb-3">
-                  <Upload className="h-6 w-6 text-green-600" />
-                </div>
-                <div className="text-2xl font-bold text-green-600">{selectedFiles.length + initialDocuments.length}/5</div>
-                <p className="text-sm text-gray-600 mt-1">Dokumen</p>
-              </CardContent>
-            </Card>
+            {/* Dokumen */}
+            <div className="flex items-center gap-3 flex-1 sm:flex-auto">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Upload className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Dokumen</p>
+                <p className="text-sm font-semibold text-gray-900">{selectedFiles.length + initialDocuments.length}/5</p>
+              </div>
+            </div>
 
-            <Card className="bg-white border-l-4 border-l-purple-600 shadow-sm rounded-lg">
-              <CardContent className="p-6 text-center">
-                <div className="p-3 bg-purple-100 rounded-lg w-fit mx-auto mb-3">
-                  <Clock className="h-6 w-6 text-purple-600" />
+            {/* Pertemuan */}
+            {pertemuan && (
+              <div className="flex items-center gap-3 flex-1 sm:flex-auto">
+                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="h-5 w-5 text-orange-600" />
                 </div>
-                <div className="text-2xl font-bold text-purple-600">Draft</div>
-                <p className="text-sm text-gray-600 mt-1">Status</p>
-              </CardContent>
-            </Card>
+                <div>
+                  <p className="text-xs text-gray-500 font-medium">Pertemuan</p>
+                  <p className="text-sm font-semibold text-orange-700">{pertemuan}</p>
+                </div>
+              </div>
+            )}
           </div>
+        </div>
 
-          {/* Form Card */}
-          <Card className="bg-white border-0 shadow-sm rounded-lg">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-3 text-gray-900 text-xl">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <BookOpen className="h-5 w-5 text-blue-600" />
-                </div>
-                Form {isEditing ? "Edit" : "Pembuatan"} Konten
-              </CardTitle>
-              <CardDescription className="text-gray-600">
-                Isi form di bawah untuk {isEditing ? "mengubah" : "membuat"} materi atau tugas
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Label htmlFor="judul" className="text-sm font-semibold text-gray-700 mb-2 block">Judul</Label>
-                    <Input 
-                      id="judul" 
-                      {...register("judul", { required: "Judul wajib diisi" })} 
-                      placeholder="Masukkan judul" 
-                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-200 h-11" 
-                    />
-                    {errors.judul && <p className="text-red-600 text-sm mt-1">{errors.judul.message}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="sub_judul" className="text-sm font-semibold text-gray-700 mb-2 block">Sub Judul</Label>
-                    <Input 
-                      id="sub_judul" 
-                      {...register("sub_judul", { required: "Sub judul wajib diisi" })} 
-                      placeholder="Masukkan sub judul" 
-                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-200 h-11" 
-                    />
-                    {errors.sub_judul && <p className="text-red-600 text-sm mt-1">{errors.sub_judul.message}</p>}
-                  </div>
-                </div>
-
+        {/* Form Card */}
+        <Card className="bg-white border border-gray-200 shadow-sm rounded-lg">
+          <CardHeader className="border-b border-gray-200 pb-4">
+            <CardTitle className="text-xl text-gray-900">
+              {isEditing ? "Edit Konten" : "Informasi Konten"}
+            </CardTitle>
+            <CardDescription className="text-gray-600 mt-1">
+              Isi formulir untuk {isEditing ? "mengubah" : "membuat"} konten pembelajaran
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {/* Judul & Sub Judul */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <input type="hidden" {...register("jenis_create", { required: "Jenis konten wajib dipilih" })} />
-                  {errors.jenis_create && <p className="text-red-600 text-sm mt-1">{errors.jenis_create.message}</p>}
-                </div>
-
-                <div>
-                  <Label htmlFor="konten" className="text-sm font-semibold text-gray-700 mb-2 block">Konten</Label>
-                  <div className="border border-gray-300 rounded-lg overflow-hidden">
-                    <Editor
-                      apiKey="ovw3rgflgzy8eequry80mjqzagd444pabxa9b0tokym3twln"
-                      initialValue={initialKonten}
-                      onInit={handleEditorInit}
-                      init={{
-                        height: 500,
-                        menubar: false,
-                        plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount',
-                        toolbar: 'undo redo | formatselect | bold italic backcolor | link image | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help | print',
-                      }}
-                      onEditorChange={handleEditorChange}
-                    />
-                  </div>
-                  {errors.konten && <p className="text-red-600 text-sm mt-1">{errors.konten.message}</p>}
-                </div>
-
-                <div>
-                  <Label className="text-sm font-semibold text-gray-700 mb-2 block">
-                    Upload Dokumen (opsional, maks 5, total 12MB)
+                  <Label htmlFor="judul" className="text-sm font-semibold text-gray-700 mb-2 block">
+                    Judul <span className="text-red-500">*</span>
                   </Label>
+                  <Input 
+                    id="judul" 
+                    {...register("judul", { required: "Judul wajib diisi" })} 
+                    placeholder="Contoh: Perkenalan Bahasa Jerman" 
+                    className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-200" 
+                  />
+                  {errors.judul && <p className="text-red-500 text-xs mt-1.5">{errors.judul.message}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="sub_judul" className="text-sm font-semibold text-gray-700 mb-2 block">
+                    Sub Judul <span className="text-red-500">*</span>
+                  </Label>
+                  <Input 
+                    id="sub_judul" 
+                    {...register("sub_judul", { required: "Sub judul wajib diisi" })} 
+                    placeholder="Contoh: Memperkenalkan diri" 
+                    className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-200" 
+                  />
+                  {errors.sub_judul && <p className="text-red-500 text-xs mt-1.5">{errors.sub_judul.message}</p>}
+                </div>
+              </div>
+
+              {/* Jenis Konten - Hidden */}
+              <input type="hidden" {...register("jenis_create", { required: "Jenis konten wajib dipilih" })} />
+              {errors.jenis_create && <p className="text-red-600 text-sm mt-1">{errors.jenis_create.message}</p>}
+
+              {/* Konten Editor */}
+              <div>
+                <Label htmlFor="konten" className="text-sm font-semibold text-gray-700 mb-3 block">
+                  Konten <span className="text-red-500">*</span>
+                </Label>
+                <div className="border border-gray-300 rounded-lg overflow-hidden hover:border-gray-400 transition-colors">
+                  <Editor
+                    apiKey="ovw3rgflgzy8eequry80mjqzagd444pabxa9b0tokym3twln"
+                    initialValue={initialKonten}
+                    onInit={handleEditorInit}
+                    init={{
+                      height: 400,
+                      menubar: false,
+                      plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount',
+                      toolbar: 'undo redo | formatselect | bold italic backcolor | link image | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help',
+                    }}
+                    onEditorChange={handleEditorChange}
+                  />
+                </div>
+                {errors.konten && <p className="text-red-500 text-xs mt-1.5">{errors.konten.message}</p>}
+              </div>
+
+              {/* Deadline */}
+              {jenis_create?.toLowerCase() === "tugas" && (
+                <div>
+                  <Label htmlFor="deadline" className="text-sm font-semibold text-gray-700 mb-2 block">
+                    Deadline <span className="text-red-500">*</span>
+                  </Label>
+                  <Input 
+                    id="deadline" 
+                    type="datetime-local" 
+                    {...register("deadline", { required: "Deadline wajib diisi untuk tugas" })} 
+                    className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-200" 
+                  />
+                  {errors.deadline && <p className="text-red-500 text-xs mt-1.5">{errors.deadline.message}</p>}
+                </div>
+              )}
+
+              {/* Dokumen Upload */}
+              <div>
+                <Label className="text-sm font-semibold text-gray-700 mb-3 block">
+                  Dokumen Pendukung <span className="text-gray-500 font-normal">(opsional)</span>
+                </Label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 hover:bg-blue-50 transition-colors">
                   <Input 
                     type="file" 
                     multiple 
                     accept=".pdf,.doc,.docx,.jpg,.png,.txt" 
-                    onChange={handleFileChange} 
-                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200" 
+                    onChange={handleFileChange}
+                    className="border-0 p-0 focus:ring-0"
                   />
-                  {fileErrors && <p className="text-red-600 text-sm mt-1">{fileErrors}</p>}
-                  
-                  {initialDocuments.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      <p className="text-sm font-medium text-gray-700">Dokumen yang sudah ada:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {initialDocuments.map((doc, index) => (
-                          <div key={index} className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded-lg flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            <span className="text-sm">{doc.name}</span>
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="sm" 
-                              className="p-0 h-auto text-red-600 hover:text-red-800 ml-1" 
-                              onClick={() => removeExistingFile(index)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {selectedFiles.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      <p className="text-sm font-medium text-gray-700">File baru yang akan diunggah:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedFiles.map((file, index) => (
-                          <div key={index} className="bg-green-50 border border-green-200 text-green-800 px-3 py-2 rounded-lg flex items-center gap-2">
-                            <Upload className="h-4 w-4" />
-                            <span className="text-sm">{file.name}</span>
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="sm" 
-                              className="p-0 h-auto text-red-600 hover:text-red-800 ml-1" 
-                              onClick={() => removeFile(index)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <p className="text-xs text-gray-500 mt-2">Maks 5 file, total 12MB</p>
                 </div>
-
-                {jenis_create.toLowerCase() === "tugas" && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <Label htmlFor="deadline" className="text-sm font-semibold text-gray-700 mb-2 block">
-                      Deadline <span className="text-red-600">*wajib diisi</span>
-                    </Label>
-                    <Input 
-                      id="deadline" 
-                      type="datetime-local" 
-                      {...register("deadline", { required: "Deadline wajib diisi untuk tugas" })} 
-                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-200 h-11" 
-                    />
-                    {errors.deadline && <p className="text-red-600 text-sm mt-1">{errors.deadline.message}</p>}
+                {fileErrors && <p className="text-red-500 text-xs mt-1.5">{fileErrors}</p>}
+                
+                {/* Existing Documents */}
+                {initialDocuments.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold text-gray-700 mb-2">Dokumen Saat Ini:</p>
+                    <div className="space-y-2">
+                      {initialDocuments.map((doc, index) => (
+                        <div key={index} className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                            <span className="text-sm text-gray-700 truncate">{doc.name}</span>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            className="p-0 h-auto text-red-500 hover:text-red-700 flex-shrink-0"
+                            onClick={() => removeExistingFile(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
+                
+                {/* New Files to Upload */}
+                {selectedFiles.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold text-gray-700 mb-2">File Baru:</p>
+                    <div className="space-y-2">
+                      {selectedFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Upload className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            className="p-0 h-auto text-red-500 hover:text-red-700 flex-shrink-0"
+                            onClick={() => removeFile(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-                <div className="pt-4">
-                  <Button 
-                    type="submit" 
-                    disabled={isSubmitting} 
-                    className="w-full bg-blue-600 text-white hover:bg-blue-700 h-12 text-base font-medium"
-                  >
-                    {isSubmitting ? (
-                      <div className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                        {isEditing ? "Memperbarui Konten..." : "Membuat Konten..."}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        {isEditing ? <Edit className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-                        {isEditing ? "Perbarui Konten" : "Buat Konten"}
-                      </div>
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+              {/* Submit Button */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowConfirmBack(true)}
+                  className="flex-1"
+                >
+                  {isEditing ? "Batalkan Edit" : "Batalkan Buat"}
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting} 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-10"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      {isEditing ? "Memperbarui..." : "Membuat..."}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {isEditing ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                      {isEditing ? "Perbarui Konten" : "Buat Konten"}
+                    </div>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Modal Pilih Jenis Konten */}
@@ -614,6 +641,41 @@ export default function CreateContentPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal Konfirmasi Kembali */}
+      <Dialog open={showConfirmBack} onOpenChange={setShowConfirmBack}>
+        <DialogContent className="bg-white max-w-md rounded-xl border-0 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-orange-600">
+              <AlertCircle className="h-6 w-6" />
+              {isEditing ? "Batalkan Edit Konten?" : "Batalkan Pembuatan Konten?"}
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 mt-2">
+              Perubahan yang belum disimpan akan hilang. Apakah Anda yakin ingin kembali?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmBack(false)}
+              className="flex-1"
+            >
+              {isEditing ? "Lanjutkan Edit" : "Lanjutkan Membuat"}
+            </Button>
+            <Button
+              onClick={() => {
+                setShowConfirmBack(false);
+                router.push(`/home/classrooms/${classId}`);
+              }}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            >
+              Batalkan
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
