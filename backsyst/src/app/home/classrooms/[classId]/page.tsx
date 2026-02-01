@@ -9,7 +9,6 @@ import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Progress } from "@/components/ui/progress";
 import {
   CheckCircle2,
   Clock,
@@ -31,7 +30,6 @@ import {
   Menu,
   Lock,
   Calendar,
-  Filter,
   X,
   ChevronRight,
   AlertCircle,
@@ -749,10 +747,10 @@ export default function ClassroomsPage() {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm border-b border-gray-200">
+      <header className="fixed top-0 left-0 right-0 z-50 shadow-sm border-b-4" style={{backgroundColor: '#1E1E1E', borderColor: '#FFD903'}}>
         <div className="px-4 lg:px-6 py-3 lg:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center">
               <Sheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="lg:hidden">
@@ -772,36 +770,77 @@ export default function ClassroomsPage() {
               </Sheet>
               
               <Link href="/home" className="flex items-center space-x-2">
-                <GraduationCap className="h-8 w-8 text-blue-600" />
-                <span className="text-xl font-semibold text-gray-900 hidden sm:inline">
+                <GraduationCap className="h-8 w-8" style={{color: '#FFD903'}} />
+                <span className="text-xl font-semibold hidden sm:inline" style={{color: '#FFD903'}}>
                   Si Jerman
                 </span>
               </Link>
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-gray-100">
-                <Bell className="h-5 w-5 text-gray-600" />
+              <input
+                type="text"
+                placeholder="Search Materi / Tugas / Soal"
+                className="hidden md:block px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 transition-all"
+                style={{
+                  backgroundColor: '#1E1E1E',
+                  borderWidth: '2px',
+                  borderStyle: 'solid',
+                  borderColor: '#FFFFFC',
+                  color: '#FFFFFC',
+                  width: '280px'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#FFD903'}
+                onBlur={(e) => e.currentTarget.style.borderColor = '#FFFFFC'}
+              />
+              <Button variant="ghost" size="icon" className="relative rounded-full border-2 transition-all" style={{borderColor: '#FFFFFC', backgroundColor: '#1E1E1E'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FFD903'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+                <Bell className="h-5 w-5" style={{color: '#FFFFFC'}} />
                 <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full border border-white"></span>
               </Button>
 
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
-                  <Button className="rounded-full bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-100 text-blue-900 font-semibold shadow-sm transition-all duration-200 cursor-pointer" size="icon">
-                    <User className="h-5 w-5 text-blue-700" />
+                  <Button 
+                    className="rounded-full border-2 font-semibold shadow-sm transition-all duration-200 cursor-pointer" 
+                    size="icon" 
+                    style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC'}} 
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FFD903'} 
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}
+                  >
+                    <User className="h-5 w-5" style={{color: '#FFFFFC'}} />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-white border-2 border-blue-300 shadow-lg">
-                  <DropdownMenuLabel className="text-blue-900 font-bold">{userName}</DropdownMenuLabel>
+                <DropdownMenuContent align="end" className="w-56 bg-white border-2 shadow-lg" style={{borderColor: '#FFD903'}}>
+                  <DropdownMenuLabel className="font-bold" style={{color: '#1E1E1E'}}>{userName}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href={userRole === "teacher" ? "/home/teacher" : "/home/student"} className="flex items-center cursor-pointer hover:bg-blue-50">
-                      <Home className="mr-2 h-4 w-4 text-blue-600" />
+                    <Link 
+                      href={userRole === "teacher" ? "/home/teacher" : "/home/student"} 
+                      className="flex items-center cursor-pointer" 
+                      style={{transition: 'all 0.2s'}} 
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#FFD903';
+                        const icon = e.currentTarget.querySelector('svg');
+                        if(icon) (icon as unknown as HTMLElement).style.color = '#1E1E1E';
+                      }} 
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        const icon = e.currentTarget.querySelector('svg');
+                        if(icon) (icon as unknown as HTMLElement).style.color = '#FFD903';
+                      }}
+                    >
+                      <Home className="mr-2 h-4 w-4" style={{color: '#FFD903', transition: 'all 0.2s'}} />
                       <span className="text-gray-800">Kelas</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer hover:bg-red-50">
+                  <DropdownMenuItem 
+                    onClick={handleLogout} 
+                    className="text-red-600 cursor-pointer" 
+                    style={{transition: 'all 0.2s'}} 
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FFD903'} 
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
                     <LogOut className="mr-2 h-4 w-4" />
                     Keluar
                   </DropdownMenuItem>
@@ -810,62 +849,76 @@ export default function ClassroomsPage() {
             </div>
           </div>
           
-          {/* Class Info & Progress */}
+          {/* Class Info with Stats Cards */}
           <div className="mt-3 lg:mt-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-3">
-              <div className="flex-1 min-w-0">
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{classroom.name}</h1>
-                <p className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-1">{classroom.description}</p>
-              </div>
-              
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">Progress</p>
-                  <p className="text-xl sm:text-2xl font-bold text-blue-600">{overallProgress}%</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+              <div className="flex items-center gap-3">
+                {/* Back Button */}
+                <Button
+                  variant="outline"
+                  className="flex-shrink-0 hover:opacity-80 border-0 w-10 h-12 p-0"
+                  onClick={() => router.push(userRole === "teacher" ? "/home/teacher" : "/home/student")}
+                  style={{backgroundColor: '#FFD903'}}
+                >
+                  <ChevronRight className="h-5 w-5 rotate-180" style={{color: '#1E1E1E'}} />
+                </Button>
+                
+                {/* Class Icon */}
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md" style={{backgroundColor: '#FFFFFC'}}>
+                  <GraduationCap className="h-6 w-6" style={{color: '#1E1E1E'}} />
                 </div>
-                <div className="w-24 sm:w-28">
-                  <Progress value={overallProgress} className="h-2" />
+                
+                {/* Class Title */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs mb-0.5 mt-1" style={{color: '#FFFFFC'}}>Kelas</p>
+                  <h1 className="text-xl sm:text-2xl font-bold" style={{color: '#FFFFFC'}}>{classroom.name}</h1>
                 </div>
               </div>
-            </div>
-            
-            {/* Filter Menu */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-3 mt-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push(userRole === "teacher" ? "/home/teacher" : "/home/student")}
-                className="flex items-center gap-1 flex-shrink-0 text-xs sm:text-sm bg-white text-gray-700 hover:bg-gray-100 border-gray-300"
-              >
-                <ChevronRight className="h-4 w-4 rotate-180" />
-                <span className="hidden sm:inline">Kembali</span>
-              </Button>
-              <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
-              {[
-                { key: "all" as FilterType, label: "Semua", icon: null },
-                { key: "materi" as FilterType, label: "Materi", icon: BookOpen },
-                { key: "tugas" as FilterType, label: "Tugas", icon: FileText },
-                { key: "latihan" as FilterType, label: "Latihan Soal", icon: Target }
-              ].map((filter) => {
-                const Icon = filter.icon;
-                return (
-                  <Button
-                    key={filter.key}
-                    variant={activeFilter === filter.key ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setActiveFilter(filter.key)}
-                    className={`flex items-center gap-1 flex-shrink-0 text-xs sm:text-sm ${
-                      activeFilter === filter.key
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "bg-white text-gray-700 hover:bg-gray-100"
-                    }`}
-                  >
-                    {Icon && <Icon className="h-4 w-4" />}
-                    <span className="hidden sm:inline">{filter.label}</span>
-                    <span className="sm:hidden">{filter.label.split(' ')[0]}</span>
-                  </Button>
-                );
-              })}
+
+              {/* Right: Stats Cards */}
+              <div className="grid grid-cols-3 gap-3">
+                <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0A0A0A'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1E1E1E'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
+                  <CardContent className="px-3 py-4 h-full flex items-center">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: 'transparent'}}>
+                        <Users className="h-6 w-6" style={{color: '#FFD903'}} />
+                      </div>
+                      <div>
+                        <p className="text-xs" style={{color: '#FFFFFC'}}>Siswa</p>
+                        <h3 className="text-xl font-bold" style={{color: '#FFD903'}}>{classroom.students.length}</h3>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0A0A0A'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1E1E1E'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
+                  <CardContent className="px-3 py-4 h-full flex items-center">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: 'transparent'}}>
+                        <BookOpen className="h-6 w-6" style={{color: '#FFD903'}} />
+                      </div>
+                      <div>
+                        <p className="text-xs" style={{color: '#FFFFFC'}}>Pertemuan</p>
+                        <h3 className="text-xl font-bold" style={{color: '#FFD903'}}>{meetings.length}</h3>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0A0A0A'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1E1E1E'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
+                  <CardContent className="px-3 py-4 h-full flex items-center">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: 'transparent'}}>
+                        <FileText className="h-6 w-6" style={{color: '#FFD903'}} />
+                      </div>
+                      <div>
+                        <p className="text-xs" style={{color: '#FFFFFC'}}>Konten</p>
+                        <h3 className="text-xl font-bold" style={{color: '#FFD903'}}>{contents.length}</h3>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </div>
@@ -901,51 +954,6 @@ export default function ClassroomsPage() {
                   {activeFilter === "tugas" && "Tugas"}
                   {activeFilter === "latihan" && "Latihan Soal"}
                 </span>
-              </div>
-
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-10">
-                <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Users className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs text-gray-600">Siswa</p>
-                        <h3 className="text-lg sm:text-xl font-bold text-gray-900">{classroom.students.length}</h3>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <BookOpen className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs text-gray-600">Pertemuan</p>
-                        <h3 className="text-lg sm:text-xl font-bold text-gray-900">{meetings.length}</h3>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <FileText className="h-5 w-5 text-purple-600" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs text-gray-600">Konten</p>
-                        <h3 className="text-lg sm:text-xl font-bold text-gray-900">{contents.length}</h3>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
 
               {/* Create Button for Teacher */}
