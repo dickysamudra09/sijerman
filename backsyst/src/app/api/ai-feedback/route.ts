@@ -1,19 +1,116 @@
 import { createClient } from '@supabase/supabase-js';
-import OpenAI from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-});
+async function callGroqAPI(prompt: string): Promise<string> {
+  if (!GROQ_API_KEY) {
+    console.warn('Groq API key not configured, will use local analysis');
+    return '';
+  }
+
+  try {
+    console.log('Calling Groq API...');
+    
+    const response = await fetch(GROQ_API_URL, {
+      headers: { 
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      method: 'POST',
+      body: JSON.stringify({ 
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert German language tutor for A1-A2 level students. Provide detailed, constructive feedback in Indonesian.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 6000,
+        top_p: 0.9
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Groq API error:', response.status, response.statusText);
+      console.error('Error details:', errorData);
+      
+      if (response.status === 429) {
+        console.error('Rate limit hit! Retry after:', response.headers.get('retry-after'));
+        throw new Error('API rate limit exceeded - please try again in a moment');
+      }
+      
+      return '';
+    }
+
+    const result = await response.json() as any;
+    const content = result.choices?.[0]?.message?.content || '';
+    
+    if (!content) {
+      console.warn('Empty response from Groq API');
+      return '';
+    }
+    
+    console.log('Groq API response received successfully');
+    console.log('Response content length:', content.length, 'characters');
+    
+
+    if (content.length > 100) {
+      const lastChars = content.slice(-20);
+      console.log('Last 20 characters:', lastChars);
+    }
+    
+    return content;
+  } catch (error) {
+    console.error('Groq API call failed:', error);
+    return '';
+  }
+}
+
+function countSentences(text: string): number {
+  if (!text) return 0;
+  const sentences = text.split(/[.!?]+(?=\s|$)/).filter(s => s.trim().length > 0);
+  return sentences.length;
+}
+
+function validateFeedbackLength(text: string): { valid: boolean; count: number; message: string } {
+  const count = countSentences(text);
+  const MIN_SENTENCES = 60;
+  const MAX_SENTENCES = 120;
+  
+  if (count < MIN_SENTENCES) {
+    return {
+      valid: false,
+      count,
+      message: `Feedback terlalu pendek: ${count} kalimat (minimum 60 kalimat)`
+    };
+  }
+  
+  if (count > MAX_SENTENCES) {
+    return {
+      valid: false,
+      count,
+      message: `Feedback terlalu panjang: ${count} kalimat (maksimal 120 kalimat)`
+    };
+  }
+  
+  return {
+    valid: true,
+    count,
+    message: `Feedback memenuhi requirement: ${count} kalimat (60-120)`
+  };
+}
 
 const GERMAN_REFERENCES = {
   grammar: [
@@ -159,14 +256,12 @@ function selectRelevantReferences(
     ...GERMAN_REFERENCES.conjugation
   ];
 
-  // Untuk essay, tambahkan referensi khusus essay
   if (questionType === 'essay') {
     allRefs = [...allRefs, ...GERMAN_REFERENCES.essay];
   }
 
   const searchTerms = `${questionText} ${correctAnswerText} ${selectedAnswerText}`.toLowerCase();
 
-  // Enhanced keyword matching for better reference selection
   const grammarKeywords = ['verb', 'artikel', 'grammar', 'konjugation', 'deklinasi', 'kasus', 'nominativ', 'akkusativ', 'dativ'];
   const vocabularyKeywords = ['wort', 'vocabulary', 'bedeutung', 'wörterbuch', 'kosakata'];
   const essayKeywords = ['essay', 'schreiben', 'text', 'struktur', 'aufsatz'];
@@ -177,23 +272,19 @@ function selectRelevantReferences(
 
   let prioritizedRefs = [];
 
-  // Prioritize grammar references for detailed grammar feedback
   if (hasGrammarIssues) {
     prioritizedRefs.push(...GERMAN_REFERENCES.grammar.slice(0, 1));
     prioritizedRefs.push(...GERMAN_REFERENCES.conjugation.slice(0, 1));
   }
 
-  // Add vocabulary reference if vocabulary issues detected
   if (hasVocabularyIssues) {
     prioritizedRefs.push(...GERMAN_REFERENCES.vocabulary.slice(0, 1));
   }
 
-  // Add essay reference for essay questions
   if (hasEssayIssues) {
     prioritizedRefs.push(...GERMAN_REFERENCES.essay.slice(0, 1));
   }
 
-  // Fill remaining slots with most relevant references
   const scoredRefs = allRefs.map(ref => {
     const score = ref.keywords.reduce((acc, keyword) => {
       return acc + (searchTerms.includes(keyword.toLowerCase()) ? 1 : 0);
@@ -211,7 +302,6 @@ function selectRelevantReferences(
     prioritizedRefs.push(...additionalRefs);
   }
 
-  // Ensure we always return exactly 3 references
   if (prioritizedRefs.length === 0) {
     if (questionType === 'essay') {
       return [
@@ -231,7 +321,7 @@ function selectRelevantReferences(
   return prioritizedRefs.slice(0, 3).map(({ title, url, description }) => ({ title, url, description }));
 }
 
-async function generateAIFeedbackWithClaude(
+async function generateAIFeedbackWithGroq(
   question: Question,
   studentAnswerText: string,
   correctAnswerText: string,
@@ -240,9 +330,6 @@ async function generateAIFeedbackWithClaude(
   const startTime = Date.now();
 
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('Claude API key is not configured');
-    }
 
     const relevantReferences = selectRelevantReferences(
       question.question_text,
@@ -252,82 +339,56 @@ async function generateAIFeedbackWithClaude(
     );
 
     const prompt = `
-Sebagai tutor bahasa Jerman yang berpengalaman di level A1-A2, berikan feedback yang SANGAT DETAIL untuk jawaban essay siswa:
+Kamu tutor bahasa Jerman A1-A2 yang ekspresif & genuine! Tone: natural, ada emoji, encouraging tapi tidak kaku 🎯
 
 Pertanyaan: "${question.question_text}"
 Jawaban siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
-Status: ${isCorrect ? 'Benar' : 'Perlu perbaikan'}
+Status: ${isCorrect ? 'Oke!' : 'Tidak apa apa, mari perbaiki'}
 
-ANALISIS YANG HARUS DILAKUKAN:
-1. **Grammar Check (Tata Bahasa):**
-   - Periksa konjugasi kata kerja (verb conjugation) - apakah sesuai dengan subjek dan tense?
-   - Analisis deklinasi kata benda (noun declension) - Nominativ, Akkusativ, Dativ, Genitiv
-   - Periksa posisi kata kerja dalam kalimat (V2 rule, subordinate clauses)
-   - Analisis penggunaan modal verbs dan auxiliary verbs
-
-2. **Artikel Check (der/die/das):**
-   - Periksa setiap artikel definit dan indefinit
-   - Analisis apakah artikel sesuai dengan gender (maskulin/feminin/netral)
-   - Periksa perubahan artikel sesuai kasus (Nominativ/Akkusativ/Dativ/Genitiv)
-
-3. **Vocabulary & Word Order:**
-   - Periksa ketepatan pemilihan kosakata
-   - Analisis word order (Subjek-Verb-Objek atau variasi lainnya)
-   - Periksa penggunaan preposisi yang tepat
-
-4. **Sentence Structure:**
-   - Analisis struktur kalimat sederhana vs kompleks
-   - Periksa penggunaan konjungsi (und, aber, oder, denn, etc.)
-
+CARA FEEDBACK:
 ${isCorrect
-      ? 'Meskipun jawaban benar, berikan analisis detail pada setiap aspek di atas dan saran spesifik untuk peningkatan.'
-      : 'Identifikasi SETIAP kesalahan grammar, artikel, dan vocabulary secara spesifik dengan contoh perbaikan.'}
+      ? `JAWABAN BENAR 💯:
+  - Start ekspresif: "Wah keren! 😎" atau "Tepat banget! ✨" atau "Ini jawaban yang solid! 👌"
+  - Jelasin kenapa benar (konkret, singkat)
+  - Komplimen: apa yang mereka kuasai
+  - Saran advanced? Optional saja
+  - Ending: "Terus gini! 💪" atau "Mantap!" bukan "Terus semangat"`
+      : `JAWABAN PERLU PERBAIKAN 🤔:
+  - Start apresiasi-expressive: "Tidak apa apa! 😊" atau "Hampir saja! 👀" atau "Bagus dicoba, tapi mari..."
+  - Jelaskan GENTLE: "Yang benar sih..." bukan "Kamu salah"
+  - Analisis: apa kurangnya? Contoh konkret
+  - Ending: "Dengan latihan pasti click! 💡" atau "Next time kamu bisa! 🚀"`}
 
-CONTOH FORMAT FEEDBACK DETAIL:
-• **Grammar**: "Kata kerja 'haben' seharusnya 'hat' untuk subjek 'er/sie/es'"
-• **Artikel**: "Penggunaan 'der' seharusnya 'die' karena 'Familie' adalah feminin"
-• **Word Order**: "Dalam kalimat subordinate, verb harus di akhir"
-• **Vocabulary**: "Kata 'groß' lebih tepat daripada 'big' untuk mendeskripsikan ukuran"
+CHECKLIST ANALISIS:
+• Grammar: Konjugasi verb? Artikel tepat? Word order German?
+• Vocabulary: Kata sesuai konteks? Ada yang lebih natural?
+• Flow: Kalimat logis & mudah dipahami?
 
-Berikan response dalam format JSON yang valid tanpa markdown formatting:
-
+FORMAT RESPONSE (JSON - NO markdown):
 {
-  "feedback_text": "feedback utama dalam bahasa Indonesia yang mencakup poin-poin grammar dan artikel utama (maksimal 150 kata)",
-  "explanation": "analisis SANGAT DETAIL dengan bullet points (•) untuk SETIAP aspek: Grammar, Artikel, Vocabulary, Structure. Berikan contoh spesifik dan koreksi untuk setiap kesalahan yang ditemukan (maksimal 300 kata)"
+  "feedback_text": "Feedback ekspresif dengan emoji (maks 150 kata). Buat siswa smile/termotivasi!",
+  "explanation": "Analisis detail dengan • bullets (maks 300 kata). Tone: natural, bukan academic kaku!"
 }`;
 
-    console.log('Sending request to Claude with prompt length:', prompt.length);
+    console.log('Calling Groq API...');
 
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022', // Updated to current available model
-      max_tokens: 2000, // Increased for detailed contextual analysis
-      temperature: 0.1, // Very low for consistent analytical approach
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    });
-
-    console.log('Claude response received:', response);
-
-    const aiContent = response.content[0].type === 'text' ? response.content[0].text : '';
+    const aiContent = await callGroqAPI(prompt);
+    
     if (!aiContent) {
-      throw new Error('No content received from Claude');
+      throw new Error('No response from Groq, will use local analysis');
     }
 
-    console.log('Raw Claude content:', aiContent);
+    console.log('Groq response received');
+
+    console.log('Raw Groq content:', aiContent);
 
     let parsedContent: any;
     try {
-      // Clean the content more thoroughly
+    
       let cleanContent = aiContent.trim();
-      
-      // Remove any markdown code blocks
+
       cleanContent = cleanContent.replace(/```(?:json)?\s*|\s*```/g, '');
-      
-      // Find JSON content between braces
+
       const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         cleanContent = jsonMatch[0];
@@ -336,16 +397,14 @@ Berikan response dalam format JSON yang valid tanpa markdown formatting:
       console.log('Cleaned content for parsing:', cleanContent);
       
       parsedContent = JSON.parse(cleanContent);
-      
-      // Validate required fields
+
       if (!parsedContent.feedback_text || !parsedContent.explanation) {
         throw new Error('Missing required fields in Claude response');
       }
       
     } catch (parseError) {
       console.error('Parse error, attempting manual extraction. Raw content:', aiContent);
-      
-      // Manual extraction as fallback
+
       const feedbackMatch = aiContent.match(/"feedback_text":\s*"([^"]+)"/);
       const explanationMatch = aiContent.match(/"explanation":\s*"([^"]+)"/);
       
@@ -355,7 +414,6 @@ Berikan response dalam format JSON yang valid tanpa markdown formatting:
           explanation: explanationMatch[1]
         };
       } else {
-        // Ultimate fallback - create structured response from raw content
         const lines = aiContent.split('\n').filter(line => line.trim());
         parsedContent = {
           feedback_text: isCorrect ? 
@@ -375,12 +433,14 @@ Berikan response dalam format JSON yang valid tanpa markdown formatting:
         explanation: parsedContent.explanation || "Penjelasan tidak tersedia",
         reference_materials: relevantReferences,
         processing_time_ms: processingTime,
-        ai_model: response.model || 'claude-3-5-sonnet',
+        ai_model: 'groq-llama-3.1-8b-instant',
       }
     };
   } catch (error: unknown) {
-    console.error('Claude Feedback generation error:', error);
+    console.error('Groq Feedback generation error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.log('Falling back to local analysis due to:', errorMessage);
+    console.error('Error Stack:', error instanceof Error ? error.stack : 'No stack trace');
 
     const fallbackReferences = [
       GERMAN_REFERENCES.essay[0],
@@ -388,13 +448,11 @@ Berikan response dalam format JSON yang valid tanpa markdown formatting:
       GERMAN_REFERENCES.vocabulary[0]
     ].map(({ title, url, description }) => ({ title, url, description }));
 
-    // Create detailed fallback feedback based on actual content analysis
     const analyzeStudentText = (text: string, questionText: string) => {
       const analysisPoints = [];
       const text_lower = text.toLowerCase();
       const question_lower = questionText.toLowerCase();
-      
-      // Analyze content relevance
+
       const questionKeywords = question_lower.split(' ').filter(word => word.length > 3);
       const answerKeywords = text_lower.split(' ').filter(word => word.length > 3);
       const relevantKeywords = questionKeywords.filter(keyword => 
@@ -407,28 +465,24 @@ Berikan response dalam format JSON yang valid tanpa markdown formatting:
         analysisPoints.push("• RELEVANSI: Jawaban kurang spesifik menjawab pertanyaan yang diajukan");
       }
       
-      // Analyze grammar patterns
       const sentences = text.split(/[.!?]+/).filter(s => s.trim());
       if (sentences.length > 0) {
-        // Check for verb conjugation patterns
+
         if (text_lower.includes('ich ') && (text_lower.includes(' bin') || text_lower.includes(' habe') || text_lower.includes(' ist'))) {
           analysisPoints.push("• GRAMMAR: Periksa konjugasi - 'ich' menggunakan 'bin', 'habe', bukan 'ist'");
         }
         
-        // Check for article usage
         const articleMatches = text.match(/\b(der|die|das|ein|eine|einen|einem|einer)\b/gi);
         if (articleMatches && articleMatches.length > 0) {
           analysisPoints.push(`• ARTIKEL: Ditemukan ${articleMatches.length} artikel - pastikan sesuai gender kata benda (${articleMatches.slice(0, 3).join(', ')})`);
         } else if (text.length > 20) {
           analysisPoints.push("• ARTIKEL: Pertimbangkan penggunaan artikel definit/indefinit dalam kalimat");
         }
-        
-        // Check sentence structure
+
         if (sentences.length > 1) {
           analysisPoints.push("• STRUCTURE: Kalimat majemuk terdeteksi - periksa penggunaan konjungsi dan word order");
         }
         
-        // Analyze vocabulary complexity
         const words = text.split(/\s+/).filter(word => word.length > 0);
         if (words.length > 10) {
           analysisPoints.push("• VOCABULARY: Jawaban cukup panjang - pastikan setiap kata tepat untuk konteks pertanyaan");
@@ -473,9 +527,6 @@ async function generateAIFeedback(
   const startTime = Date.now();
 
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OpenAI API key is not configured');
-    }
 
     const relevantReferences = selectRelevantReferences(
       question.question_text,
@@ -488,98 +539,309 @@ async function generateAIFeedback(
     
     if (question.question_type === 'sentence_arrangement') {
       prompt = `
-Sebagai tutor bahasa Jerman yang berpengalaman di level A1-A2, berikan feedback untuk jawaban siswa pada soal Isian Celah:
+Kamu adalah expert German teacher untuk siswa level A1-A2 yang memberikan SATU NARASI FEEDBACK LENGKAP untuk soal sentence arrangement/puzzle mengisi celah kalimat!
+
+KONTEKS SOAL:
+Pertanyaan: "${question.question_text}"
+Jawaban siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
+Jawaban benar: "${correctAnswerText || 'Tidak diketahui'}"
+Status: ${isCorrect ? 'CORRECT!' : 'INCORRECT'}
+
+INSTRUKSI - BUAT SATU NARASI LENGKAP:
+
+Mulai dengan REAKSI AWAL yang natural dan encouraging, kemudian jelaskan dengan DETAIL:
+
+REAKSI (Baris pertama - singkat, encouraging):
+   ${isCorrect 
+     ? `Berikan pujian authentic atas jawaban yang benar` 
+     : `Appreciate usaha mereka dengan gentle correction`}
+
+ANALISIS LENGKAP yang mengalir:
+   • Urutan kata (word order) dalam kalimat German - apakah V2/V-final benar?
+   • Grammar: verb conjugation, case endings (Nominatif/Akkusativ/Dativ)
+   • Vocabulary: apakah kata yang dipilih natural dan sesuai konteks?
+   • Structure: apakah penempatan kata/frasa sudah tepat?
+
+PENJELASAN SPESIFIK:
+   ${isCorrect
+     ? `Highlight part mana yang PALING TRICKY dari struktur ini
+      Explain WHY ini adalah jawaban yang CORRECT
+      Give 1 contoh kalimat lain dengan pattern yang sama
+      Share 1 common mistake yang sering students buat`
+     : `Jelaskan SPECIFICALLY MENGAPA jawaban siswa salah
+      Jelaskan apa yang SEHARUSNYA dan WHY (konkret!)
+      Show struktur/pattern yang benar dengan example
+      Give 2 contoh lain dengan pattern yang sama
+      Share tips khusus untuk soal serupa di masa depan`}
+
+FORMAT OUTPUT (JSON):
+{
+  "feedback_text": "SATU NARASI LENGKAP feedback (bukan 2 bagian, tapi satu cerita utuh yang mengalir dari reaksi → analisis → contoh). Natural tone, encouraging, specific. MINIMUM 60 KALIMAT, MAKSIMAL 120 KALIMAT."
+}
+
+CRITICAL: 
+- Return ONLY 1 field: "feedback_text" yang berisi SATU NARASI LENGKAP
+- WAJIB: Antara 60-120 kalimat (jumlah kalimat penting!)
+- NO "explanation" field, NO terpisah-pisah
+- Tone: Natural, friendly, encouraging, specific examples
+- Struktur: Reaksi → Analisis → Contoh → Tips (MENGALIR seperti percakapan)
+- Return ONLY valid JSON!`;
+    } else if (question.question_type === 'multiple_choice' || question.question_type === 'true_false') {
+      prompt = `
+Kamu adalah expert German teacher untuk siswa level A1-A2 yang memberikan SATU NARASI FEEDBACK LENGKAP, DETAIL, EDUKATIF & MOTIVATIF untuk soal pilihan ganda!
+
+KONTEKS SOAL LENGKAP:
+Tipe soal: ${question.question_type === 'multiple_choice' ? 'Multiple Choice (Pilihan Ganda)' : 'True/False'}
+Pertanyaan: "${question.question_text}"
+Jawaban siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
+Jawaban BENAR: "${correctAnswerText || 'Tidak diketahui'}"
+Status: ${isCorrect ? 'CORRECT!' : 'INCORRECT'}
+
+INSTRUKSI - BUAT SATU NARASI LENGKAP, EDUKATIF & MOTIVATIF:
+
+KHUSUS UNTUK JAWABAN SALAH - Feedback harus lebih DETAIL dengan:
+${!isCorrect ? `
+REAKSI ENCOURAGEMENT (Baris pertama):
+   • Appreciate usaha mereka dengan genuine dan gentle
+   • Jangan membuat mereka merasa buruk, tapi motivatif
+
+ANALISIS DETAIL MENGAPA JAWABAN SALAH:
+   • Apa KONSEP GRAMMAR/VOCAB yang di-test soal ini?
+   • JAWABAN SISWA mengapa SALAH? Jelaskan dengan konkret & spesifik
+   • Apa GRAMMAR/VOCAB RULE yang dilanggar atau tidak tepat?
+   • JAWABAN BENAR mengapa TEPAT? Jelaskan rule/concept-nya
+
+PENJELASAN PERBEDAAN KONKRET:
+   • Bandingkan langsung: "Jawaban Anda mengatakan [X], tapi seharusnya [Y] karena..."
+   • Jelaskan RULE/CONCEPT yang digunakan dalam jawaban benar
+   • Beri 1-2 contoh KALIMAT LAIN yang menggunakan rule yang sama
+   • Highlight common mistakes: "Banyak students buat kesalahan ini karena..."
+
+TIPS UNTUK IMPROVE:
+   • Apa yang perlu diingat untuk avoid kesalahan serupa
+   • Gimme strategy atau tips untuk identify jawaban benar di soal serupa
+   • Encourage mereka untuk terus berlatih
+
+TONE KHUSUS UNTUK JAWABAN SALAH:
+• Gentle & supportive (tidak critical)
+• Motivating ("Ini bagian dari process belajar!")
+• Clear & specific (bukan vague)
+• Constructive (fokus improvement, bukan kesalahan)
+` : `
+REAKSI (Pujian authentic):
+   • Celebrate jawaban mereka yang benar
+   • Highlight konsep mana yang mereka kuasai dengan baik
+
+PENJELASAN SINGKAT:
+   • Kenapa jawaban ini CORRECT
+   • Konsep grammar/vocab apa yang tepat
+   • Why other options wrong (brief)
+
+TIPS & CONTOH:
+   • 1-2 contoh kalimat lain dengan pattern yang sama
+   • Tips untuk confident di soal serupa
+`}
+
+FORMAT OUTPUT (JSON):
+{
+  "feedback_text": "SATU NARASI LENGKAP feedback yang DETAIL, EDUKATIF & MOTIVATIF. Untuk jawaban salah: analisis → perbedaan konkret → examples → tips. Untuk benar: lebih singkat tapi jelas. MINIMUM 60 KALIMAT, MAKSIMAL 120 KALIMAT."
+}
+
+CRITICAL REQUIREMENTS:
+- Return ONLY "feedback_text" field
+- WAJIB: Antara 60-120 kalimat (jumlah kalimat sangat penting!)
+- TONE: Motivatif & encouraging bahkan untuk jawaban salah
+- CONTENT: Spesifik & akurat (reference actual concepts)
+- STRUCTURE: Mengalir seperti percakapan dengan guru
+- DETAIL: Especially untuk jawaban SALAH - explain deeply why & how to improve
+- Return ONLY valid JSON!`;
+    } else if (question.question_type === 'essay') {
+      prompt = `
+Kamu adalah expert German teacher untuk siswa level A1-A2 yang memberikan SATU NARASI FEEDBACK LENGKAP untuk soal essay!
+
+KONTEKS SOAL:
+Pertanyaan: "${question.question_text}"
+Jawaban siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
+Jawaban ideal: "${correctAnswerText || 'Tidak diketahui'}"
+Status: ${isCorrect ? 'GOOD!' : 'PERLU PERBAIKAN'}
+
+INSTRUKSI - BUAT SATU NARASI LENGKAP & DETAIL:
+
+Mulai dengan REAKSI AWAL yang natural, kemudian jelaskan dengan DETAIL:
+
+REAKSI (Baris pertama - singkat, encouraging):
+   ${isCorrect 
+     ? `Berikan pujian authentic atas essay yang bagus` 
+     : `Appreciate usaha mereka dengan gentle constructive feedback`}
+
+ANALISIS LENGKAP yang mengalir:
+   • Apa yang BAGUS dari jawaban mereka? (spesifik!)
+   • Apa yang PERLU diperbaiki? (be gentle but specific!)
+   • Grammar issues (if any): verb conjugation, case, word order, sentence structure
+   • Vocabulary: apakah word choices natural dan sesuai context?
+   • Content/Ideas: apakah answering the question dengan lengkap?
+   • Struktur: apakah ada paragraph breaks, flow yang jelas?
+
+PENJELASAN SPESIFIK:
+   ${isCorrect
+     ? `Highlight apa yang impressive dari essay ini (grammar, vocabulary, ideas)
+      Share 1-2 examples dari essay mereka yang bagus
+      Give suggestion untuk level yang lebih advanced
+      Encourage untuk terus write more!`
+     : `Point out SPECIFIC grammar/vocab errors dengan gentle explanation
+      Show how to correct mereka dengan contoh konkret
+      Explain vocabulary/grammar rules yang violated
+      Give tips untuk improve essay next time
+      Share positive aspects juga untuk encourage!`}
+
+FORMAT OUTPUT (JSON):
+{
+  "feedback_text": "SATU NARASI LENGKAP feedback essay yang konstruktif, encouraging, DETAIL. Highlight strengths & areas for improvement dengan spesifik. MINIMUM 60 KALIMAT, MAKSIMAL 120 KALIMAT."
+}
+
+CRITICAL: 
+- Return ONLY 1 field: "feedback_text" yang berisi SATU NARASI LENGKAP
+- WAJIB: Antara 60-120 kalimat`;
+    } else {
+      prompt = `
+Kamu adalah tutor bahasa Jerman yang sangat supportive untuk siswa level A1-A2!
 
 Pertanyaan: "${question.question_text}"
 Jawaban siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
 Jawaban yang benar: "${correctAnswerText || 'Tidak diketahui'}"
-Status: ${isCorrect ? 'Benar' : 'Salah'}
+Status: ${isCorrect ? 'Benar!' : 'Perlu perbaikan'}
 
-${isCorrect
-        ? 'Berikan pujian singkat dan penjelasan mengapa jawaban tersebut benar.'
-        : 'Jelaskan mengapa jawaban siswa salah dan berikan pemahaman yang jelas tentang konsep yang benar.'}
+INSTRUKSI - BUAT SATU NARASI FEEDBACK LENGKAP:
 
-PENTING untuk soal Isian Celah:
-- Fokus pada konsep bahasa Jerman yang spesifik (grammar, vocabulary, dll).
-- Jelaskan mengapa kata/urutan yang benar penting dalam konteks kalimat tersebut.
-- Berikan penjelasan yang mudah dipahami untuk level A1-A2.
-- WAJIB: Di bagian explanation, sertakan kalimat lengkap yang benar dengan format: "**Kalimat yang benar:** <span style='font-size: 1.2em; font-weight: bold; color: #059669;'>${correctAnswerText}</span>"
-- Gunakan contoh-contoh sederhana jika memungkinkan.
-- JANGAN menyebutkan URL atau link dalam response.
+Tulis feedback sebagai SATU CERITA MENGALIR yang:
+1. Mulai dengan REAKSI natural dan encouraging
+2. Jelaskan detail analysis (grammar, vocab, structure)
+3. Berikan contoh konkret
+4. Akhiri dengan motivasi/tips
 
-Format response dalam JSON yang VALID:
+Tone: Friendly, supportive, NOT robotic. Buat siswa merasa:
+- Didukung dan tidak dihakimi
+- Bangga dengan usahanya  
+- Termotivasi untuk belajar lebih
+
+FORMAT OUTPUT (JSON):
 {
-  "feedback_text": "feedback utama dalam bahasa Indonesia (maksimal 100 kata)",
-  "explanation": "penjelasan detail konsep dalam bahasa Indonesia (maksimal 150 kata), WAJIB menyertakan highlighted answer di akhir"
-}`;
-    } else {
-      prompt = `
-Sebagai tutor bahasa Jerman yang berpengalaman di level A1-A2, berikan feedback untuk jawaban siswa:
+  "feedback_text": "SATU NARASI LENGKAP feedback (reaksi → analisis → contoh → tips) yang mengalir seperti percakapan dengan guru. 300-400 words."
+}
 
-Pertanyaan: "${question.question_text}"
-Jawaban yang dipilih siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
-Jawaban yang benar: "${correctAnswerText || 'Tidak diketahui'}"
-Status: ${isCorrect ? 'Benar' : 'Salah'}
-
-${isCorrect
-        ? 'Berikan pujian singkat dan penjelasan mengapa jawaban tersebut benar.'
-        : 'Jelaskan mengapa jawaban siswa salah dan berikan pemahaman yang jelas tentang konsep yang benar. Fokus pada mengapa jawaban yang salah tidak cocok dengan struktur kalimat.'}
-
-PENTING:
-- Fokus pada konsep bahasa Jerman yang spesifik (grammar, vocabulary, dll).
-- Berikan penjelasan yang mudah dipahami untuk level A1-A2.
-- Gunakan contoh-contoh sederhana jika memungkinkan.
-- JANGAN menyebutkan URL atau link dalam response.
-
-Format response dalam JSON yang VALID:
-{
-  "feedback_text": "feedback utama dalam bahasa Indonesia (maksimal 100 kata)",
-  "explanation": "penjelasan detail konsep dalam bahasa Indonesia (maksimal 150 kata)"
-}`;
+CRITICAL: Return ONLY "feedback_text" field dengan narasi lengkap, tidak terpisah!`;
     }
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an experienced German language tutor specializing in A1-A2 levels. Always respond in valid JSON format without any markdown or additional formatting. Focus on educational content only.'
-        },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.3,
-      max_tokens: 500,
-    });
+    console.log('Calling Groq...');
 
-    const aiContent = response.choices[0]?.message?.content;
+    const aiContent = await callGroqAPI(prompt);
+    
     if (!aiContent) {
-      throw new Error('No content received from OpenAI');
+      throw new Error('No response from Groq, will use local analysis');
     }
+
+    console.log('Response received!');
 
     let parsedContent: any;
     try {
-      const cleanContent = aiContent.replace(/```json\s*|\s*```/g, '').trim();
+      let cleanContent = aiContent.trim();
+      cleanContent = cleanContent.replace(/```(?:json)?\s*|\s*```/g, '');
+
+      const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleanContent = jsonMatch[0];
+      }
+      
+      console.log('Attempting JSON parse...');
+      console.log('Cleaned content for parsing:', cleanContent.substring(0, 100) + '...');
+      
       parsedContent = JSON.parse(cleanContent);
+
+      if (!parsedContent.feedback_text) {
+        throw new Error('Missing feedback_text in AI response');
+      }
+      
+      parsedContent.feedback_text = String(parsedContent.feedback_text).trim();
+      console.log('JSON parse successful. Feedback length:', parsedContent.feedback_text.length);
+      
+      const validation = validateFeedbackLength(parsedContent.feedback_text);
+      console.log(validation.message);
+      if (!validation.valid) {
+        console.warn('Feedback validation warning:', validation.message);
+      }
+      
     } catch (parseError) {
-      console.error('Parse error, raw content:', aiContent);
-      throw new Error(`Failed to parse OpenAI response: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`);
+      console.error('JSON parse failed, attempting manual extraction...');
+      console.log('Response length:', aiContent.length, 'characters');
+      console.log('First 200 chars:', aiContent.substring(0, 200));
+      console.log('Last 200 chars:', aiContent.substring(Math.max(0, aiContent.length - 200)));
+
+      let feedbackText = null;
+
+      let feedbackMatch = aiContent.match(/"feedback_text"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+      if (feedbackMatch) {
+        feedbackText = feedbackMatch[1].replace(/\\"/g, '"');
+        console.log('Pattern 1 matched. Length:', feedbackText.length);
+      }
+
+      if (!feedbackText) {
+        feedbackMatch = aiContent.match(/"feedback_text"\s*:\s*"([^"]*?)(?:"|$)/);
+        if (feedbackMatch) {
+          feedbackText = feedbackMatch[1].replace(/\\"/g, '"');
+          console.log('Pattern 2 matched (partial). Length:', feedbackText.length);
+        }
+      }
+
+      if (!feedbackText) {
+        const lines = aiContent.split('\n').filter((line: string) => line.trim().length > 0);
+        const allContent = lines.join(' ');
+        
+        if (allContent.length > 20 && !allContent.includes('error')) {
+          feedbackText = allContent.replace(/^[{"]*(feedback_text[":,\s]*)*/i, '').replace(/["}\s]*$/, '');
+          console.log('Pattern 3 matched (raw content). Length:', feedbackText.length);
+        }
+      }
+
+      if (!feedbackText || feedbackText.length < 20) {
+        console.warn('All extraction patterns failed, using fallback');
+        feedbackText = isCorrect ? 
+          "Sempurna! Jawaban Anda menunjukkan pemahaman yang baik terhadap struktur kalimat Jerman. Anda sudah menangkap word order yang benar, case endings yang tepat, dan pemilihan kata yang natural. Terus pertahankan kualitas ini dan jangan ragu untuk mencoba struktur yang lebih kompleks! Semakin banyak Anda berlatih, semakin mahir Anda akan menjadi. 💪" :
+          "Jawaban Anda memerlukan beberapa perbaikan. Mari kita analisis apa yang perlu diperbaiki. Fokus pada beberapa aspek kunci: pertama, perhatikan word order dalam kalimat German - apakah verb berada di posisi yang benar? Kedua, periksa case endings untuk nominatif, akkusativ, dan dativ. Ketiga, pastikan pemilihan kata sesuai dengan konteks. Jangan khawatir, ini adalah bagian dari proses belajar. Terus berlatih dan Anda pasti akan semakin baik! 🤔";
+      }
+
+      parsedContent = {
+        feedback_text: feedbackText.trim()
+      };
+      
+      console.log('Final feedback extracted. Length:', parsedContent.feedback_text.length);
+      
+      const extractedValidation = validateFeedbackLength(parsedContent.feedback_text);
+      console.log(extractedValidation.message);
+      if (!extractedValidation.valid) {
+        console.warn('Extracted feedback validation warning:', extractedValidation.message);
+      }
     }
 
     const processingTime = Date.now() - startTime;
+    const finalValidation = validateFeedbackLength(parsedContent.feedback_text);
+    console.log('Processing time:', processingTime, 'ms');
+    console.log(finalValidation.message);
 
     return {
       success: true,
       data: {
         feedback_text: parsedContent.feedback_text || "Feedback tidak tersedia",
-        explanation: parsedContent.explanation || "Penjelasan tidak tersedia",
+        explanation: "", 
         reference_materials: relevantReferences,
         processing_time_ms: processingTime,
-        ai_model: response.model || 'gpt-4o-mini',
+        ai_model: 'groq-llama-3.1-8b-instant',
       }
     };
   } catch (error: unknown) {
-    console.error('AI Feedback generation error:', error);
+    console.error('Groq Feedback generation error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('AI Feedback generation error - Message:', errorMessage);
+    console.error('AI Feedback generation error - Stack:', error instanceof Error ? error.stack : 'No stack trace');
 
     const fallbackReferences = [
       GERMAN_REFERENCES.grammar[0],
@@ -591,8 +853,8 @@ Format response dalam JSON yang VALID:
       success: false,
       error: errorMessage,
       data: {
-        feedback_text: "Maaf, terjadi kesalahan saat menghasilkan feedback. Silakan coba lagi nanti.",
-        explanation: "Sistem feedback AI sedang mengalami gangguan.",
+        feedback_text: "Maaf, terjadi kesalahan saat menghasilkan feedback AI. Sistem sedang mengalami gangguan. Silakan coba submit jawaban lagi nanti. Kami akan memperbaiki segera!",
+        explanation: "",
         reference_materials: fallbackReferences,
         processing_time_ms: Date.now() - startTime,
         ai_model: 'error'
@@ -655,6 +917,30 @@ export async function POST(request: Request): Promise<Response> {
         { error: 'Missing required fields' },
         { status: 400 }
       );
+    }
+
+    console.log('Checking cache for question:', questionId);
+    const { data: cachedFeedback, error: cacheError } = await supabaseAdmin
+      .from('ai_feedback_cache')
+      .select('*')
+      .eq('question_id', questionId)
+      .eq('is_correct', isCorrect)
+      .maybeSingle();
+
+    if (!cacheError && cachedFeedback) {
+      console.log('Cache HIT - Using cached feedback for question:', questionId);
+      return Response.json({
+        success: true,
+        data: {
+          feedback_text: cachedFeedback.feedback_text,
+          explanation: cachedFeedback.explanation,
+          reference_materials: cachedFeedback.reference_materials,
+          processing_time_ms: cachedFeedback.processing_time_ms,
+          ai_model: cachedFeedback.ai_model,
+        },
+        cached: true,
+        cachedAt: cachedFeedback.created_at
+      });
     }
 
     const { data: rawQuestionData, error: questionError } = await supabaseAdmin
@@ -735,8 +1021,7 @@ export async function POST(request: Request): Promise<Response> {
       studentAnswerText = textAnswer || 'Tidak ada jawaban';
       correctAnswerText = 'Jawaban ideal bervariasi (Essay)';
       
-      // Gunakan Claude API untuk essay
-      aiResponse = await generateAIFeedbackWithClaude(
+      aiResponse = await generateAIFeedbackWithGroq(
         questionData,
         studentAnswerText,
         correctAnswerText,
@@ -759,7 +1044,6 @@ export async function POST(request: Request): Promise<Response> {
       success: aiResponse.success
     });
 
-    // Simpan ke database
     const { data: feedback, error: saveError } = await supabaseAdmin
       .from('ai_feedback')
       .insert([{
@@ -775,6 +1059,30 @@ export async function POST(request: Request): Promise<Response> {
       }])
       .select()
       .single();
+
+    if (aiResponse.success || aiResponse.data?.feedback_text) {
+      console.log('Caching feedback for question:', questionId);
+      const { error: cacheInsertError } = await supabaseAdmin
+        .from('ai_feedback_cache')
+        .upsert([{
+          question_id: questionId,
+          is_correct: finalIsCorrect,
+          feedback_text: aiResponse.data.feedback_text,
+          explanation: aiResponse.data.explanation,
+          reference_materials: aiResponse.data.reference_materials,
+          ai_model: aiResponse.data.ai_model,
+          processing_time_ms: aiResponse.data.processing_time_ms,
+          created_at: new Date().toISOString()
+        }], {
+          onConflict: 'question_id, is_correct'
+        });
+
+      if (cacheInsertError) {
+        console.warn('Cache insert failed (non-critical):', cacheInsertError.message);
+      } else {
+        console.log('Feedback cached successfully');
+      }
+    }
 
     if (saveError) {
       console.error('Error saving AI feedback:', saveError);
@@ -794,8 +1102,10 @@ export async function POST(request: Request): Promise<Response> {
     });
 
   } catch (error: unknown) {
-    console.error('AI Feedback API error:', error);
+    console.error('AI Feedback API error - Full error object:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('AI Feedback API error - Message:', errorMessage);
+    console.error('AI Feedback API error - Stack:', error instanceof Error ? error.stack : 'No stack trace');
 
     return Response.json(
       { error: 'Internal server error', details: errorMessage },
