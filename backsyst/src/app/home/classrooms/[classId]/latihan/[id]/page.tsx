@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import {
-  Clock,
   CheckCircle2,
   XCircle,
   Brain,
@@ -32,6 +32,7 @@ import {
   Edit3,
   FileText,
   Puzzle,
+  AlertCircle,
 } from "lucide-react";
 
 interface Option {
@@ -97,6 +98,7 @@ interface QuizState {
   hasInitialized: boolean;
   aiFeedback: AIFeedback | null;
   isLoadingFeedback: boolean;
+  answeredQuestions: Set<number>;
 }
 
 const initialQuizState: QuizState = {
@@ -114,17 +116,15 @@ const initialQuizState: QuizState = {
   hasInitialized: false,
   aiFeedback: null,
   isLoadingFeedback: false,
+  answeredQuestions: new Set<number>(),
 };
 
-// Utility function to format explanation text with bullet points
 const formatExplanationText = (text: string) => {
   if (!text) return text;
   
-  // Convert bullet points (•) to proper JSX list items
   const parts = text.split('•').filter(part => part.trim());
   
   if (parts.length <= 1) {
-    // No bullet points found, return as paragraph with HTML parsing
     return (
       <div 
         className="text-purple-800 bg-white/80 p-4 rounded-lg border border-purple-200 leading-relaxed"
@@ -133,7 +133,6 @@ const formatExplanationText = (text: string) => {
     );
   }
   
-  // Has bullet points, format as list
   return (
     <div className="text-purple-800 bg-white/80 p-4 rounded-lg border border-purple-200 leading-relaxed">
       {parts[0].trim() && <p className="mb-3">{parts[0].trim()}</p>}
@@ -154,31 +153,270 @@ export default function InteractiveQuiz() {
   const params = useParams();
   const exerciseSetId = params.id as string;
   const [state, setState] = useState<QuizState>(initialQuizState);
-  const [timeLeft, setTimeLeft] = useState(30);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [availablePieces, setAvailablePieces] = useState<Option[]>([]);
   const [blankPositions, setBlankPositions] = useState<BlankPositionState[]>([]);
+  const [showConfirmBack, setShowConfirmBack] = useState(false);
+  const [showConfirmRefresh, setShowConfirmRefresh] = useState(false);
+  const [feedbackRunId, setFeedbackRunId] = useState<string | null>(null);
   const initializedRef = useRef(false);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (!state.showResult && timeLeft > 0 && !state.quizCompleted) {
-      interval = setInterval(() => {
-        setTimeLeft(prevTime => prevTime - 1);
-      }, 1000);
-    } else if (timeLeft === 0 && !state.showResult && !state.quizCompleted) {
-      handleSubmitAnswer();
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [state.showResult, timeLeft, state.quizCompleted]);
+  const clearExerciseCache = () => {
+    if (!exerciseSetId) return;
+    
+    console.log('🧹 Clearing exercise cache for:', exerciseSetId);
+
+    const keys = Object.keys(sessionStorage);
+    
+    keys.forEach(key => {
+      if (key.includes(exerciseSetId) || key.includes('puzzle_') || key.includes('sentence_')) {
+        console.log('Deleting cache key:', key);
+        sessionStorage.removeItem(key);
+      }
+    });
+    
+    const stateKeys = ['quiz_state', 'current_question_index', 'answered_questions'];
+    stateKeys.forEach(key => {
+      if (sessionStorage.getItem(key)?.includes(exerciseSetId)) {
+        sessionStorage.removeItem(key);
+      }
+    });
+    
+    console.log('Exercise cache cleared');
+  };
+
+  const handleBackClick = () => {
+    clearExerciseCache();
+    router.back();
+  };
 
   useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (state.questions.length > 0 && !state.quizCompleted && (state.answeredQuestions.size > 0 || state.selectedOptionId || state.essayAnswer)) {
+        e.preventDefault();
+        e.returnValue = '';
+        setShowConfirmRefresh(true);
+        return false;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [state]);
+
+  useEffect(() => {
+    if (!exerciseSetId) return;
+    try {
+      const runKey = `feedback_run_${exerciseSetId}`;
+      let run = sessionStorage.getItem(runKey);
+      if (!run) {
+        run = crypto.randomUUID();
+        sessionStorage.setItem(runKey, run);
+      }
+      setFeedbackRunId(run);
+    } catch (e) {
+      console.warn('sessionStorage tidak tersedia untuk run id:', e);
+      setFeedbackRunId(null);
+    }
+  }, [exerciseSetId]);
+
+  useEffect(() => {
+    if (state.aiFeedback && state.currentQuestionIndex >= 0) {
+      const owner = state.attemptId ?? feedbackRunId;
+      if (!owner) return;
+      const cacheKey = `feedback_${exerciseSetId}_owner_${owner}_q${state.currentQuestionIndex}`;
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify(state.aiFeedback));
+      } catch (e) {
+        console.warn('Gagal menyimpan feedback ke sessionStorage:', e);
+      }
+    }
+  }, [state.aiFeedback, state.currentQuestionIndex, exerciseSetId, state.attemptId, feedbackRunId]);
+
+  useEffect(() => {
+    if (state.currentQuestionIndex < 0 || state.questions.length === 0) return;
+    
+    const owner = state.attemptId ?? feedbackRunId;
+    if (!owner) {
+      setState(s => ({ ...s, aiFeedback: null, selectedOptionId: null, essayAnswer: "" }));
+      setBlankPositions([]);
+      setAvailablePieces([]);
+      return;
+    }
+
+    const answerKey = `answer_${exerciseSetId}_owner_${owner}_q${state.currentQuestionIndex}`;
+    const cachedAnswer = sessionStorage.getItem(answerKey);
+
+    if (cachedAnswer) {
+      try {
+        const parsedAnswer = JSON.parse(cachedAnswer);
+        
+        setState(s => ({
+          ...s,
+          selectedOptionId: parsedAnswer.selectedOptionId ?? null,
+          essayAnswer: parsedAnswer.essayAnswer ?? "",
+          showResult: !!parsedAnswer.showResult
+        }));
+        console.log('Restored answer:', { selectedOptionId: parsedAnswer.selectedOptionId, essayAnswer: parsedAnswer.essayAnswer, showResult: parsedAnswer.showResult });
+        
+        if (parsedAnswer.showResult) {
+          const feedbackKey = `feedback_${exerciseSetId}_owner_${owner}_q${state.currentQuestionIndex}`;
+          const cachedFeedback = sessionStorage.getItem(feedbackKey);
+          if (cachedFeedback) {
+            try {
+              const parsedFeedback = JSON.parse(cachedFeedback) as AIFeedback;
+              setState(s => ({ ...s, aiFeedback: parsedFeedback }));
+              console.log('Loaded feedback for answered question', state.currentQuestionIndex);
+            } catch (e) {
+              console.error('Error parsing cached feedback:', e);
+            }
+          }
+        }
+        
+        const currentQuestion = state.questions[state.currentQuestionIndex];
+        if (currentQuestion?.question_type === 'sentence_arrangement' && parsedAnswer.blankPositions) {
+          const allPieces = buildPiecesFromQuestion(currentQuestion);
+          const restoredBlankPositions: BlankPositionState[] = parsedAnswer.blankPositions.map((bp: any, idx: number) => ({
+            piece: bp.pieceId ? allPieces.find(p => p.id === bp.pieceId) ?? null : null,
+            isCorrect: bp.isCorrect ?? null,
+            correctWord: currentQuestion.sentence_arrangement_config?.blank_words?.[idx] ?? ''
+          }));
+          const restoredAvailable = (parsedAnswer.availablePieceIds || []).map((pid: string) => allPieces.find(p => p.id === pid)).filter(Boolean) as Option[];
+          
+          console.log('Restored puzzle:', { blanks: restoredBlankPositions.length, available: restoredAvailable.length });
+          setBlankPositions(restoredBlankPositions);
+          setAvailablePieces(restoredAvailable);
+        }
+      } catch (e) {
+        console.error('Error in consolidated load/restore:', e);
+        setState(s => ({ ...s, aiFeedback: null }));
+      }
+    } else {
+      setState(s => ({ ...s, aiFeedback: null, selectedOptionId: null, essayAnswer: "", showResult: false }));
+      setBlankPositions([]);
+      setAvailablePieces([]);
+      console.log('No answer cached for question', state.currentQuestionIndex);
+    }
+  }, [state.currentQuestionIndex, state.questions, state.attemptId, feedbackRunId, exerciseSetId]);
+
+  useEffect(() => {
+    if (state.currentQuestionIndex < 0 || state.questions.length === 0) return;
+
     const currentQuestion = state.questions[state.currentQuestionIndex];
-    if (currentQuestion?.question_type === 'sentence_arrangement') {
-      console.log('Setting up sentence arrangement (Fill-in-the-Blank) for question:', currentQuestion);
+    if (!currentQuestion || currentQuestion.question_type !== 'sentence_arrangement') return;
+
+    const owner = state.attemptId ?? feedbackRunId;
+    if (!owner) return;
+
+    const answerKey = `answer_${exerciseSetId}_owner_${owner}_q${state.currentQuestionIndex}`;
+    const cachedAnswer = sessionStorage.getItem(answerKey);
+
+    if (cachedAnswer) {
+      try {
+        const parsedAnswer = JSON.parse(cachedAnswer);
+      
+        if (parsedAnswer.blankPositions && parsedAnswer.availablePieceIds) {
+          const timeoutId = setTimeout(() => {
+            const allPieces = buildPiecesFromQuestion(currentQuestion);
+            const restoredBlankPositions: BlankPositionState[] = parsedAnswer.blankPositions.map((bp: any, idx: number) => ({
+              piece: bp.pieceId ? allPieces.find(p => p.id === bp.pieceId) ?? null : null,
+              isCorrect: bp.isCorrect ?? null,
+              correctWord: currentQuestion.sentence_arrangement_config?.blank_words?.[idx] ?? ''
+            }));
+            const restoredAvailable = (parsedAnswer.availablePieceIds || []).map((pid: string) => allPieces.find(p => p.id === pid)).filter(Boolean) as Option[];
+            
+            console.log('Restored puzzle from cache:', { blanks: restoredBlankPositions.length, available: restoredAvailable.length });
+            setBlankPositions(restoredBlankPositions);
+            setAvailablePieces(restoredAvailable);
+          }, 10);
+          
+          return () => clearTimeout(timeoutId);
+        }
+      } catch (e) {
+        console.error('Error restoring puzzle from cache:', e);
+      }
+    }
+  }, [state.currentQuestionIndex, state.questions, state.attemptId, feedbackRunId, exerciseSetId]);
+  const buildPiecesFromQuestion = (question: Question | undefined) => {
+    if (!question || !question.sentence_arrangement_config) return [] as Option[];
+    const config = question.sentence_arrangement_config;
+    const correctWords = config.blank_words || [];
+    const distractorWords = config.distractor_words || [];
+    const allWords = [...correctWords, ...distractorWords];
+    return allWords.map((word, index) => ({
+      id: `word-${index}-${word.replace(/\s/g, '-')}`,
+      option_text: word,
+      is_correct: correctWords.includes(word),
+      order_index: index + 1,
+    } as Option));
+  };
+
+  useEffect(() => {
+    if (state.currentQuestionIndex < 0 || state.questions.length === 0) return;
+    const owner = state.attemptId ?? feedbackRunId;
+    if (!owner) return;
+    const answerKey = `answer_${exerciseSetId}_owner_${owner}_q${state.currentQuestionIndex}`;
+
+    const payload: any = {
+      selectedOptionId: state.selectedOptionId ?? null,
+      essayAnswer: state.essayAnswer ?? "",
+      showResult: state.showResult || false,
+    };
+
+    // save puzzle state
+    if (state.questions[state.currentQuestionIndex]?.question_type === 'sentence_arrangement') {
+      payload.blankPositions = blankPositions.map(bp => ({
+        pieceId: bp.piece?.id ?? null,
+        isCorrect: bp.isCorrect
+      }));
+      payload.availablePieceIds = availablePieces.map(p => p.id);
+    }
+
+    try {
+      sessionStorage.setItem(answerKey, JSON.stringify(payload));
+    } catch (e) {
+      console.warn('Gagal menyimpan answer state ke sessionStorage:', e);
+    }
+  }, [state.currentQuestionIndex, state.selectedOptionId, state.essayAnswer, state.showResult, blankPositions, availablePieces, state.attemptId, feedbackRunId, exerciseSetId, state.questions]);
+
+  const clearFeedbackCacheForExercise = () => {
+    try {
+      const prefix = `feedback_${exerciseSetId}_`;
+      const answerPrefix = `answer_${exerciseSetId}_`;
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k && (k.startsWith(prefix) || k.startsWith(answerPrefix))) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach(k => {
+        console.log('Clearing cache key:', k);
+        sessionStorage.removeItem(k);
+      });
+      const runKey = `feedback_run_${exerciseSetId}`;
+      const newRun = crypto.randomUUID();
+      sessionStorage.setItem(runKey, newRun);
+      setFeedbackRunId(newRun);
+      console.log('Cache cleared. New run ID:', newRun);
+    } catch (e) {
+      console.warn('Gagal membersihkan feedback cache:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (state.currentQuestionIndex < 0 || state.questions.length === 0) {
+      setAvailablePieces([]);
+      setBlankPositions([]);
+      return;
+    }
+
+    const currentQuestion = state.questions[state.currentQuestionIndex];
+    if (!currentQuestion) return;
+
+    if (currentQuestion.question_type === 'sentence_arrangement') {
+      console.log('Setting up sentence arrangement for question:', state.currentQuestionIndex, currentQuestion);
       
       if (currentQuestion.sentence_arrangement_config) {
         const config = currentQuestion.sentence_arrangement_config;
@@ -199,21 +437,21 @@ export default function InteractiveQuiz() {
             correctWord: word 
         }));
         
+        console.log('Initialized puzzle:', { blanks: initialBlankPositions.length, pieces: pieces.length });
         setAvailablePieces(pieces);
         setBlankPositions(initialBlankPositions);
         setState(s => ({ ...s, sentenceArrangement: [] }));
-        
-        console.log('Loaded question config:', currentQuestion); 
       } else {
-        console.warn('No sentence_arrangement_config found for sentence_arrangement question');
+        console.warn('No sentence_arrangement_config found for question:', state.currentQuestionIndex);
+        setAvailablePieces([]);
+        setBlankPositions([]);
       }
     } else {
       setAvailablePieces([]);
       setBlankPositions([]);
-      setState(s => ({ ...s, sentenceArrangement: [] }));
     }
   }, [state.currentQuestionIndex, state.questions]);
-  
+
   const createExerciseAttempt = async (userId: string) => {
     try {
       if (!exerciseSetId) {
@@ -396,46 +634,70 @@ export default function InteractiveQuiz() {
       
       console.log('Sending AI feedback request with payload:', payload);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
       const response = await fetch('/api/ai-feedback', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
+
       console.log('AI feedback response status:', response.status);
-      const result = await response.json();
-      console.log('AI feedback result:', result);
+      console.log('AI feedback response headers:', {
+        contentType: response.headers.get('content-type'),
+        contentLength: response.headers.get('content-length'),
+      });
 
-      if (result.success) {
-        setState(s => ({ 
-          ...s, 
-          aiFeedback: result.data,
-          isLoadingFeedback: false 
-        }));
-        
-        if (result.warning) {
-          console.warn('AI Feedback warning:', result.warning);
+      if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error('Server sedang sibuk (rate limit). Coba lagi dalam beberapa saat.');
+        } else if (response.status >= 500) {
+          throw new Error('Server sedang maintenance. Silakan coba lagi nanti.');
+        } else {
+          throw new Error(`API error: ${response.status}`);
         }
-      } else {
-        // Fallback saat AI gagal
-        const fallbackReferences = [
-            { title: "Deutsche Grammatik - Goethe Institut", url: "https://www.goethe.de/de/spr/ueb/gram.html", description: "Panduan tata bahasa Jerman resmi dari Goethe Institut" },
-            { title: "Leo Dictionary - Deutsch-Englisch", url: "https://dict.leo.org/german-english/", description: "Kamus online Jerman-Inggris yang komprehensif" },
-            { title: "Verbformen.de", url: "https://www.verbformen.de/", description: "Database konjugasi lengkap untuk semua kata kerja Jerman" }
-        ];
+      }
 
-        setState(s => ({ 
+      const responseText = await response.text();
+      console.log('Raw response text length:', responseText.length);
+      console.log('Raw response first 300 chars:', responseText.substring(0, 300));
+
+      if (!responseText || responseText.trim().length === 0) {
+        throw new Error('Menerima respons kosong dari server');
+      }
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response:', e);
+        console.log('Response text:', responseText);
+        throw new Error('Response dari server tidak valid. Server sedang mengalami masalah.');
+      }
+
+      console.log('AI feedback result:', result);
+      console.log('Feedback text length:', result?.data?.feedback_text?.length || 0);
+
+      if (result.data?.feedback_text && result.data.feedback_text.length > 10) {
+        setTimeout(() => {
+          setState(s => ({ 
             ...s, 
-            aiFeedback: {
-                feedback_text: result.data?.feedback_text || "Maaf, feedback AI tidak dapat dimuat saat ini.",
-                explanation: result.data?.explanation || "Silakan lanjutkan dengan pertanyaan berikutnya.",
-                reference_materials: result.data?.reference_materials || fallbackReferences
-            },
+            aiFeedback: result.data,
             isLoadingFeedback: false 
-        }));
-        toast.error(result.error || "Gagal memuat feedback AI");
+          }));
+          
+          if (result.warning) {
+            console.warn('AI Feedback warning:', result.warning);
+          }
+        }, 2500);
+      } else {
+        throw new Error('Feedback tidak lengkap diterima dari AI');
       }
 
     } catch (error: unknown) {
@@ -444,19 +706,24 @@ export default function InteractiveQuiz() {
       let errorMessage = 'Unknown error occurred';
       if (error instanceof Error) {
         errorMessage = error.message;
+        if (error.name === 'AbortError') {
+          errorMessage = 'Permintaan timeout - AI feedback memakan waktu terlalu lama. Silakan coba lagi.';
+        }
       }
       
-      setState(s => ({ 
-        ...s, 
-        aiFeedback: {
-          feedback_text: "Maaf, feedback AI tidak dapat dimuat saat ini.",
-          explanation: "Silakan lanjutkan dengan pertanyaan berikutnya.",
-          reference_materials: []
-        },
-        isLoadingFeedback: false 
-      }));
-      
-      toast.error("Gagal memuat feedback AI: " + errorMessage);
+      setTimeout(() => {
+        setState(s => ({ 
+          ...s, 
+          aiFeedback: {
+            feedback_text: "Maaf, feedback AI tidak dapat dimuat saat ini. " + errorMessage,
+            explanation: "Silakan lanjutkan dengan pertanyaan berikutnya.",
+            reference_materials: []
+          },
+          isLoadingFeedback: false 
+        }));
+        
+        toast.error("Gagal memuat feedback AI: " + errorMessage);
+      }, 2500);
     }
   };
 
@@ -724,14 +991,8 @@ export default function InteractiveQuiz() {
 
     if (currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') {
       if (!state.selectedOptionId) {
-        if (timeLeft === 0) {
-          selectedOptionId = currentQuestion.options[0]?.id || null;
-          setState(s => ({ ...s, selectedOptionId }));
-          toast.info("Waktu habis! Jawaban otomatis dipilih.");
-        } else {
-          toast.warning("Silakan pilih salah satu jawaban.");
-          return;
-        }
+        toast.warning("Silakan pilih salah satu jawaban.");
+        return;
       } else {
         selectedOptionId = state.selectedOptionId;
       }
@@ -742,12 +1003,8 @@ export default function InteractiveQuiz() {
       
     } else if (currentQuestion.question_type === 'essay') {
       if (!state.essayAnswer.trim()) {
-        if (timeLeft === 0) {
-          toast.info("Waktu habis! Jawaban kosong akan disubmit.");
-        } else {
-          toast.warning("Silakan isi jawaban essay.");
-          return;
-        }
+        toast.warning("Silakan isi jawaban essay.");
+        return;
       }
       
       textAnswer = state.essayAnswer.trim();
@@ -757,12 +1014,8 @@ export default function InteractiveQuiz() {
     } else if (currentQuestion.question_type === 'sentence_arrangement') {
       
       if (blankPositions.some(pos => pos.piece === null)) {
-        if (timeLeft === 0) {
-          toast.info("Waktu habis! Susunan kalimat yang belum lengkap akan disubmit.");
-        } else {
-          toast.warning("Silakan lengkapi susunan kalimat.");
-          return;
-        }
+        toast.warning("Silakan lengkapi susunan kalimat.");
+        return;
       }
       
       let totalCorrectPieces = 0;
@@ -819,6 +1072,11 @@ export default function InteractiveQuiz() {
   };
 
   const handleNextQuestion = async () => {
+    setState(s => ({
+      ...s,
+      answeredQuestions: new Set([...s.answeredQuestions, s.currentQuestionIndex])
+    }));
+
     if (state.currentQuestionIndex < state.questions.length - 1) {
       setState(s => ({
         ...s,
@@ -831,7 +1089,6 @@ export default function InteractiveQuiz() {
       }));
       setBlankPositions([]);
       setAvailablePieces([]);
-      setTimeLeft(30);
     } else {
       await completeExerciseAttempt();
       
@@ -839,9 +1096,23 @@ export default function InteractiveQuiz() {
     }
   };
 
+  const handleJumpToQuestion = (questionIndex: number) => {
+    setState(s => ({
+      ...s,
+      currentQuestionIndex: questionIndex,
+      selectedOptionId: null,
+      essayAnswer: "",
+      sentenceArrangement: [],
+      showResult: false,
+      aiFeedback: null,
+    }));
+    setBlankPositions([]);
+    setAvailablePieces([]);
+  };
+
   const resetQuiz = () => {
+    clearFeedbackCacheForExercise();
     setState(initialQuizState);
-    setTimeLeft(30);
     setStartTime(null);
     setAvailablePieces([]);
     setBlankPositions([]);
@@ -869,7 +1140,6 @@ export default function InteractiveQuiz() {
     }
   };
 
-  // Enhanced AI Feedback Display Component
   const renderAIFeedback = () => {
     if (state.isLoadingFeedback) {
       return (
@@ -892,57 +1162,64 @@ export default function InteractiveQuiz() {
     const currentQuestion = state.questions[state.currentQuestionIndex];
 
     return (
-      <Card className="border-purple-200 bg-purple-50/50 shadow-lg">
-        <CardHeader className="pb-4">
+      <Card className="border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-white shadow-lg">
+        <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-700 pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-500 rounded-lg">
-              <Lightbulb className="h-5 w-5 text-white" />
+            <div className="p-2 rounded-lg bg-yellow-400/90">
+              <Lightbulb className="h-5 w-5 text-purple-900" />
             </div>
-            <CardTitle className="text-lg text-purple-900 flex items-center gap-2">
-              AI Feedback 
-              {currentQuestion.question_type === 'essay' && (
-                <Badge className="bg-green-100 text-green-800 border-green-300">
-                  Claude AI
-                </Badge>
-              )}
-              {currentQuestion.question_type !== 'essay' && (
-                <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-                  GPT-4o Mini
-                </Badge>
-              )}
+            <CardTitle className="text-lg text-white flex items-center gap-2">
+              Analisis Feedback Lengkap
+              <Badge className="bg-purple-200 text-purple-900 border-opacity-30 text-xs">
+                {currentQuestion.question_type === 'essay' && 'Essay'}
+                {currentQuestion.question_type === 'sentence_arrangement' && 'Puzzle'}
+                {(currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && 'Pilihan'}
+              </Badge>
             </CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h5 className="font-semibold text-purple-900 mb-3">Feedback:</h5>
-            <p className="text-purple-800 bg-white/80 p-4 rounded-lg border border-purple-200 leading-relaxed">
-              {state.aiFeedback.feedback_text}
-            </p>
+        <CardContent className="space-y-5 pt-6">
+          {/* Single Comprehensive Feedback Narrative */}
+          <div className="p-6 rounded-lg border-2 border-purple-300 bg-white/95">
+            <h5 className="font-bold mb-4 flex items-center gap-2 text-purple-900 text-base">
+              Analisis Detail
+            </h5>
+            
+            {/* Feedback as single comprehensive narrative */}
+            {state.aiFeedback.feedback_text && (
+              <>
+                <div className="leading-relaxed whitespace-pre-wrap text-purple-900 mb-3">
+                  {state.aiFeedback.feedback_text}
+                </div>
+                {/* Sentence count info */}
+                <div className="text-xs text-purple-600 mt-4 pt-3 border-t border-purple-200">
+                  <span className="inline-block bg-purple-100 px-2 py-1 rounded">
+                    {(() => {
+                      const sentences = state.aiFeedback.feedback_text.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
+                      return `${sentences.length} kalimat (60-120 ✓)`;
+                    })()}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
-          
-          {state.aiFeedback.explanation && (
-            <div>
-              <h5 className="font-semibold text-purple-900 mb-3">Penjelasan Detail:</h5>
-              {formatExplanationText(state.aiFeedback.explanation)}
-            </div>
-          )}
 
+          {/* Reference Materials */}
           {state.aiFeedback.reference_materials && state.aiFeedback.reference_materials.length > 0 && (
             <div>
-              <h5 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
+              <h5 className="font-bold mb-3 flex items-center gap-2 text-purple-900">
                 <BookOpen className="h-4 w-4" />
-                Referensi Belajar:
+                Sumber Belajar Terkait
               </h5>
               <div className="space-y-3">
                 {state.aiFeedback.reference_materials.map((ref, index) => (
-                  <div key={index} className="bg-white/90 p-4 rounded-lg border border-purple-200 shadow-sm">
+                  <div key={index} className="p-4 rounded-lg border-2 border-purple-300 bg-white/90 hover:bg-purple-50 shadow-sm hover:shadow-md transition-all">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
-                        <h6 className="font-semibold text-purple-900 mb-1">
-                          {ref.title}
+                        <h6 className="font-semibold mb-1 text-purple-900 text-base">
+                          {index + 1}. {ref.title}
                         </h6>
-                        <p className="text-sm text-purple-700 leading-relaxed">
+                        <p className="text-sm leading-relaxed text-purple-800">
                           {ref.description}
                         </p>
                       </div>
@@ -950,7 +1227,7 @@ export default function InteractiveQuiz() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="shrink-0 border-purple-300 text-purple-700 hover:bg-purple-100 shadow-sm"
+                          className="shrink-0 shadow-sm transition-colors border-purple-400 text-purple-700 hover:bg-purple-100 bg-purple-50"
                           onClick={() => window.open(ref.url, '_blank')}
                         >
                           <ExternalLink className="h-4 w-4" />
@@ -963,9 +1240,10 @@ export default function InteractiveQuiz() {
             </div>
           )}
 
+          {/* Processing Info */}
           {state.aiFeedback.ai_model && process.env.NODE_ENV === 'development' && (
-            <div className="text-xs text-purple-600 pt-3 border-t border-purple-200">
-              Powered by {state.aiFeedback.ai_model}
+            <div className="text-xs text-purple-600 pt-3 border-t border-purple-200 opacity-75">
+              {state.aiFeedback.ai_model}
               {state.aiFeedback.processing_time_ms && 
                 ` • Generated in ${state.aiFeedback.processing_time_ms}ms`
               }
@@ -1074,7 +1352,7 @@ export default function InteractiveQuiz() {
       return (
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <h2 className="mb-6 text-lg font-medium text-gray-900 leading-relaxed">
-            {currentQuestion.question_text}
+            Lengkapi kalimat rumpang dibawah ini dengan potongan kata yang benar
           </h2>
           
           {config && (
@@ -1136,7 +1414,6 @@ export default function InteractiveQuiz() {
       );
     }
 
-    // Default multiple choice rendering
     return (
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
         <h2 className="mb-6 text-lg font-medium text-gray-900 leading-relaxed">
@@ -1177,7 +1454,15 @@ export default function InteractiveQuiz() {
                 <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
               )}
               {state.showResult && state.selectedOptionId === option.id && !option.is_correct && (
-                <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-red-600">Jawabanmu:</span>
+                  <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                </div>
+              )}
+              {!state.showResult && state.selectedOptionId === option.id && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-sky-600">Jawabanmu:</span>
+                </div>
               )}
             </div>
           ))}
@@ -1188,14 +1473,26 @@ export default function InteractiveQuiz() {
 
   if (state.isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 p-6">
-        <div className="max-w-7xl mx-auto">
-          <Card className="bg-white shadow-2xl border-0 rounded-2xl">
-            <CardContent className="flex items-center justify-center p-16">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mx-auto mb-4"></div>
-                <p className="text-gray-600 text-lg">Memuat latihan soal...</p>
+      <div className="min-h-screen bg-white flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-white">Latihan Soal Interaktif</h1>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading Content */}
+        <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 flex items-center justify-center">
+          <Card className="bg-white border border-gray-200 rounded-lg w-full max-w-md">
+            <CardContent className="p-8 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-6">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+              <p className="text-gray-600 font-medium">Memuat latihan soal...</p>
             </CardContent>
           </Card>
         </div>
@@ -1205,22 +1502,43 @@ export default function InteractiveQuiz() {
 
   if (state.error || !state.questions.length) {
     return (
-      <div className="min-h-screen bg-gray-100 p-6">
-        <div className="max-w-7xl mx-auto">
-          <Card className="bg-white shadow-2xl border-0 rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-red-600 text-xl flex items-center gap-3">
-                <XCircle className="h-6 w-6" />
-                Terjadi Kesalahan
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-red-600 mb-6">{state.error || "Tidak ada pertanyaan yang tersedia."}</p>
+      <div className="min-h-screen bg-white flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button 
+                  onClick={handleBackClick} 
+                  className="gap-2 bg-blue-800 hover:bg-blue-900 text-white"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Kembali
+                </Button>
+              </div>
+              <div className="text-center">
+                <h1 className="text-2xl font-bold text-white">Latihan Soal</h1>
+              </div>
+              <div className="w-32"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 flex items-center justify-center">
+          <Card className="bg-white border border-gray-200 rounded-lg w-full max-w-md">
+            <CardContent className="p-8 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-6">
+                <AlertCircle className="h-8 w-8 text-red-600" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 mb-2">Terjadi Kesalahan</h2>
+              <p className="text-gray-600 mb-6">
+                {state.error || "Tidak ada pertanyaan yang tersedia."}
+              </p>
               <Button 
-                onClick={() => router.back()} 
-                className="bg-sky-500 hover:bg-sky-600 text-white shadow-md"
+                onClick={handleBackClick} 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               >
-                <ChevronLeft className="mr-2 h-4 w-4" />
                 Kembali
               </Button>
             </CardContent>
@@ -1237,285 +1555,341 @@ export default function InteractiveQuiz() {
   if (state.quizCompleted) {
     const percentage = maxPossibleScore > 0 ? Math.round((state.score / maxPossibleScore) * 100) : 0;
     return (
-      <div className="min-h-screen bg-gray-100 p-6">
-        <div className="max-w-7xl mx-auto">
-          <Card className="bg-white shadow-2xl border-0 rounded-2xl overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100 p-8">
-              <div className="text-center">
-                <div className="p-4 bg-sky-500 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center shadow-lg">
-                  <Trophy className="h-10 w-10 text-white" />
-                </div>
-                <CardTitle className="text-2xl font-bold text-gray-900">Latihan Selesai!</CardTitle>
-                <CardDescription className="text-gray-600 mt-2">Berikut adalah hasil latihan Anda</CardDescription>
+      <div className="min-h-screen bg-white flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button 
+                  onClick={handleBackClick} 
+                  className="gap-2 bg-blue-800 hover:bg-blue-900 text-white"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Kembali ke Kelas
+                </Button>
               </div>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="space-y-6">
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
-                    <CardContent className="p-6">
-                      <div className="text-center">
-                        <div className="p-3 bg-green-500 rounded-full w-fit mx-auto mb-3">
-                          <Award className="h-6 w-6 text-white" />
-                        </div>
-                        <div className={`text-2xl font-bold ${getScoreColor(percentage)}`}>
-                          {state.score}/{maxPossibleScore}
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">Skor Anda</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
-                    <CardContent className="p-6">
-                      <div className="text-center">
-                        <div className="p-3 bg-blue-500 rounded-full w-fit mx-auto mb-3">
-                          <Target className="h-6 w-6 text-white" />
-                        </div>
-                        <div className={`text-2xl font-bold ${getScoreColor(percentage)}`}>
-                          {percentage}%
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">Persentase</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
-                    <CardContent className="p-6">
-                      <div className="text-center">
-                        <div className="p-3 bg-purple-500 rounded-full w-fit mx-auto mb-3">
-                          <CheckCircle2 className="h-6 w-6 text-white" />
-                        </div>
-                        <div className="text-2xl font-bold text-purple-600">{totalQuestions}</div>
-                        <p className="text-sm text-gray-500 mt-1">Total Soal</p>
-                      </div>
-                    </CardContent>
-                  </Card>
+              <div className="text-center">
+                <h1 className="text-2xl font-bold text-white">Latihan Selesai!</h1>
+              </div>
+              <div className="w-32"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
+          <div className="space-y-6">
+            {/* Result Card */}
+            <Card className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <CardContent className="p-8">
+                <div className="text-center mb-8">
+                  <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 mb-6">
+                    <Trophy className="h-12 w-12 text-white" />
+                  </div>
+                  <p className="text-gray-600 text-lg">Hasil Latihan Anda</p>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-3 gap-6 mb-8">
+                  {/* Skor */}
+                  <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-gray-600 text-sm font-medium mb-2">Skor</p>
+                    <p className={`text-4xl font-bold mb-1 ${getScoreColor(percentage)}`}>
+                      {state.score}
+                    </p>
+                    <p className="text-gray-500 text-sm">dari {maxPossibleScore}</p>
+                  </div>
+
+                  {/* Persentase */}
+                  <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-gray-600 text-sm font-medium mb-2">Persentase</p>
+                    <p className={`text-4xl font-bold mb-1 ${getScoreColor(percentage)}`}>
+                      {percentage}%
+                    </p>
+                    <p className="text-gray-500 text-sm">Nilai Anda</p>
+                  </div>
+
+                  {/* Total Soal */}
+                  <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-gray-600 text-sm font-medium mb-2">Total Soal</p>
+                    <p className="text-4xl font-bold text-blue-600 mb-1">
+                      {totalQuestions}
+                    </p>
+                    <p className="text-gray-500 text-sm">Soal Dikerjakan</p>
+                  </div>
+                </div>
+
+                {/* Summary */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-gray-900">Ringkasan Hasil</p>
+                      <p className="text-gray-700 mt-2">
+                        Anda telah menyelesaikan latihan dengan skor <span className="font-bold">{state.score}/{maxPossibleScore}</span> ({percentage}%). 
+                        {percentage >= 80 ? " Luar biasa! Anda sudah menguasai materi ini." : percentage >= 60 ? " Bagus! Namun masih ada ruang untuk improvement." : " Anda perlu belajar lebih lagi untuk menguasai materi ini."}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="pt-6 border-t border-gray-200">
-                  <div className="flex gap-4">
-                    <Button 
-                      onClick={resetQuiz} 
-                      className="flex-1 bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 py-3 text-lg"
-                      size="lg"
-                    >
-                      <RotateCcw className="h-5 w-5 mr-2" />
-                      Coba Lagi
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => router.back()} 
-                      className="flex-1 border-gray-300 text-gray-600 shadow-md hover:bg-gray-50 py-3 text-lg"
-                      size="lg"
-                    >
-                      Kembali ke Kelas
-                    </Button>
-                  </div>
+                <div className="flex gap-4">
+                  <Button 
+                    onClick={resetQuiz} 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Coba Lagi
+                  </Button>
+                  <Button 
+                    onClick={handleBackClick} 
+                    variant="outline" 
+                    className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    Tutup
+                  </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     );
   }
 
-  const progress = ((state.currentQuestionIndex + 1) / totalQuestions) * 100;
+  const progress = Math.min((state.answeredQuestions.size / totalQuestions) * 100, 99);
   const questionTypeInfo = getQuestionTypeInfo(currentQuestion.question_type);
   const QuestionIcon = questionTypeInfo.icon;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Main Card Container */}
-        <Card className="bg-white shadow-2xl border-0 rounded-2xl overflow-hidden">
-          {/* Header */}
-          <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100 p-8">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => router.back()}
-                  className="border-gray-300 text-gray-600 shadow-sm hover:bg-gray-50"
-                >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Kembali
-                </Button>
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-sky-500 rounded-full shadow-lg">
-                    <GraduationCap className="h-6 w-6 text-white" />
-                  </div>
-                  <h1 className="text-2xl font-bold text-gray-900">Latihan Soal Interaktif</h1>
-                </div>
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button 
+                onClick={() => setShowConfirmBack(true)}
+                className="gap-2 bg-blue-800 hover:bg-blue-900 text-white"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Kembali
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Latihan Soal Interaktif</h1>
+                <p className="text-blue-100 text-sm mt-1">Soal {state.currentQuestionIndex + 1} dari {totalQuestions}</p>
               </div>
-              <div className="flex items-center gap-4">
-                <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700 px-4 py-2 text-lg font-medium">
-                  <Clock className="h-4 w-4 mr-2" />
-                  <span className={`font-mono ${timeLeft <= 10 ? 'text-red-600' : ''}`}>
-                    {timeLeft}s
-                  </span>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <p className="text-blue-100 text-sm">Skor Saat Ini</p>
+                <p className="text-3xl font-bold text-white">{state.score}/{maxPossibleScore}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex flex-1 max-w-7xl mx-auto w-full gap-8 px-6 py-8">
+        {/* Left Content - 70% */}
+        <div className="flex-1">
+          {/* Progress Bar */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">Progress</span>
+              <span className="text-sm font-medium text-blue-600">{Math.round(progress)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div 
+                className="bg-blue-600 h-full transition-all duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Question Card */}
+          <Card className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 border-b border-blue-700 p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="text-lg text-white">{questionTypeInfo.label}</CardTitle>
+                  <CardDescription className="text-blue-100 mt-2">
+                    {currentQuestion.question_type === 'essay' && "Tulis jawaban essay yang lengkap dan jelas"}
+                    {currentQuestion.question_type === 'sentence_arrangement' && "Lengkapi kalimat rumpang dibawah ini dengan potongan kata yang benar"}
+                    {(currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && "Pilih jawaban yang paling tepat"}
+                  </CardDescription>
+                </div>
+                <Badge className="bg-white text-blue-700 text-xs font-medium">
+                  {currentQuestion.points} Poin
                 </Badge>
               </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-8">
-            <div className="space-y-6">
-              {/* Progress Section */}
-              <Card className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Pertanyaan {state.currentQuestionIndex + 1} dari {totalQuestions}
-                      </h3>
-                      <p className="text-gray-600">Skor saat ini: {state.score} poin</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Badge variant="outline" className={`${questionTypeInfo.color} border-2`}>
-                        <QuestionIcon className="h-4 w-4 mr-1" />
-                        {questionTypeInfo.label}
-                      </Badge>
-                      <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
-                        {currentQuestion.points} Poin
-                      </Badge>
-                    </div>
-                  </div>
-                  <Progress value={progress} className="h-3 bg-gray-200" />
-                  <div className="flex justify-between text-sm text-gray-500 mt-2">
-                    <span>Progress</span>
-                    <span>{Math.round(progress)}%</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
-                  <CardContent className="p-6">
-                    <div className="text-center">
-                      <div className="p-3 bg-blue-500 rounded-full w-fit mx-auto mb-3">
-                        <Timer className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="text-2xl font-bold text-blue-600">{state.currentQuestionIndex + 1}</div>
-                      <p className="text-sm text-gray-500 mt-1">Soal Saat Ini</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
-                  <CardContent className="p-6">
-                    <div className="text-center">
-                      <div className="p-3 bg-green-500 rounded-full w-fit mx-auto mb-3">
-                        <Award className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="text-2xl font-bold text-green-600">{state.score}</div>
-                      <p className="text-sm text-gray-500 mt-1">Skor</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
-                  <CardContent className="p-6">
-                    <div className="text-center">
-                      <div className="p-3 bg-purple-500 rounded-full w-fit mx-auto mb-3">
-                        <Target className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="text-2xl font-bold text-purple-600">{totalQuestions}</div>
-                      <p className="text-sm text-gray-500 mt-1">Total Soal</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl">
-                  <CardContent className="p-6">
-                    <div className="text-center">
-                      <div className="p-3 bg-orange-500 rounded-full w-fit mx-auto mb-3">
-                        <Clock className="h-6 w-6 text-white" />
-                      </div>
-                      <div className={`text-2xl font-bold ${timeLeft <= 10 ? 'text-red-600' : 'text-orange-600'}`}>
-                        {timeLeft}s
-                      </div>
-                      <p className="text-sm text-gray-500 mt-1">Waktu Tersisa</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Question Card */}
-              <Card className="bg-gray-50 border border-gray-200 shadow-lg rounded-xl">
-                <CardHeader className="pb-6">
-                  <CardTitle className="flex items-center gap-3 text-gray-900 text-xl">
-                    <div className="p-2 bg-sky-500 rounded-lg">
-                      <QuestionIcon className="h-5 w-5 text-white" />
-                    </div>
-                    Soal {questionTypeInfo.label}
-                  </CardTitle>
-                                    <CardDescription className="text-gray-600">
-                    {currentQuestion.question_type === 'essay' && "Tulis jawaban essay yang lengkap dan jelas"}
-                    {currentQuestion.question_type === 'sentence_arrangement' && "Seret dan lepas potongan kata untuk menyusun kalimat yang benar"}
-                    {(currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && "Pilih jawaban yang paling tepat untuk soal di bawah ini"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
+            </CardHeader>
+            
+            <CardContent className="p-6">
+              <div className="space-y-6">
+                {/* Question Content */}
+                <div>
                   {renderQuestionContent(currentQuestion)}
+                </div>
 
-                  {state.showResult && currentQuestion.explanation && (
-                    <div className="bg-blue-50 border border-blue-200 p-6 rounded-xl">
-                      <div className="flex items-center gap-2 mb-3">
-                        <BookOpen className="h-5 w-5 text-blue-600" />
-                        <h4 className="font-semibold text-blue-900">Penjelasan:</h4>
-                      </div>
-                      <p className="text-blue-800 leading-relaxed">{currentQuestion.explanation}</p>
+                {/* Explanation */}
+                {state.showResult && currentQuestion.explanation && (
+                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                    <div className="flex gap-2 mb-2">
+                      <Lightbulb className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <h4 className="font-semibold text-blue-900">Penjelasan:</h4>
                     </div>
-                  )}
-
-                  {state.showResult && renderAIFeedback()}
-
-                  <div className="pt-6 border-t border-gray-200">
-                    <div className="flex justify-end">
-                      {!state.showResult ? (
-                        <Button 
-                          onClick={handleSubmitAnswer} 
-                          disabled={
-                            (currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && !state.selectedOptionId ||
-                            currentQuestion.question_type === 'essay' && !state.essayAnswer.trim() ||
-                            currentQuestion.question_type === 'sentence_arrangement' && blankPositions.some(pos => pos.piece === null)
-                          }
-                          className="bg-sky-500 hover:bg-sky-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg font-medium"
-                          size="lg"
-                        >
-                          Submit Jawaban
-                        </Button>
-                      ) : (
-                        <Button 
-                          onClick={handleNextQuestion} 
-                          className="bg-green-500 hover:bg-green-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg font-medium"
-                          size="lg"
-                          disabled={state.isLoadingFeedback}
-                        >
-                          {state.currentQuestionIndex < totalQuestions - 1 ? (
-                            <>
-                              Soal Berikutnya <ArrowRight className="h-5 w-5 ml-2" />
-                            </>
-                          ) : (
-                            <>
-                              Selesai <CheckCircle2 className="h-5 w-5 ml-2" />
-                            </>
-                          )}
-                        </Button>
-                      )}
+                    <div className="text-blue-800 text-sm leading-relaxed ml-7">
+                      {formatExplanationText(currentQuestion.explanation)}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </CardContent>
-        </Card>
+                )}
+
+                {/* AI Feedback */}
+                {state.showResult && renderAIFeedback()}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  {!state.showResult ? (
+                    <Button 
+                      onClick={handleSubmitAnswer} 
+                      disabled={
+                        (currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && !state.selectedOptionId ||
+                        currentQuestion.question_type === 'essay' && !state.essayAnswer.trim() ||
+                        currentQuestion.question_type === 'sentence_arrangement' && blankPositions.some(pos => pos.piece === null)
+                      }
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Submit Jawaban
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={handleNextQuestion} 
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      disabled={state.isLoadingFeedback}
+                    >
+                      {state.currentQuestionIndex < totalQuestions - 1 ? (
+                        <>
+                          Soal Berikutnya <ArrowRight className="h-4 w-4 ml-2" />
+                        </>
+                      ) : (
+                        <>
+                          Selesai <CheckCircle2 className="h-4 w-4 ml-2" />
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Sidebar - Question List - 30% */}
+        <div className="w-80">
+          <Card className="bg-white border border-gray-200 rounded-lg sticky top-8">
+            <CardHeader className="border-b border-gray-200 p-4">
+              <CardTitle className="text-base text-gray-900">Daftar Soal</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="grid grid-cols-4 gap-2">
+                {Array.from({ length: totalQuestions }).map((_, index) => {
+                  const isCurrentQuestion = index === state.currentQuestionIndex;
+                  const isAnswered = state.answeredQuestions.has(index);
+
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleJumpToQuestion(index)}
+                      className={`
+                        h-10 rounded-lg font-semibold text-xs transition-all duration-200
+                        ${isCurrentQuestion 
+                          ? 'bg-blue-600 text-white ring-2 ring-blue-300' 
+                          : isAnswered 
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }
+                      `}
+                      disabled={isCurrentQuestion}
+                      title={`Soal ${index + 1}`}
+                    >
+                      {index + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* Confirm Back Modal */}
+      <Dialog open={showConfirmBack} onOpenChange={setShowConfirmBack}>
+        <DialogContent className="bg-white rounded-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-gray-900">Tinggalkan Latihan?</DialogTitle>
+            <DialogDescription className="text-gray-600 mt-2">
+              Apakah Anda yakin ingin meninggalkan latihan? Kemajuan Anda mungkin tidak tersimpan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 mt-6">
+            <Button 
+              variant="outline"
+              onClick={() => setShowConfirmBack(false)}
+              className="flex-1"
+            >
+              Lanjutkan
+            </Button>
+            <Button 
+              onClick={handleBackClick}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            >
+              Keluar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Refresh Modal */}
+      <Dialog open={showConfirmRefresh} onOpenChange={setShowConfirmRefresh}>
+        <DialogContent className="bg-white rounded-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-600" />
+              Yakin ingin refresh halaman?
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 mt-2">
+              Memperbarui halaman akan mereset semua jawaban Anda yang belum disimpan. Kami sudah menyimpan feedback untuk setiap soal, tapi jawaban Anda akan hilang.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 my-4 bg-blue-50 p-3 rounded-lg border border-blue-200">
+            <p className="text-sm text-blue-900 font-semibold flex items-center gap-2">
+              Tip: Gunakan tombol "Kembali" jika ingin meninggalkan latihan dengan aman.
+            </p>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <Button 
+              variant="outline"
+              onClick={() => setShowConfirmRefresh(false)}
+              className="flex-1"
+            >
+              Batalkan Refresh
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowConfirmRefresh(false);
+                window.location.reload();
+              }}
+              className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              Lanjutkan Refresh
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
