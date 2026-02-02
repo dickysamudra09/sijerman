@@ -949,10 +949,10 @@ export default function ClassroomsPage() {
                 <span className="font-semibold text-gray-900">Pertemuan {selectedMeeting}</span>
                 <ChevronRight className="h-4 w-4 mx-2 text-gray-400" />
                 <span className="text-gray-600">
-                  {activeFilter === "all" && "Semua Konten"}
-                  {activeFilter === "materi" && "Materi"}
-                  {activeFilter === "tugas" && "Tugas"}
-                  {activeFilter === "latihan" && "Latihan Soal"}
+                  {selectedContentType === "all" && "Semua Konten"}
+                  {selectedContentType === "materi" && "Materi"}
+                  {selectedContentType === "tugas" && "Tugas"}
+                  {selectedContentType === "latihan" && "Latihan Soal"}
                 </span>
               </div>
 
@@ -960,7 +960,7 @@ export default function ClassroomsPage() {
               {userRole === "teacher" && (
                 <Button
                   onClick={() => setShowMeetingModal(true)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 sm:py-3 mb-6"
+                  className="w-full bg-black hover:bg-gray-900 text-white py-2 sm:py-3 mb-6 font-semibold"
                 >
                   <Plus className="h-5 w-5 mr-2" />
                   Buat Pertemuan
@@ -985,8 +985,8 @@ export default function ClassroomsPage() {
                       >
                         <CardContent className="p-4 sm:p-5">
                           <div className="flex items-start gap-3 sm:gap-4">
-                            <div className="w-10 sm:w-12 h-10 sm:h-12 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                              <Icon className="h-5 sm:h-6 w-5 sm:w-6 text-blue-600" />
+                            <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#1E1E1E'}}>
+                              <Icon className="h-5 sm:h-6 w-5 sm:w-6" style={{color: '#FFFFFC'}} />
                             </div>
                             
                             <div className="flex-1 min-w-0">
@@ -1000,8 +1000,23 @@ export default function ClassroomsPage() {
                                   </p>
                                 </div>
                                 
-                                <Badge className={`${status.color} flex items-center gap-1 px-2 sm:px-3 py-1 flex-shrink-0 text-xs sm:text-sm`}>
-                                  <StatusIcon className="h-3 w-3" />
+                                <Badge 
+                                  className={`flex items-center gap-1 px-2 sm:px-3 py-1 flex-shrink-0 text-xs sm:text-sm ${
+                                    (content.jenis_create.toLowerCase() === "materi" || content.jenis_create.toLowerCase() === "latihan soal") 
+                                      ? "" 
+                                      : status.color
+                                  }`}
+                                  style={
+                                    (content.jenis_create.toLowerCase() === "materi" || content.jenis_create.toLowerCase() === "latihan soal") 
+                                      ? {backgroundColor: '#1E1E1E', color: '#FFFFFC'}
+                                      : {}
+                                  }
+                                >
+                                  <StatusIcon className="h-3 w-3" style={
+                                    (content.jenis_create.toLowerCase() === "materi" || content.jenis_create.toLowerCase() === "latihan soal")
+                                      ? {color: '#FFFFFC'}
+                                      : {}
+                                  } />
                                   <span className="hidden sm:inline">{status.label}</span>
                                   <span className="sm:hidden">{status.label.split(' ')[0]}</span>
                                 </Badge>
@@ -1051,7 +1066,7 @@ export default function ClassroomsPage() {
                                     </Button>
                                     <Button
                                       size="sm"
-                                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm"
+                                      className="bg-yellow-400 hover:bg-yellow-500 text-black text-xs sm:text-sm font-semibold"
                                     >
                                       <Eye className="h-3 sm:h-4 w-3 sm:w-4 mr-1" />
                                       Lihat Detail
@@ -1062,7 +1077,8 @@ export default function ClassroomsPage() {
                                     {content.jenis_create.toLowerCase() === "latihan soal" ? (
                                       <Button
                                         size="sm"
-                                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm"
+                                        className="text-xs sm:text-sm"
+                                        style={{backgroundColor: '#FFD903', color: '#1E1E1E'}}
                                       >
                                         {attempts && attempts.length > 0 ? (
                                           <>
@@ -1081,7 +1097,8 @@ export default function ClassroomsPage() {
                                     ) : content.jenis_create.toLowerCase() === "tugas" ? (
                                       <Button
                                         size="sm"
-                                        className={submission ? "bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm" : "bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm"}
+                                        className={submission ? "bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm" : "text-xs sm:text-sm"}
+                                        style={submission ? {} : {backgroundColor: '#FFD903', color: '#1E1E1E'}}
                                       >
                                         {submission ? (
                                           <>
@@ -1100,7 +1117,8 @@ export default function ClassroomsPage() {
                                     ) : (
                                       <Button
                                         size="sm"
-                                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm"
+                                        className="text-xs sm:text-sm"
+                                        style={{backgroundColor: '#FFD903', color: '#1E1E1E'}}
                                       >
                                         <BookOpen className="h-3 sm:h-4 w-3 sm:w-4 mr-1" />
                                         <span className="hidden sm:inline">Pelajari</span>
@@ -1399,37 +1417,40 @@ export default function ClassroomsPage() {
 
       {/* Latihan Modal */}
       <Dialog open={showLatihanModal} onOpenChange={setShowLatihanModal}>
-        <DialogContent className="bg-white max-w-xl border-0 shadow-xl rounded-xl">
-          <DialogHeader className="border-b pb-4">
-            <DialogTitle className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Target className="h-6 w-6 text-purple-600" />
+        <DialogContent className="max-w-xl border-0 shadow-xl rounded-xl p-0 overflow-hidden">
+          {/* Header */}
+          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '2px'}}>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-white">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-yellow-400">
+                <Target className="h-6 w-6 text-black" />
               </div>
               Latihan: {currentLatihan?.title}
             </DialogTitle>
-            <DialogDescription className="text-gray-600 mt-2">
+            <DialogDescription className="mt-2 pb-4 text-gray-300">
               {currentLatihan?.attempts && currentLatihan.attempts.length > 0
                 ? `Anda telah menyelesaikan latihan ini ${currentLatihan.attempts.length} kali. Mulai percobaan baru untuk meningkatkan skor Anda.`
                 : 'Anda belum mengerjakan latihan ini. Mulai sekarang dan kuji kemampuan Anda!'
               }
             </DialogDescription>
           </DialogHeader>
-          <div className="py-6 space-y-4 max-h-96 overflow-y-auto">
-            {currentLatihan?.attempts && currentLatihan.attempts.length > 0 && (
-              <div className="space-y-3">
-                <h4 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-blue-600" />
+
+          {/* Content */}
+          <div className="px-6 space-y-4 max-h-96 overflow-y-auto bg-white">
+            {currentLatihan?.attempts && currentLatihan.attempts.length > 0 ? (
+              <div className="space-y-3 pt-6 pb-6">
+                <h4 className="text-base font-bold flex items-center gap-2 text-gray-900">
+                  <CheckCircle2 className="h-5 w-5 text-yellow-400" />
                   Riwayat Percobaan
                 </h4>
                 <div className="space-y-2">
                   {currentLatihan.attempts.map((attempt) => (
-                    <Card key={attempt.id} className="border border-gray-200 hover:border-blue-300 transition-colors">
+                    <Card key={attempt.id} className="border-2 bg-gray-50 hover:bg-gray-100 transition-colors" style={{borderColor: '#FFD903'}}>
                       <CardContent className="p-4 flex justify-between items-center">
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-gray-900">
                             Percobaan #{attempt.attempt_number}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-600 mt-1">
                             <Clock className="h-3 w-3 inline mr-1" />
                             {new Date(attempt.submitted_at).toLocaleString('id-ID', {
                               year: 'numeric',
@@ -1440,22 +1461,18 @@ export default function ClassroomsPage() {
                             })}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <Badge className="bg-blue-100 text-blue-700 font-bold text-lg px-4 py-2 border-0">
-                            {attempt.percentage.toFixed(0)}%
-                          </Badge>
-                        </div>
+                        <Badge className="font-bold text-lg px-4 py-2 bg-yellow-400 text-black border-0">
+                          {attempt.percentage.toFixed(0)}%
+                        </Badge>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
               </div>
-            )}
-
-            {(!currentLatihan?.attempts || currentLatihan.attempts.length === 0) && (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-purple-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <Target className="h-8 w-8 text-purple-600" />
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-yellow-400">
+                  <Target className="h-8 w-8 text-black" />
                 </div>
                 <h4 className="text-lg font-semibold text-gray-900 mb-2">Belum Ada Percobaan</h4>
                 <p className="text-sm text-gray-600">
@@ -1465,17 +1482,18 @@ export default function ClassroomsPage() {
             )}
           </div>
 
-          <div className="flex gap-3 pt-4 border-t">
+          {/* Footer */}
+          <div className="flex gap-3 px-6 py-4" style={{backgroundColor: '#1E1E1E', borderTopColor: '#FFD903', borderTopWidth: '2px'}}>
             <Button 
-              variant="outline" 
               onClick={() => setShowLatihanModal(false)}
-              className="flex-1"
+              variant="outline"
+              className="flex-1 font-semibold border-yellow-400 text-black hover:bg-gray-900 hover:text-yellow-400"
             >
               Tutup
             </Button>
             <Button 
-              onClick={handleStartNewAttempt} 
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-10 font-semibold"
+              onClick={handleStartNewAttempt}
+              className="flex-1 h-10 font-semibold bg-yellow-400 text-black hover:bg-yellow-500"
             >
               <Plus className="h-4 w-4 mr-2" />
               Mulai Percobaan {currentLatihan?.attempts?.length ? currentLatihan.attempts.length + 1 : 1}
@@ -1559,17 +1577,19 @@ export default function ClassroomsPage() {
 
       {/* Modal 1: Pilih Pertemuan */}
       <Dialog open={showMeetingModal} onOpenChange={setShowMeetingModal}>
-        <DialogContent className="bg-white max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold">Buat Konten Baru</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-md border-0 shadow-xl rounded-xl p-0 overflow-hidden">
+          {/* Header */}
+          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '2px'}}>
+            <DialogTitle className="text-xl font-bold text-white">Buat Konten Baru</DialogTitle>
+            <DialogDescription className="mt-2 pb-4 text-gray-300">
               Pilih pertemuan ke berapa konten ini akan diberikan
             </DialogDescription>
           </DialogHeader>
           
-          <div className="py-6 space-y-4">
+          {/* Content */}
+          <div className="py-6 px-6 space-y-4 bg-white">
             <div>
-              <Label className="text-sm font-semibold text-gray-700 mb-3 block">Pertemuan</Label>
+              <Label className="text-sm font-semibold text-gray-900 mb-3 block">Pertemuan</Label>
               <div className="grid grid-cols-5 gap-2">
                 {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => {
                   const maxExistingMeeting = Math.max(...meetings.map(m => m.number), 0);
@@ -1600,7 +1620,7 @@ export default function ClassroomsPage() {
                   );
                 })}
               </div>
-              <p className="text-xs text-gray-500 mt-3">
+              <p className="text-xs text-gray-600 mt-3">
                 <span className="inline-block w-3 h-3 rounded bg-green-600 mr-2"></span>Sudah dibuat
                 <span className="inline-block w-3 h-3 rounded bg-purple-500 mr-2 ml-3"></span>Bisa dibuat
                 <span className="inline-block w-3 h-3 rounded bg-gray-300 mr-2 ml-3"></span>Belum tersedia
@@ -1608,13 +1628,15 @@ export default function ClassroomsPage() {
             </div>
           </div>
 
-          <div className="flex gap-3 pt-4 border-t">
+          {/* Footer */}
+          <div className="flex gap-3 px-6 py-4" style={{backgroundColor: '#1E1E1E', borderTopColor: '#FFD903', borderTopWidth: '2px'}}>
             <Button
               variant="outline"
               onClick={() => {
                 setShowMeetingModal(false);
                 setSelectedPertemuan(null);
               }}
+              className="flex-1 border-yellow-400 text-black hover:bg-gray-900 hover:text-yellow-400 font-semibold"
             >
               Batal
             </Button>
@@ -1627,7 +1649,7 @@ export default function ClassroomsPage() {
                   toast.error("Pilih pertemuan terlebih dahulu");
                 }
               }}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold"
             >
               Lanjutkan
               <ChevronRight className="h-4 w-4 ml-2" />
@@ -1638,18 +1660,21 @@ export default function ClassroomsPage() {
 
       {/* Modal 2: Pilih Jenis Konten (Materi/Tugas & Latihan Soal) */}
       <Dialog open={showContentTypeModal} onOpenChange={setShowContentTypeModal}>
-        <DialogContent className="bg-white max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold">Pilih Jenis Konten</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-2xl border-0 shadow-xl rounded-xl p-0 overflow-hidden">
+          {/* Header */}
+          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '2px'}}>
+            <DialogTitle className="text-xl font-bold text-white">Pilih Jenis Konten</DialogTitle>
+            <DialogDescription className="mt-2 pb-4 text-gray-300">
               Pertemuan {selectedPertemuan} - Pilih jenis konten yang akan dibuat
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
+          {/* Content */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 px-6 bg-white">
             {/* Materi & Tugas Card */}
             <Card
-              className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-blue-400"
+              className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-yellow-400"
+              style={{backgroundColor: '#1E1E1E', borderColor: '#FFD903'}}
               onClick={() => {
                 router.push(`/home/classrooms/create?classId=${classId}&pertemuan=${selectedPertemuan}`);
                 setShowContentTypeModal(false);
@@ -1658,13 +1683,13 @@ export default function ClassroomsPage() {
               }}
             >
               <CardHeader className="text-center">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <BookOpen className="w-8 h-8 text-blue-600" />
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{backgroundColor: '#FFD903'}}>
+                  <BookOpen className="w-8 h-8 text-black" />
                 </div>
-                <CardTitle className="text-lg">Materi & Tugas</CardTitle>
+                <CardTitle className="text-lg text-white">Materi & Tugas</CardTitle>
               </CardHeader>
               <CardContent className="text-center">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-300">
                   Buat materi pembelajaran atau tugas untuk siswa.
                 </p>
               </CardContent>
@@ -1672,7 +1697,8 @@ export default function ClassroomsPage() {
 
             {/* Latihan Soal Card */}
             <Card
-              className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-green-400"
+              className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-yellow-400"
+              style={{backgroundColor: '#1E1E1E', borderColor: '#FFD903'}}
               onClick={() => {
                 router.push(`/home/classrooms/latihanSoal?classId=${classId}&pertemuan=${selectedPertemuan}`);
                 setShowContentTypeModal(false);
@@ -1681,13 +1707,13 @@ export default function ClassroomsPage() {
               }}
             >
               <CardHeader className="text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Target className="w-8 h-8 text-green-600" />
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{backgroundColor: '#FFD903'}}>
+                  <Target className="w-8 h-8 text-black" />
                 </div>
-                <CardTitle className="text-lg">Latihan Soal</CardTitle>
+                <CardTitle className="text-lg text-white">Latihan Soal</CardTitle>
               </CardHeader>
               <CardContent className="text-center">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-300">
                   Buat soal latihan untuk menguji pemahaman siswa.
                 </p>
               </CardContent>
@@ -1761,7 +1787,7 @@ function MeetingSidebar({
         {userRole === "teacher" && (
           <Button
             onClick={onCreateContent}
-            className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+            className="w-full mt-4 bg-black hover:bg-gray-900 text-white flex items-center justify-center gap-2 font-semibold"
             size="sm"
           >
             <Plus className="h-4 w-4" />
@@ -1779,16 +1805,23 @@ function MeetingSidebar({
           return (
             <div
               key={meeting.number}
-              onClick={() => onSelectMeeting(meeting.number)}
+              onClick={() => {
+                if (selectedMeeting === meeting.number) {
+                  onSelectMeeting(0);
+                } else {
+                  onSelectMeeting(meeting.number);
+                }
+              }}
               className={`relative rounded-xl border-2 overflow-hidden transition-all duration-300 cursor-pointer group ${
                 selectedMeeting === meeting.number
-                  ? "border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 shadow-md"
-                  : "border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm"
+                  ? "border-yellow-400 shadow-md"
+                  : "border-yellow-400 hover:shadow-sm"
               }`}
+              style={{backgroundColor: '#1E1E1E'}}
             >
               {/* Top accent bar */}
               <div className={`h-1 ${
-                selectedMeeting === meeting.number ? "bg-blue-600" : "bg-gray-300"
+                selectedMeeting === meeting.number ? "bg-yellow-400" : "bg-gray-700"
               }`} />
               
               <div className="p-4 lg:p-5">
@@ -1797,47 +1830,43 @@ function MeetingSidebar({
                   <div className="flex-1 min-w-0">
                     <h4 className={`text-sm lg:text-base font-bold transition-colors ${
                       selectedMeeting === meeting.number 
-                        ? "text-blue-700" 
-                        : "text-gray-900 group-hover:text-blue-600"
+                        ? "text-white" 
+                        : "text-white hover:text-yellow-400"
                     }`}>
                       {meeting.title}
                     </h4>
                   </div>
                   
                   {meeting.isCompleted && (
-                    <div className="flex-shrink-0 bg-green-100 rounded-full p-1.5">
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <div className="flex-shrink-0 rounded-full p-1.5">
+                      <CheckCircle2 className="h-4 w-4" style={{color: '#FFFFFC'}} />
                     </div>
                   )}
                 </div>
                 
                 {/* Content count */}
-                <div className="flex items-center gap-2 mb-4 text-xs text-gray-600">
-                  <FileText className="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
+                <div className="flex items-center gap-2 mb-4 text-xs" style={{color: '#FFFFFC'}}>
+                  <FileText className="h-3.5 w-3.5 flex-shrink-0" style={{color: '#FFFFFC'}} />
                   <span className="font-medium">
-                    <span className={selectedMeeting === meeting.number ? "text-blue-700 font-bold" : "text-gray-700"}>
+                    <span className={selectedMeeting === meeting.number ? "font-bold" : ""}>
                       {meeting.completedContents}
                     </span>
-                    <span className="text-gray-500"> / {meeting.totalContents} konten</span>
+                    <span> / {meeting.totalContents} konten</span>
                   </span>
                 </div>
                 
                 {/* Progress bar */}
                 <div className="space-y-1.5 mb-4">
-                  <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                  <div className="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
                     <div 
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        selectedMeeting === meeting.number 
-                          ? "bg-gradient-to-r from-blue-500 to-blue-600 shadow-md" 
-                          : "bg-blue-500"
-                      }`}
-                      style={{ width: `${progress}%` }}
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${progress}%`, backgroundColor: '#FFD903' }}
                     />
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-medium text-gray-600">{progress.toFixed(0)}%</span>
+                    <span className="text-xs font-medium" style={{color: '#FFD903'}}>{progress.toFixed(0)}%</span>
                     {meeting.isCompleted && (
-                      <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{color: '#FFD903', backgroundColor: 'transparent'}}>
                         Selesai
                       </span>
                     )}
@@ -1846,7 +1875,7 @@ function MeetingSidebar({
 
                 {/* Content Type Submenu */}
                 {selectedMeeting === meeting.number && (
-                  <div className="border-t pt-3 mt-3">
+                  <div className="border-t pt-3 mt-3" style={{borderColor: '#FFFFFC'}}>
                     <div className="flex flex-col gap-2">
                       {[
                         { type: "materi", label: "Materi", color: "bg-slate-600", textColor: "text-slate-600" },
@@ -1859,7 +1888,10 @@ function MeetingSidebar({
                         return (
                           <button
                             key={item.type}
-                            onClick={() => onContentTypeChange?.(item.type as "materi" | "tugas" | "latihan")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onContentTypeChange?.(item.type as "materi" | "tugas" | "latihan");
+                            }}
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
                               isSelected
                                 ? `${item.color} text-white font-semibold shadow-md`
