@@ -328,24 +328,25 @@ export default function CreateContentPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 sm:px-6 py-4 sm:py-6 shadow-lg">
+      <div className="text-white px-4 sm:px-6 py-4 sm:py-6 shadow-lg" style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '3px'}}>
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <Button 
                 variant="ghost" 
                 onClick={() => setShowConfirmBack(true)} 
-                className="text-white hover:bg-white/20 h-10 w-10 p-0 flex-shrink-0"
+                className="text-black hover:text-white h-10 w-10 p-0 flex-shrink-0 rounded-lg font-bold"
+                style={{backgroundColor: '#FFD903'}}
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-2xl font-bold">{isEditing ? "Edit Konten" : "Buat Konten"}</h1>
-                <p className="text-xs sm:text-sm text-blue-100 truncate">{className}</p>
+                <p className="text-xs sm:text-sm text-gray-300 truncate">{className}</p>
               </div>
             </div>
             {classCode && (
-              <Badge className="bg-white/20 text-white border-0 px-3 py-1.5 text-xs sm:text-sm flex-shrink-0 backdrop-blur-sm">
+              <Badge className="border-yellow-400 text-white px-3 py-1.5 text-xs sm:text-sm flex-shrink-0" style={{backgroundColor: '#FFD903', color: '#1E1E1E'}}>
                 {classCode}
               </Badge>
             )}
@@ -367,10 +368,10 @@ export default function CreateContentPage() {
                   toast.info("Tipe konten tidak dapat diubah saat mode edit.");
                 }
               }}
-              className="flex items-center gap-3 hover:bg-blue-50 p-2 rounded-lg transition-colors flex-1 sm:flex-auto text-left"
+              className="flex items-center gap-3 hover:bg-gray-50 p-2 rounded-lg transition-colors flex-1 sm:flex-auto text-left"
             >
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <FileText className="h-5 w-5 text-blue-600" />
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#1E1E1E'}}>
+                <FileText className="h-5 w-5" style={{color: '#FFD903'}} />
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-medium">Tipe Konten</p>
@@ -380,8 +381,8 @@ export default function CreateContentPage() {
 
             {/* Dokumen */}
             <div className="flex items-center gap-3 flex-1 sm:flex-auto">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Upload className="h-5 w-5 text-green-600" />
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#1E1E1E'}}>
+                <Upload className="h-5 w-5" style={{color: '#FFD903'}} />
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-medium">Dokumen</p>
@@ -392,12 +393,12 @@ export default function CreateContentPage() {
             {/* Pertemuan */}
             {pertemuan && (
               <div className="flex items-center gap-3 flex-1 sm:flex-auto">
-                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="h-5 w-5 text-orange-600" />
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#1E1E1E'}}>
+                  <BookOpen className="h-5 w-5" style={{color: '#FFD903'}} />
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 font-medium">Pertemuan</p>
-                  <p className="text-sm font-semibold text-orange-700">{pertemuan}</p>
+                  <p className="text-sm font-semibold" style={{color: '#1E1E1E'}}>{pertemuan}</p>
                 </div>
               </div>
             )}
@@ -562,18 +563,19 @@ export default function CreateContentPage() {
                   type="button"
                   variant="outline"
                   onClick={() => setShowConfirmBack(true)}
-                  className="flex-1"
+                  className="flex-1 border-yellow-400 text-black hover:bg-gray-100"
                 >
                   {isEditing ? "Batalkan Edit" : "Batalkan Buat"}
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={isSubmitting} 
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-10"
+                  className="flex-1 h-10 font-semibold"
+                  style={{backgroundColor: '#FFD903', color: '#1E1E1E'}}
                 >
                   {isSubmitting ? (
                     <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
                       {isEditing ? "Memperbarui..." : "Membuat..."}
                     </div>
                   ) : (
@@ -591,31 +593,32 @@ export default function CreateContentPage() {
 
       {/* Modal Pilih Jenis Konten */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="bg-white shadow-xl border-0 rounded-xl max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-900">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <FileText className="h-5 w-5 text-blue-600" />
+        <DialogContent className="shadow-xl border-0 rounded-xl max-w-md p-0 overflow-hidden">
+          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '2px'}}>
+            <DialogTitle className="flex items-center gap-3 text-xl font-bold text-white">
+              <div className="p-2 rounded-lg" style={{backgroundColor: '#FFD903'}}>
+                <FileText className="h-5 w-5 text-black" />
               </div>
               Pilih Jenis Konten
             </DialogTitle>
-            <DialogDescription className="text-gray-600">
+            <DialogDescription className="mt-2 pb-4 text-gray-300">
               Tentukan apakah konten ini adalah Materi atau Tugas.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 pt-4">
+          <div className="grid gap-4 px-6 py-6 bg-white">
             <Button
               variant="outline"
               onClick={() => handleSelectJenis("materi")}
-              className="w-full bg-white border-l-4 border-l-blue-600 shadow-sm hover:shadow-md transition-all duration-200 rounded-lg p-6 h-auto flex items-start text-left"
+              className="w-full border-l-4 border-l-yellow-400 shadow-sm hover:shadow-md transition-all duration-200 rounded-lg p-6 h-auto flex items-start text-left justify-start"
+              style={{backgroundColor: '#1E1E1E', borderColor: '#FFD903'}}
             >
-              <div className="flex items-center gap-3 w-full">
-                <div className="p-3 bg-blue-100 rounded-lg flex-shrink-0">
-                  <BookOpen className="h-6 w-6 text-blue-600" />
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="p-3 rounded-lg flex-shrink-0" style={{backgroundColor: '#FFD903'}}>
+                  <BookOpen className="h-6 w-6 text-black" />
                 </div>
-                <div className="flex-1">
-                  <span className="text-lg font-bold text-blue-600 block">Materi</span>
-                  <p className="text-sm text-gray-600 mt-1">
+                <div className="flex-1 text-left">
+                  <span className="text-lg font-bold text-white block">Materi</span>
+                  <p className="text-sm text-gray-300 mt-1">
                     Buat konten pembelajaran dengan teks, gambar, dan video.
                   </p>
                 </div>
@@ -624,15 +627,16 @@ export default function CreateContentPage() {
             <Button
               variant="outline"
               onClick={() => handleSelectJenis("tugas")}
-              className="w-full bg-white border-l-4 border-l-green-600 shadow-sm hover:shadow-md transition-all duration-200 rounded-lg p-6 h-auto flex items-start text-left"
+              className="w-full border-l-4 border-l-yellow-400 shadow-sm hover:shadow-md transition-all duration-200 rounded-lg p-6 h-auto flex items-start text-left justify-start"
+              style={{backgroundColor: '#1E1E1E', borderColor: '#FFD903'}}
             >
-              <div className="flex items-center gap-3 w-full">
-                <div className="p-3 bg-green-100 rounded-lg flex-shrink-0">
-                  <FileText className="h-6 w-6 text-green-600" />
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="p-3 rounded-lg flex-shrink-0" style={{backgroundColor: '#FFD903'}}>
+                  <FileText className="h-6 w-6 text-black" />
                 </div>
-                <div className="flex-1">
-                  <span className="text-lg font-bold text-green-600 block">Tugas</span>
-                  <p className="text-sm text-gray-600 mt-1">
+                <div className="flex-1 text-left">
+                  <span className="text-lg font-bold text-white block">Tugas</span>
+                  <p className="text-sm text-gray-300 mt-1">
                     Buat tugas yang memerlukan pengumpulan.
                   </p>
                 </div>
@@ -644,22 +648,22 @@ export default function CreateContentPage() {
 
       {/* Modal Konfirmasi Kembali */}
       <Dialog open={showConfirmBack} onOpenChange={setShowConfirmBack}>
-        <DialogContent className="bg-white max-w-md rounded-xl border-0 shadow-xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-orange-600">
-              <AlertCircle className="h-6 w-6" />
+        <DialogContent className="max-w-md rounded-xl border-0 shadow-xl p-0 overflow-hidden">
+          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '2px'}}>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-white">
+              <AlertCircle className="h-6 w-6" style={{color: '#FFD903'}} />
               {isEditing ? "Batalkan Edit Konten?" : "Batalkan Pembuatan Konten?"}
             </DialogTitle>
-            <DialogDescription className="text-gray-600 mt-2">
+            <DialogDescription className="text-gray-300 mt-2 pb-4">
               Perubahan yang belum disimpan akan hilang. Apakah Anda yakin ingin kembali?
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex gap-3 pt-4 border-t">
+          <div className="flex gap-3 px-6 py-4 bg-white border-t" style={{borderTopColor: '#FFD903', borderTopWidth: '2px'}}>
             <Button
               variant="outline"
               onClick={() => setShowConfirmBack(false)}
-              className="flex-1"
+              className="flex-1 border-yellow-400 text-black hover:bg-gray-100 font-semibold"
             >
               {isEditing ? "Lanjutkan Edit" : "Lanjutkan Membuat"}
             </Button>
@@ -668,7 +672,8 @@ export default function CreateContentPage() {
                 setShowConfirmBack(false);
                 router.push(`/home/classrooms/${classId}`);
               }}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              className="flex-1 text-white font-semibold"
+              style={{backgroundColor: '#1E1E1E'}}
             >
               Batalkan
             </Button>
