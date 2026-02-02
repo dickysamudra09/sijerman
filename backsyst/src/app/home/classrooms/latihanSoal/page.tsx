@@ -746,13 +746,13 @@ export default function LatihanSoalPage() {
       <Card key={question.id} className="bg-white border border-gray-200 shadow-sm rounded-xl">
         <CardContent className="p-6">
           <div className="flex items-start gap-4">
-            <div className="w-8 h-8 bg-sky-600 text-white rounded-full flex items-center justify-center flex-shrink-0 font-semibold">
+            <div style={{backgroundColor: '#FFD903', color: '#1E1E1E'}} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-semibold">
               {qIndex + 1}
             </div>
             <div className="flex-1 space-y-4">
               {/* Header dengan tipe pertanyaan dan poin */}
               <div className="flex items-center gap-4 mb-4">
-                <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700">
+                <Badge style={{backgroundColor: '#FEF3C7', color: '#1E1E1E', borderColor: '#FFD903'}} className="border">
                   {renderQuestionTypeIcon(question.question_type)}
                   <span className="ml-1 capitalize">
                     {question.question_type === 'multiple_choice' && 'Pilihan Ganda'}
@@ -761,7 +761,7 @@ export default function LatihanSoalPage() {
                   </span>
                 </Badge>
                 <div className="flex items-center gap-2">
-                  <Star className="h-4 w-4 text-yellow-500" />
+                  <Star className="h-4 w-4" style={{color: '#FFD903'}} />
                   <Input
                     type="number"
                     value={question.points}
@@ -783,7 +783,7 @@ export default function LatihanSoalPage() {
                     }
                     min="1"
                     max="100"
-                    className="w-20 border-gray-300 focus:border-yellow-500 focus:ring-yellow-200"
+                    className="w-20 border-gray-300 focus:border-yellow-400 focus:ring-yellow-200"
                   />
                   <span className="text-sm text-gray-600">poin</span>
                 </div>
@@ -821,7 +821,7 @@ export default function LatihanSoalPage() {
                     )
                   }
                   placeholder={question.question_type === 'sentence_arrangement' ? "Masukkan kalimat lengkap yang akan dijadikan puzzle..." : "Masukkan pertanyaan di sini..."}
-                  className="border-gray-300 focus:border-sky-500 focus:ring-sky-200 bg-white shadow-sm min-h-[100px]"
+                  className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-200 bg-white shadow-sm min-h-[100px]"
                   rows={3}
                 />
               </div>
@@ -860,7 +860,8 @@ export default function LatihanSoalPage() {
                                 )
                               );
                             }}
-                            className="w-4 h-4 text-sky-600 focus:ring-sky-500"
+                            className="w-4 h-4 focus:ring-yellow-200"
+                            style={{accentColor: '#FFD903'}}
                           />
                         </div>
                         <div className="flex-1">
@@ -890,7 +891,7 @@ export default function LatihanSoalPage() {
                               )
                             }
                             placeholder={`Pilihan ${String.fromCharCode(65 + optIndex)}`}
-                            className="border-gray-300 focus:border-sky-500 focus:ring-sky-200 bg-white shadow-sm"
+                            className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-200 bg-white shadow-sm"
                           />
                         </div>
                       </div>
@@ -915,7 +916,7 @@ export default function LatihanSoalPage() {
                             autoGenerateBlanks(exercise.id, question.id, question.question_text);
                           }
                         }}
-                        className="bg-purple-500 hover:bg-purple-600 text-white text-sm px-4 py-2"
+                        style={{backgroundColor: '#FFD903', color: '#1E1E1E'}} className="hover:opacity-90 text-sm px-4 py-2 transition-opacity"
                         size="sm"
                       >
                         <Square className="h-4 w-4 mr-2" />
@@ -926,14 +927,14 @@ export default function LatihanSoalPage() {
 
                   {question.sentence_arrangement_config?.sentence_with_blanks && (
                     <div className="space-y-4">
-                      <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                        <Label className="text-sm font-semibold text-purple-800 mb-2 block">
+                      <div style={{backgroundColor: '#FEF3C7', borderColor: '#FFD903', borderWidth: '1px'}} className="p-4 rounded-lg">
+                        <Label style={{color: '#1E1E1E'}} className="text-sm font-semibold mb-2 block">
                           Preview Puzzle
                         </Label>
-                        <div className="text-lg text-purple-900 font-medium mb-3">
+                        <div style={{color: '#1E1E1E'}} className="text-lg font-medium mb-3">
                           {question.sentence_arrangement_config.sentence_with_blanks}
                         </div>
-                        <div className="text-xs text-purple-600">
+                        <div style={{color: '#7C2D12'}} className="text-xs">
                           Siswa akan mengisi bagian "___" dengan kata-kata yang tersedia
                         </div>
                       </div>
@@ -946,10 +947,10 @@ export default function LatihanSoalPage() {
                           </Label>
                           <div className="space-y-2">
                             {question.sentence_arrangement_config.blank_words.map((word, index) => (
-                              <div key={index} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-200">
+                              <div key={index} style={{backgroundColor: '#DCFCE7', borderColor: '#22C55E', borderWidth: '1px'}} className="flex items-center gap-2 p-2 rounded-lg">
                                 <Square className="h-4 w-4 text-green-600" />
                                 <span className="text-green-800 font-medium">{word}</span>
-                                <Badge className="bg-green-500 text-white text-xs ml-auto">
+                                <Badge style={{backgroundColor: '#22C55E', color: '#FFFFFF'}} className="text-xs ml-auto">
                                   Blank {index + 1}
                                 </Badge>
                               </div>
@@ -964,7 +965,7 @@ export default function LatihanSoalPage() {
                           </Label>
                           <div className="space-y-2">
                             {question.sentence_arrangement_config.distractor_words.map((word, index) => (
-                              <div key={index} className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg border border-orange-200">
+                              <div key={index} style={{backgroundColor: '#FED7AA', borderColor: '#EA580C', borderWidth: '1px'}} className="flex items-center gap-2 p-2 rounded-lg">
                                 <X className="h-4 w-4 text-orange-600" />
                                 <span className="text-orange-800">{word}</span>
                                 <Button
@@ -1002,7 +1003,7 @@ export default function LatihanSoalPage() {
                             <div className="flex gap-2">
                               <Input
                                 placeholder="Tambah kata pengecoh..."
-                                className="flex-1 text-sm border-orange-300 focus:border-orange-500"
+                                className="flex-1 text-sm border-gray-300 focus:border-yellow-400 focus:ring-yellow-200"
                                 onKeyPress={(e) => {
                                   if (e.key === 'Enter') {
                                     const input = e.target as HTMLInputElement;
@@ -1064,7 +1065,7 @@ export default function LatihanSoalPage() {
                                     if (input) input.value = '';
                                   }
                                 }}
-                                className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                                style={{borderColor: '#FFD903', color: '#1E1E1E'}} className="border"
                               >
                                 <Plus className="h-3 w-3" />
                               </Button>
@@ -1073,8 +1074,8 @@ export default function LatihanSoalPage() {
                         </div>
                       </div>
 
-                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="text-sm text-blue-800">
+                      <div style={{backgroundColor: '#FEF3C7', borderColor: '#FFD903', borderWidth: '1px'}} className="p-3 rounded-lg">
+                        <div style={{color: '#1E1E1E'}} className="text-sm">
                           <strong>Cara Kerja Puzzle:</strong>
                           <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
                             <li>Siswa melihat kalimat dengan bagian kosong (___)</li>
@@ -1098,10 +1099,10 @@ export default function LatihanSoalPage() {
                       (question.question_type === 'multiple_choice' && question.options.some(opt => !opt.option_text.trim())) ||
                       (question.question_type === 'sentence_arrangement' && !question.question_text.trim())
                     }
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    style={{backgroundColor: '#FFD903', color: '#1E1E1E'}} className="hover:opacity-90 transition-opacity disabled:opacity-50"
                   >
                     {isSaving ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2" />
                     ) : (
                       <Save className="h-4 w-4 mr-2" />
                     )}
@@ -1111,10 +1112,10 @@ export default function LatihanSoalPage() {
                   <Button
                     onClick={() => updateQuestion(exercise.id, question)}
                     disabled={isSaving}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    style={{backgroundColor: '#FFD903', color: '#1E1E1E'}} className="hover:opacity-90 transition-opacity disabled:opacity-50"
                   >
                     {isSaving ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2" />
                     ) : (
                       <Save className="h-4 w-4 mr-2" />
                     )}
@@ -1143,7 +1144,7 @@ export default function LatihanSoalPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div style={{borderColor: '#FFD903'}} className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"></div>
           <p className="text-gray-600 text-lg">Memuat latihan soal...</p>
         </div>
       </div>
@@ -1152,21 +1153,22 @@ export default function LatihanSoalPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header Hero Section */}
-      <div className="bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-lg">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-          <div className="flex items-center gap-4 mb-6">
+      {/* Header */}
+      <div className="text-white shadow-lg" style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '3px'}}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          <div className="flex items-center gap-4 mb-0">
             <Button 
               variant="ghost" 
               onClick={() => router.back()}
-              className="hover:bg-white/20 transition-colors text-white border-0"
+              className="text-black hover:text-white h-10 w-10 p-0 rounded-lg font-bold flex-shrink-0"
+              style={{backgroundColor: '#FFD903'}}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="flex-1">
-              <h1 className="text-3xl sm:text-4xl font-bold">Latihan Soal</h1>
-              <p className="text-blue-100 text-sm sm:text-base mt-1">
-                Kelas: <span className="font-semibold">{classroomName || "..."}</span>
+              <h1 className="text-xl sm:text-2xl font-bold text-white">Latihan Soal</h1>
+              <p className="text-gray-300 text-xs sm:text-sm mt-1">
+                Kelas: <span className="font-semibold text-white">{classroomName || "..."}</span>
               </p>
             </div>
           </div>
@@ -1176,124 +1178,76 @@ export default function LatihanSoalPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Main Content Container */}
         <div>
-        {/* Create New Exercise Section */}
-            {!isCreating ? (
-              <Card className="bg-white border border-gray-200 shadow-sm rounded-lg mb-8 overflow-hidden">
-                <CardContent className="p-0">
-                  <button 
-                    onClick={() => setIsCreating(true)}
-                    className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Plus className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <div className="text-left">
-                        <h3 className="text-lg font-semibold text-gray-900">Buat Latihan Soal Baru</h3>
-                        <p className="text-sm text-gray-500 mt-1">Mulai membuat set latihan soal untuk siswa</p>
-                      </div>
-                    </div>
-                    <Plus className="h-5 w-5 text-gray-400" />
-                  </button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="bg-white border border-gray-200 shadow-sm rounded-lg mb-8">
-                <CardHeader className="border-b border-gray-200 pb-4">
-                  <CardTitle className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Plus className="h-5 w-5 text-blue-600" />
-                    </div>
-                    Buat Latihan Soal Baru
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6 space-y-6">
-                  <div>
-                    <Label htmlFor="exercise-title" className="text-sm font-semibold text-gray-700 mb-2 block">
-                      Judul Latihan Soal <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="exercise-title"
-                      value={newTitle}
-                      onChange={(e) => setNewTitle(e.target.value)}
-                      placeholder="Contoh: Latihan Soal Kosakata Bab 1"
-                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-200 bg-white shadow-sm"
-                      onKeyPress={(e) => e.key === 'Enter' && createNewExercise()}
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-4 border-t border-gray-200">
-                    <Button 
-                      onClick={createNewExercise}
-                      disabled={!newTitle.trim() || isSaving}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      {isSaving ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                      ) : (
-                        <Save className="h-4 w-4 mr-2" />
-                      )}
-                      {isSaving ? "Menyimpan..." : "Buat"}
-                    </Button>
-                    <Button 
-                      onClick={() => {
-                        setIsCreating(false);
-                        setNewTitle("");
-                      }}
-                      variant="outline"
-                      className="border-gray-300 text-gray-600 hover:bg-gray-50"
-                    >
-                      Batal
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Exercise Sets List */}
             <div className="space-y-4">
-              {/* Filter Pertemuan */}
+              {/* Filter Pertemuan and Create Button */}
               {availablePertemuan.length > 0 && (
-                <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border-2 border-blue-300 shadow-md">
-                  <Label className="font-bold text-blue-900">Pertemuan:</Label>
-                  <Select value={selectedPertemuan?.toString()} onValueChange={(val) => setSelectedPertemuan(Number(val))}>
-                    <SelectTrigger className="w-56 bg-white border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-50 cursor-pointer shadow-sm transition-all duration-200">
-                      <SelectValue placeholder="Pilih pertemuan" className="text-gray-700 font-medium" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-2 border-blue-300 shadow-lg">
-                      {availablePertemuan.map((num) => (
-                        <SelectItem 
-                          key={num} 
-                          value={num.toString()}
-                          className="cursor-pointer hover:bg-blue-100 py-2 px-3 transition-colors duration-150"
-                        >
-                          <span className="font-medium text-gray-800">Pertemuan {num}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div style={{backgroundColor: '#FFFFFC', borderColor: '#FFD903', borderWidth: '2px'}} className="flex items-center justify-between gap-3 p-4 rounded-lg shadow-md">
+                  <div className="flex items-center gap-3">
+                    <Label className="font-bold text-black">Pertemuan:</Label>
+                    <Select value={selectedPertemuan?.toString() || ""} onValueChange={(val) => setSelectedPertemuan(Number(val))}>
+                      <SelectTrigger style={{borderColor: '#FFD903', borderWidth: '2px'}} className="w-56 bg-white hover:bg-gray-50 cursor-pointer shadow-sm transition-all duration-200">
+                        <SelectValue placeholder="Pilih pertemuan">
+                          {selectedPertemuan ? `Pertemuan ${selectedPertemuan}` : "Pilih pertemuan"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-2 shadow-lg" style={{borderColor: '#FFD903'}}>
+                        {availablePertemuan.map((num) => (
+                          <SelectItem 
+                            key={num} 
+                            value={num.toString()}
+                            className="cursor-pointer hover:bg-gray-100 py-2 px-3 transition-colors duration-150"
+                          >
+                            <span className="font-medium text-gray-800">Pertemuan {num}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={() => setIsCreating(true)}
+                    style={{backgroundColor: '#FFD903', color: '#1E1E1E'}}
+                    className="font-semibold hover:opacity-90 transition-opacity flex-shrink-0"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Buat Soal
+                  </Button>
                 </div>
               )}
 
-              {exerciseSets.length === 0 ? (
-                <Card className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                  <CardContent className="p-12 text-center">
-                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <AlertCircle className="h-10 w-10 text-gray-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      Belum Ada Latihan Soal
-                    </h3>
-                    <p className="text-gray-600">
-                      Mulai dengan membuat latihan soal pertama untuk siswa Anda
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-4">
-                  {exerciseSets
-                    .filter((exercise) => !selectedPertemuan || exercise.pertemuan === selectedPertemuan)
-                    .map((exercise) => (
-                    <Card key={exercise.id} id={`exercise-${exercise.id}`} className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all duration-200">
+              {(() => {
+                const filteredExercises = exerciseSets.filter((exercise) => !selectedPertemuan || exercise.pertemuan === selectedPertemuan);
+                return filteredExercises.length === 0 ? (
+                  <Card className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                    <CardContent className="p-12 text-center">
+                      <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle className="h-10 w-10 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        Belum Ada Latihan Soal
+                      </h3>
+                      <p className="text-gray-600 text-sm mb-6">
+                        {selectedPertemuan 
+                          ? `Belum ada latihan soal untuk Pertemuan ${selectedPertemuan}. Buat sekarang untuk mulai memberikan latihan kepada siswa.`
+                          : `Mulai dengan membuat latihan soal untuk kelas Anda. Pilih pertemuan terlebih dahulu.`
+                        }
+                      </p>
+                      {selectedPertemuan && (
+                        <Button
+                          onClick={() => setIsCreating(true)}
+                          style={{backgroundColor: '#FFD903', color: '#1E1E1E'}}
+                          className="font-semibold hover:opacity-90 transition-opacity"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Buat Latihan Soal
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredExercises.map((exercise) => (
+                      <Card key={exercise.id} id={`exercise-${exercise.id}`} className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all duration-200">
                       <div className="relative">
                         {/* Delete button outside the clickable area */}
                         <div className="absolute top-4 right-4 z-10">
@@ -1310,47 +1264,47 @@ export default function LatihanSoalPage() {
 
                         {/* Clickable header */}
                         <button
-                          className="w-full text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                          className="w-full text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-yellow-400"
                           onClick={() => setEditingExercise(editingExercise === exercise.id ? null : exercise.id)}
                         >
-                          <CardHeader className="pb-4 pr-16 bg-gradient-to-r from-sky-600 to-blue-600 text-white hover:from-sky-700 hover:to-blue-700 transition-colors">
+                          <CardHeader style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '2px'}} className="pb-4 pr-16 text-white hover:opacity-90 transition-opacity">
                             <div className="flex items-start gap-4">
-                              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <CheckCircle className="h-6 w-6 text-white" />
+                              <div style={{backgroundColor: '#FFD903'}} className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <CheckCircle className="h-6 w-6" style={{color: '#1E1E1E'}} />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <CardTitle className="text-lg font-semibold text-white mb-3">
                                   {exercise.judul_latihan}
                                 </CardTitle>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <Badge className="bg-white text-blue-600 border-0 shadow-sm font-medium">
+                                  <Badge style={{backgroundColor: '#FFD903', color: '#1E1E1E'}} className="border-0 shadow-sm font-medium">
                                     <Users className="h-3 w-3 mr-1" />
                                     {exercise.questions.length} Soal
                                   </Badge>
-                                  <Badge className="bg-white text-amber-600 border-0 shadow-sm font-medium">
+                                  <Badge style={{backgroundColor: '#FFFFFC', color: '#1E1E1E', borderColor: '#FFD903', borderWidth: '1px'}} className="border-0 shadow-sm font-medium">
                                     <Star className="h-3 w-3 mr-1" />
                                     {exercise.questions.reduce((total, q) => total + q.points, 0)} Poin
                                   </Badge>
                                   {exercise.questions.some(q => q.question_type === 'multiple_choice') && (
-                                    <Badge className="bg-white text-blue-600 border-0 text-xs shadow-sm font-medium">
+                                    <Badge style={{backgroundColor: '#FFD903', color: '#1E1E1E'}} className="border-0 text-xs shadow-sm font-medium">
                                       <CheckCircle className="h-3 w-3 mr-1" />
                                       PG
                                     </Badge>
                                   )}
                                   {exercise.questions.some(q => q.question_type === 'essay') && (
-                                    <Badge className="bg-white text-green-600 border-0 text-xs shadow-sm font-medium">
+                                    <Badge style={{backgroundColor: '#FFFFFC', color: '#1E1E1E', borderColor: '#FFD903', borderWidth: '1px'}} className="border-0 text-xs shadow-sm font-medium">
                                       <FileText className="h-3 w-3 mr-1" />
                                       Essay
                                     </Badge>
                                   )}
                                   {exercise.questions.some(q => q.question_type === 'sentence_arrangement') && (
-                                    <Badge className="bg-white text-purple-600 border-0 text-xs shadow-sm font-medium">
+                                    <Badge style={{backgroundColor: '#FFD903', color: '#1E1E1E'}} className="border-0 text-xs shadow-sm font-medium">
                                       <Square className="h-3 w-3 mr-1" />
                                       Puzzle
                                     </Badge>
                                   )}
                                   {exercise.deadline_enabled && exercise.deadline && (
-                                    <Badge className="bg-white text-orange-600 border-0 shadow-sm font-medium">
+                                    <Badge style={{backgroundColor: '#FFFFFC', color: '#1E1E1E', borderColor: '#FFD903', borderWidth: '1px'}} className="border-0 shadow-sm font-medium">
                                       <Clock className="h-3 w-3 mr-1" />
                                       {new Date(exercise.deadline).toLocaleDateString('id-ID')}
                                     </Badge>
@@ -1386,7 +1340,7 @@ export default function LatihanSoalPage() {
                                         addQuestion(exercise.id, 'multiple_choice');
                                       }}
                                       disabled={isSaving || exercise.questions.some(q => !q.isSaved)}
-                                      className="bg-blue-600 hover:bg-blue-700 text-white flex-1 sm:flex-none"
+                                      style={{backgroundColor: '#FFD903', color: '#1E1E1E'}} className="hover:opacity-90 text-white flex-1 sm:flex-none transition-opacity disabled:opacity-50"
                                     >
                                       <CheckCircle className="h-4 w-4 mr-2" />
                                       Pilihan Ganda
@@ -1401,7 +1355,7 @@ export default function LatihanSoalPage() {
                                         addQuestion(exercise.id, 'essay');
                                       }}
                                       disabled={isSaving || exercise.questions.some(q => !q.isSaved)}
-                                      className="bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none"
+                                      style={{backgroundColor: '#FFD903', color: '#1E1E1E'}} className="hover:opacity-90 text-white flex-1 sm:flex-none transition-opacity disabled:opacity-50"
                                     >
                                       <FileText className="h-4 w-4 mr-2" />
                                       Essay
@@ -1416,7 +1370,7 @@ export default function LatihanSoalPage() {
                                         addQuestion(exercise.id, 'sentence_arrangement');
                                       }}
                                       disabled={isSaving || exercise.questions.some(q => !q.isSaved)}
-                                      className="bg-purple-600 hover:bg-purple-700 text-white flex-1 sm:flex-none"
+                                      style={{backgroundColor: '#FFD903', color: '#1E1E1E'}} className="hover:opacity-90 text-white flex-1 sm:flex-none transition-opacity disabled:opacity-50"
                                     >
                                       <Square className="h-4 w-4 mr-2" />
                                       Lengkapi Kalimat Rumpang
@@ -1436,9 +1390,78 @@ export default function LatihanSoalPage() {
                     </Card>
                   ))}
                 </div>
-              )}
+                );
+              })()}
             </div>
         </div>
+
+        {/* Modal Buat Latihan Soal Baru */}
+        {isCreating && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center">
+            <Card className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg sm:mx-4 overflow-hidden animate-in slide-in-from-bottom-5 sm:fade-in-0 sm:zoom-in-95">
+              <CardHeader className="pb-4" style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '2px'}}>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-3 text-white text-lg font-bold">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{backgroundColor: '#FFD903'}}>
+                      <Plus className="h-5 w-5" style={{color: '#1E1E1E'}} />
+                    </div>
+                    Buat Latihan Soal
+                  </CardTitle>
+                  <button
+                    onClick={() => {
+                      setIsCreating(false);
+                      setNewTitle("");
+                    }}
+                    className="text-white hover:text-gray-300 transition-colors"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6 pb-6 space-y-4">
+                <div>
+                  <Label htmlFor="modal-exercise-title" className="text-sm font-semibold text-gray-700 mb-2 block">
+                    Judul Latihan Soal <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="modal-exercise-title"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="Contoh: Latihan Soal Kosakata Bab 1"
+                    className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-200 bg-white shadow-sm"
+                    onKeyPress={(e) => e.key === 'Enter' && createNewExercise()}
+                    autoFocus
+                  />
+                </div>
+              </CardContent>
+              <div className="flex gap-3 px-6 pb-6">
+                <Button 
+                  onClick={() => {
+                    setIsCreating(false);
+                    setNewTitle("");
+                  }}
+                  variant="outline"
+                  className="flex-1 border-yellow-400 text-black hover:bg-gray-100 font-semibold"
+                >
+                  Batal
+                </Button>
+                <Button 
+                  onClick={createNewExercise}
+                  disabled={!newTitle.trim() || isSaving}
+                  className="flex-1 font-semibold"
+                  style={{backgroundColor: '#FFD903', color: '#1E1E1E'}}
+                >
+                  {isSaving ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  {isSaving ? "Menyimpan..." : "Buat"}
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );
