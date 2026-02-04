@@ -397,8 +397,24 @@ const WhyChooseSection = ({ language }: LanguageProps) => {
 const UserDropdownMenu = ({ user, language, onLogout }: UserDropdownProps) => {
   const getText = (id: string, de: string) => (language === "de" ? de : id);
   const [isOpen, setIsOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string>("student");
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      if (data?.role) {
+        setUserRole(data.role);
+      }
+    };
+    fetchUserRole();
+  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -415,6 +431,7 @@ const UserDropdownMenu = ({ user, language, onLogout }: UserDropdownProps) => {
   }, [isOpen]);
 
   const displayName = user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
+  const myCoursesUrl = userRole === "teacher" ? "/home/teacher?tab=my-courses" : "/home/student";
 
   return (
     <div className="relative">
@@ -462,7 +479,7 @@ const UserDropdownMenu = ({ user, language, onLogout }: UserDropdownProps) => {
 
           <button
             onClick={() => {
-              window.location.href = "/home/teacher?tab=my-courses";
+              window.location.href = myCoursesUrl;
               setIsOpen(false);
             }}
             className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
