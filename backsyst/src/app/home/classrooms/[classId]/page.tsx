@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -32,10 +33,12 @@ import {
   Calendar,
   X,
   ChevronRight,
+  ChevronDown,
   AlertCircle,
   Upload,
   Download,
-  UploadCloud
+  UploadCloud,
+  Globe
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -102,6 +105,120 @@ interface Meeting {
 }
 
 type FilterType = "all" | "materi" | "tugas" | "latihan";
+
+// User Profile Menu Component
+interface UserProfileMenuProps {
+  userRole: string | null;
+  userName: string;
+  handleLogout: () => void;
+}
+
+const UserProfileMenu = ({ userRole, userName, handleLogout }: UserProfileMenuProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node) && 
+          triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isOpen]);
+
+  const myCoursesUrl = userRole === "teacher" ? "/home/teacher?tab=my-courses" : "/home/student";
+
+  return (
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        onClick={() => setIsOpen(!isOpen)}
+        className="font-semibold flex items-center gap-2 px-3 py-2 rounded-md transition-colors hover:bg-gray-700"
+        style={{ color: "#FFFFFC" }}
+      >
+        <User className="h-4 w-4" />
+        <span className="hidden sm:inline text-sm">{userName.split(" ")[0]}</span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div
+          ref={menuRef}
+          className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E5E5E5",
+            zIndex: 99999,
+            top: "100%",
+            marginTop: "8px"
+          }}
+        >
+          <div
+            className="px-4 py-2 text-sm font-medium border-b"
+            style={{ color: "#1A1A1A", borderColor: "#E5E5E5" }}
+          >
+            {userName}
+          </div>
+
+          <button
+            onClick={() => {
+              window.location.href = "/";
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <Home className="h-4 w-4" />
+            Home
+          </button>
+
+          <button
+            onClick={() => {
+              window.location.href = myCoursesUrl;
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <BookOpen className="h-4 w-4" />
+            Kelas Saya
+          </button>
+
+          <button
+            onClick={() => {
+              window.location.href = "/open-courses";
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <Globe className="h-4 w-4" />
+            Kursus Terbuka
+          </button>
+
+          <div style={{ borderColor: "#E5E5E5" }} className="border-t my-1"></div>
+
+          <button
+            onClick={() => {
+              handleLogout();
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+            style={{ color: "#DC2626" }}
+          >
+            Keluar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function ClassroomsPage() {
   const [userName, setUserName] = useState<string>("");
@@ -747,14 +864,15 @@ export default function ClassroomsPage() {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 shadow-sm border-b-4" style={{backgroundColor: '#1E1E1E', borderColor: '#FFD903'}}>
+      <header style={{backgroundColor: '#0D0D0D', backdropFilter: 'none', WebkitBackdropFilter: 'none', zIndex: 40, overflow: 'visible'}} className="sticky top-0 overflow-visible">
         <div className="px-4 lg:px-6 py-3 lg:py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
+          <div className="flex items-center justify-between gap-4">
+            {/* Logo Section */}
+            <div className="flex items-center gap-3 flex-shrink-0">
               <Sheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="lg:hidden">
-                    <Menu className="h-5 w-5" />
+                    <Menu className="h-5 w-5" style={{color: '#E8B824'}} />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-80 p-0">
@@ -769,166 +887,134 @@ export default function ClassroomsPage() {
                 </SheetContent>
               </Sheet>
               
-              <Link href="/home" className="flex items-center space-x-2">
-                <GraduationCap className="h-8 w-8" style={{color: '#FFD903'}} />
-                <span className="text-xl font-semibold hidden sm:inline" style={{color: '#FFD903'}}>
-                  Si Jerman
-                </span>
+              <Link href="/home" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <img
+                  src="/img/1.png"
+                  alt="Logo"
+                  className="h-10 w-auto"
+                />
+                <div className="hidden sm:block">
+                  <h2 className="text-lg font-bold" style={{color: '#E8B824'}}>Si Jerman</h2>
+                  <p className="text-xs uppercase tracking-wider" style={{color: '#FFFFFC'}}>Learning Platform</p>
+                </div>
               </Link>
             </div>
 
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <input
-                type="text"
-                placeholder="Search Materi / Tugas / Soal"
-                className="hidden md:block px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 transition-all"
-                style={{
-                  backgroundColor: '#1E1E1E',
-                  borderWidth: '2px',
-                  borderStyle: 'solid',
-                  borderColor: '#FFFFFC',
-                  color: '#FFFFFC',
-                  width: '280px'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = '#FFD903'}
-                onBlur={(e) => e.currentTarget.style.borderColor = '#FFFFFC'}
-              />
-              <Button variant="ghost" size="icon" className="relative rounded-full border-2 transition-all" style={{borderColor: '#FFFFFC', backgroundColor: '#1E1E1E'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FFD903'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
-                <Bell className="h-5 w-5" style={{color: '#FFFFFC'}} />
-                <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full border border-white"></span>
+            {/* Search and Actions */}
+            <div className="flex items-center gap-3 flex-1 max-w-md justify-center md:justify-end">
+              {/* Search Bar - Desktop */}
+              <div className="relative hidden md:flex items-center flex-1 max-w-xs">
+                <Input
+                  placeholder="Cari materi..."
+                  className="pl-8 pr-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 transition-all"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 252, 0.1)',
+                    borderWidth: '1px',
+                    borderColor: '#E8B824',
+                    color: '#FFFFFC'
+                  }}
+                />
+                <Globe className="absolute left-2 h-4 w-4" style={{color: '#E8B824'}} />
+              </div>
+
+              {/* Notification Button */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="relative rounded-full border transition-all" 
+                style={{borderColor: '#E8B824', borderWidth: '1px'}}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(232, 184, 36, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <Bell className="h-5 w-5" style={{color: '#E8B824'}} />
+                <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></span>
               </Button>
 
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    className="rounded-full border-2 font-semibold shadow-sm transition-all duration-200 cursor-pointer" 
-                    size="icon" 
-                    style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC'}} 
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FFD903'} 
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}
-                  >
-                    <User className="h-5 w-5" style={{color: '#FFFFFC'}} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-white border-2 shadow-lg" style={{borderColor: '#FFD903'}}>
-                  <DropdownMenuLabel className="font-bold" style={{color: '#1E1E1E'}}>{userName}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link 
-                      href={userRole === "teacher" ? "/home/teacher" : "/home/student"} 
-                      className="flex items-center cursor-pointer" 
-                      style={{transition: 'all 0.2s'}} 
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#FFD903';
-                        const icon = e.currentTarget.querySelector('svg');
-                        if(icon) (icon as unknown as HTMLElement).style.color = '#1E1E1E';
-                      }} 
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        const icon = e.currentTarget.querySelector('svg');
-                        if(icon) (icon as unknown as HTMLElement).style.color = '#FFD903';
-                      }}
-                    >
-                      <Home className="mr-2 h-4 w-4" style={{color: '#FFD903', transition: 'all 0.2s'}} />
-                      <span className="text-gray-800">Kelas</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={handleLogout} 
-                    className="text-red-600 cursor-pointer" 
-                    style={{transition: 'all 0.2s'}} 
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FFD903'} 
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Keluar
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* User Profile Menu */}
+              <UserProfileMenu userRole={userRole} userName={userName} handleLogout={handleLogout} />
             </div>
           </div>
-          
-          {/* Class Info with Stats Cards */}
-          <div className="mt-3 lg:mt-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-              <div className="flex items-center gap-3">
-                {/* Back Button */}
-                <Button
-                  variant="outline"
-                  className="flex-shrink-0 hover:opacity-80 border-0 w-10 h-12 p-0"
-                  onClick={() => router.push(userRole === "teacher" ? "/home/teacher" : "/home/student")}
-                  style={{backgroundColor: '#FFD903'}}
-                >
-                  <ChevronRight className="h-5 w-5 rotate-180" style={{color: '#1E1E1E'}} />
-                </Button>
-                
-                {/* Class Icon */}
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md" style={{backgroundColor: '#FFFFFC'}}>
-                  <GraduationCap className="h-6 w-6" style={{color: '#1E1E1E'}} />
-                </div>
-                
-                {/* Class Title */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs mb-0.5 mt-1" style={{color: '#FFFFFC'}}>Kelas</p>
-                  <h1 className="text-xl sm:text-2xl font-bold" style={{color: '#FFFFFC'}}>{classroom.name}</h1>
-                </div>
+        </div>
+
+        {/* Class Info with Stats Cards */}
+        <div style={{backgroundColor: 'transparent', backdropFilter: 'none', WebkitBackdropFilter: 'none', borderBottomWidth: '2px', borderColor: '#E8B824'}} className="px-4 lg:px-6 py-3 lg:py-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+            <div className="flex items-center gap-3">
+              {/* Back Button */}
+              <Button
+                variant="outline"
+                className="flex-shrink-0 hover:opacity-80 border-0 w-10 h-12 p-0"
+                onClick={() => router.push(userRole === "teacher" ? "/home/teacher" : "/home/student")}
+                style={{backgroundColor: '#E8B824'}}
+              >
+                <ChevronRight className="h-5 w-5 rotate-180" style={{color: '#1A1A1A'}} />
+              </Button>
+              
+              {/* Class Icon */}
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md" style={{backgroundColor: '#FFFFFC'}}>
+                <GraduationCap className="h-6 w-6" style={{color: '#1A1A1A'}} />
               </div>
-
-              {/* Right: Stats Cards */}
-              <div className="grid grid-cols-3 gap-3">
-                <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0A0A0A'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1E1E1E'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
-                  <CardContent className="px-3 py-4 h-full flex items-center">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: 'transparent'}}>
-                        <Users className="h-6 w-6" style={{color: '#FFD903'}} />
-                      </div>
-                      <div>
-                        <p className="text-xs" style={{color: '#FFFFFC'}}>Siswa</p>
-                        <h3 className="text-xl font-bold" style={{color: '#FFD903'}}>{classroom.students.length}</h3>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0A0A0A'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1E1E1E'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
-                  <CardContent className="px-3 py-4 h-full flex items-center">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: 'transparent'}}>
-                        <BookOpen className="h-6 w-6" style={{color: '#FFD903'}} />
-                      </div>
-                      <div>
-                        <p className="text-xs" style={{color: '#FFFFFC'}}>Pertemuan</p>
-                        <h3 className="text-xl font-bold" style={{color: '#FFD903'}}>{meetings.length}</h3>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0A0A0A'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1E1E1E'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
-                  <CardContent className="px-3 py-4 h-full flex items-center">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: 'transparent'}}>
-                        <FileText className="h-6 w-6" style={{color: '#FFD903'}} />
-                      </div>
-                      <div>
-                        <p className="text-xs" style={{color: '#FFFFFC'}}>Konten</p>
-                        <h3 className="text-xl font-bold" style={{color: '#FFD903'}}>{contents.length}</h3>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              
+              {/* Class Title */}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs mb-0.5 mt-1" style={{color: '#FFFFFC'}}>Kelas</p>
+                <h1 className="text-xl sm:text-2xl font-bold" style={{color: '#FFFFFC'}}>{classroom?.name || 'Loading...'}</h1>
               </div>
+            </div>
+
+            {/* Right: Stats Cards */}
+            <div className="grid grid-cols-3 gap-3">
+              <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1A1A1A'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0F0F0F'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
+                <CardContent className="px-3 py-4 h-full flex items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
+                      <Users className="h-6 w-6" style={{color: '#1A1A1A'}} />
+                    </div>
+                    <div>
+                      <p className="text-xs" style={{color: '#FFFFFC'}}>Siswa</p>
+                      <h3 className="text-xl font-bold" style={{color: '#FFFFFC'}}>{classroom?.students.length || 0}</h3>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1A1A1A'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0F0F0F'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
+                <CardContent className="px-3 py-4 h-full flex items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
+                      <BookOpen className="h-6 w-6" style={{color: '#1A1A1A'}} />
+                    </div>
+                    <div>
+                      <p className="text-xs" style={{color: '#FFFFFC'}}>Pertemuan</p>
+                      <h3 className="text-xl font-bold" style={{color: '#FFFFFC'}}>{meetings.length}</h3>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1A1A1A'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0F0F0F'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
+                <CardContent className="px-3 py-4 h-full flex items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
+                      <FileText className="h-6 w-6" style={{color: '#1A1A1A'}} />
+                    </div>
+                    <div>
+                      <p className="text-xs" style={{color: '#FFFFFC'}}>Konten</p>
+                      <h3 className="text-xl font-bold" style={{color: '#FFFFFC'}}>{contents.length}</h3>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 pt-44 lg:pt-56 pb-10">
-        <div className="flex h-full">
+      <main className="flex-1 pb-10 w-full">
+        <div className="flex w-full">
           {/* Desktop Sidebar */}
-          <aside className="hidden lg:block w-72 fixed left-0 top-44 bottom-0 border-r border-gray-200 bg-white overflow-y-auto">
+          <aside className="hidden lg:block w-72 fixed left-0 top-52 bottom-0 border-r border-gray-200 bg-white overflow-y-auto">
             <MeetingSidebar
               meetings={meetings}
               selectedMeeting={selectedMeeting}
@@ -942,7 +1028,7 @@ export default function ClassroomsPage() {
           </aside>
 
           {/* Content Area */}
-          <div className="flex-1 lg:ml-72 px-4 sm:px-6 lg:px-8">
+          <div className="w-full lg:ml-72 px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12">
             <div className="max-w-6xl mx-auto">
               {/* Context Indicator */}
               <div className="mb-8 flex items-center text-xs sm:text-sm text-gray-600">
@@ -960,7 +1046,8 @@ export default function ClassroomsPage() {
               {userRole === "teacher" && (
                 <Button
                   onClick={() => setShowMeetingModal(true)}
-                  className="w-full bg-black hover:bg-gray-900 text-white py-2 sm:py-3 mb-6 font-semibold"
+                  className="w-full text-black py-2 sm:py-3 mb-6 font-semibold hover:opacity-90 transition-opacity"
+                  style={{backgroundColor: '#E8B824'}}
                 >
                   <Plus className="h-5 w-5 mr-2" />
                   Buat Pertemuan
@@ -985,7 +1072,7 @@ export default function ClassroomsPage() {
                       >
                         <CardContent className="p-4 sm:p-5">
                           <div className="flex items-start gap-3 sm:gap-4">
-                            <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#1E1E1E'}}>
+                            <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#1A1A1A'}}>
                               <Icon className="h-5 sm:h-6 w-5 sm:w-6" style={{color: '#FFFFFC'}} />
                             </div>
                             
@@ -1008,7 +1095,7 @@ export default function ClassroomsPage() {
                                   }`}
                                   style={
                                     (content.jenis_create.toLowerCase() === "materi" || content.jenis_create.toLowerCase() === "latihan soal") 
-                                      ? {backgroundColor: '#1E1E1E', color: '#FFFFFC'}
+                                      ? {backgroundColor: '#1A1A1A', color: '#FFFFFC'}
                                       : {}
                                   }
                                 >
@@ -1078,7 +1165,7 @@ export default function ClassroomsPage() {
                                       <Button
                                         size="sm"
                                         className="text-xs sm:text-sm"
-                                        style={{backgroundColor: '#FFD903', color: '#1E1E1E'}}
+                                        style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
                                       >
                                         {attempts && attempts.length > 0 ? (
                                           <>
@@ -1098,7 +1185,7 @@ export default function ClassroomsPage() {
                                       <Button
                                         size="sm"
                                         className={submission ? "bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm" : "text-xs sm:text-sm"}
-                                        style={submission ? {} : {backgroundColor: '#FFD903', color: '#1E1E1E'}}
+                                        style={submission ? {} : {backgroundColor: '#E8B824', color: '#1A1A1A'}}
                                       >
                                         {submission ? (
                                           <>
@@ -1118,7 +1205,7 @@ export default function ClassroomsPage() {
                                       <Button
                                         size="sm"
                                         className="text-xs sm:text-sm"
-                                        style={{backgroundColor: '#FFD903', color: '#1E1E1E'}}
+                                        style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
                                       >
                                         <BookOpen className="h-3 sm:h-4 w-3 sm:w-4 mr-1" />
                                         <span className="hidden sm:inline">Pelajari</span>
@@ -1419,9 +1506,9 @@ export default function ClassroomsPage() {
       <Dialog open={showLatihanModal} onOpenChange={setShowLatihanModal}>
         <DialogContent className="max-w-xl border-0 shadow-xl rounded-xl p-0 overflow-hidden">
           {/* Header */}
-          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '2px'}}>
+          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1A1A1A', borderBottomColor: '#E8B824', borderBottomWidth: '2px'}}>
             <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-white">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-yellow-400">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
                 <Target className="h-6 w-6 text-black" />
               </div>
               Latihan: {currentLatihan?.title}
@@ -1439,12 +1526,12 @@ export default function ClassroomsPage() {
             {currentLatihan?.attempts && currentLatihan.attempts.length > 0 ? (
               <div className="space-y-3 pt-6 pb-6">
                 <h4 className="text-base font-bold flex items-center gap-2 text-gray-900">
-                  <CheckCircle2 className="h-5 w-5 text-yellow-400" />
+                  <CheckCircle2 className="h-5 w-5" style={{color: '#E8B824'}} />
                   Riwayat Percobaan
                 </h4>
                 <div className="space-y-2">
                   {currentLatihan.attempts.map((attempt) => (
-                    <Card key={attempt.id} className="border-2 bg-gray-50 hover:bg-gray-100 transition-colors" style={{borderColor: '#FFD903'}}>
+                    <Card key={attempt.id} className="border-2 bg-gray-50 hover:bg-gray-100 transition-colors" style={{borderColor: '#E8B824'}}>
                       <CardContent className="p-4 flex justify-between items-center">
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-gray-900">
@@ -1461,7 +1548,7 @@ export default function ClassroomsPage() {
                             })}
                           </p>
                         </div>
-                        <Badge className="font-bold text-lg px-4 py-2 bg-yellow-400 text-black border-0">
+                        <Badge className="font-bold text-lg px-4 py-2 text-black border-0" style={{backgroundColor: '#E8B824'}}>
                           {attempt.percentage.toFixed(0)}%
                         </Badge>
                       </CardContent>
@@ -1471,7 +1558,7 @@ export default function ClassroomsPage() {
               </div>
             ) : (
               <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-yellow-400">
+                <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{backgroundColor: '#E8B824'}}>
                   <Target className="h-8 w-8 text-black" />
                 </div>
                 <h4 className="text-lg font-semibold text-gray-900 mb-2">Belum Ada Percobaan</h4>
@@ -1483,17 +1570,19 @@ export default function ClassroomsPage() {
           </div>
 
           {/* Footer */}
-          <div className="flex gap-3 px-6 py-4" style={{backgroundColor: '#1E1E1E', borderTopColor: '#FFD903', borderTopWidth: '2px'}}>
+          <div className="flex gap-3 px-6 py-4" style={{backgroundColor: '#1A1A1A', borderTopColor: '#E8B824', borderTopWidth: '2px'}}>
             <Button 
               onClick={() => setShowLatihanModal(false)}
               variant="outline"
-              className="flex-1 font-semibold border-yellow-400 text-black hover:bg-gray-900 hover:text-yellow-400"
+              className="flex-1 font-semibold text-black hover:bg-gray-900"
+              style={{borderColor: '#E8B824', color: '#E8B824'}}
             >
               Tutup
             </Button>
             <Button 
               onClick={handleStartNewAttempt}
-              className="flex-1 h-10 font-semibold bg-yellow-400 text-black hover:bg-yellow-500"
+              className="flex-1 h-10 font-semibold text-black"
+              style={{backgroundColor: '#E8B824'}}
             >
               <Plus className="h-4 w-4 mr-2" />
               Mulai Percobaan {currentLatihan?.attempts?.length ? currentLatihan.attempts.length + 1 : 1}
@@ -1579,7 +1668,7 @@ export default function ClassroomsPage() {
       <Dialog open={showMeetingModal} onOpenChange={setShowMeetingModal}>
         <DialogContent className="max-w-md border-0 shadow-xl rounded-xl p-0 overflow-hidden">
           {/* Header */}
-          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '2px'}}>
+          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1A1A1A', borderBottomColor: '#E8B824', borderBottomWidth: '2px'}}>
             <DialogTitle className="text-xl font-bold text-white">Buat Konten Baru</DialogTitle>
             <DialogDescription className="mt-2 pb-4 text-gray-300">
               Pilih pertemuan ke berapa konten ini akan diberikan
@@ -1629,14 +1718,15 @@ export default function ClassroomsPage() {
           </div>
 
           {/* Footer */}
-          <div className="flex gap-3 px-6 py-4" style={{backgroundColor: '#1E1E1E', borderTopColor: '#FFD903', borderTopWidth: '2px'}}>
+          <div className="flex gap-3 px-6 py-4" style={{backgroundColor: '#1A1A1A', borderTopColor: '#E8B824', borderTopWidth: '2px'}}>
             <Button
               variant="outline"
               onClick={() => {
                 setShowMeetingModal(false);
                 setSelectedPertemuan(null);
               }}
-              className="flex-1 border-yellow-400 text-black hover:bg-gray-900 hover:text-yellow-400 font-semibold"
+              className="flex-1 font-semibold text-black hover:bg-gray-900"
+              style={{borderColor: '#E8B824', color: '#E8B824'}}
             >
               Batal
             </Button>
@@ -1649,7 +1739,8 @@ export default function ClassroomsPage() {
                   toast.error("Pilih pertemuan terlebih dahulu");
                 }
               }}
-              className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold"
+              className="flex-1 text-black font-semibold"
+              style={{backgroundColor: '#E8B824'}}
             >
               Lanjutkan
               <ChevronRight className="h-4 w-4 ml-2" />
@@ -1662,7 +1753,7 @@ export default function ClassroomsPage() {
       <Dialog open={showContentTypeModal} onOpenChange={setShowContentTypeModal}>
         <DialogContent className="max-w-2xl border-0 shadow-xl rounded-xl p-0 overflow-hidden">
           {/* Header */}
-          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1E1E1E', borderBottomColor: '#FFD903', borderBottomWidth: '2px'}}>
+          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1A1A1A', borderBottomColor: '#E8B824', borderBottomWidth: '2px'}}>
             <DialogTitle className="text-xl font-bold text-white">Pilih Jenis Konten</DialogTitle>
             <DialogDescription className="mt-2 pb-4 text-gray-300">
               Pertemuan {selectedPertemuan} - Pilih jenis konten yang akan dibuat
@@ -1673,8 +1764,8 @@ export default function ClassroomsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 px-6 bg-white">
             {/* Materi & Tugas Card */}
             <Card
-              className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-yellow-400"
-              style={{backgroundColor: '#1E1E1E', borderColor: '#FFD903'}}
+              className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-[#E8B824]"
+              style={{backgroundColor: '#1A1A1A', borderColor: '#E8B824'}}
               onClick={() => {
                 router.push(`/home/classrooms/create?classId=${classId}&pertemuan=${selectedPertemuan}`);
                 setShowContentTypeModal(false);
@@ -1683,7 +1774,7 @@ export default function ClassroomsPage() {
               }}
             >
               <CardHeader className="text-center">
-                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{backgroundColor: '#FFD903'}}>
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{backgroundColor: '#E8B824'}}>
                   <BookOpen className="w-8 h-8 text-black" />
                 </div>
                 <CardTitle className="text-lg text-white">Materi & Tugas</CardTitle>
@@ -1697,8 +1788,8 @@ export default function ClassroomsPage() {
 
             {/* Latihan Soal Card */}
             <Card
-              className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-yellow-400"
-              style={{backgroundColor: '#1E1E1E', borderColor: '#FFD903'}}
+              className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-[#E8B824]"
+              style={{backgroundColor: '#1A1A1A', borderColor: '#E8B824'}}
               onClick={() => {
                 router.push(`/home/classrooms/latihanSoal?classId=${classId}&pertemuan=${selectedPertemuan}`);
                 setShowContentTypeModal(false);
@@ -1707,7 +1798,7 @@ export default function ClassroomsPage() {
               }}
             >
               <CardHeader className="text-center">
-                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{backgroundColor: '#FFD903'}}>
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{backgroundColor: '#E8B824'}}>
                   <Target className="w-8 h-8 text-black" />
                 </div>
                 <CardTitle className="text-lg text-white">Latihan Soal</CardTitle>
