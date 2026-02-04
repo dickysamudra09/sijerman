@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -22,6 +22,8 @@ import {
   BookOpen,
   Smile,
   Compass,
+  ChevronDown,
+  Home,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -39,14 +41,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import type { User as SupabaseUser } from '@supabase/supabase-js';
@@ -156,7 +150,17 @@ const HeroSection = ({ language }: LanguageProps) => {
 
             {/* Buttons */}
             <div className="flex flex-col sm:flex-row items-center lg:items-start gap-4">
-              {/* Explore button */}
+              {/* Explore Open Courses button */}
+              <Button 
+                onClick={() => window.location.href = '/open-courses'}
+                className="w-full sm:w-auto px-8 py-3 font-semibold text-white rounded-full transition-all hover:opacity-90 shadow-lg flex items-center justify-center gap-2" 
+                style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
+              >
+                <Compass className="h-5 w-5" />
+                {getText("Explore Open Courses", "Offene Kurse erkunden")}
+              </Button>
+              
+              {/* Explore Features button */}
               <Button className="w-full sm:w-auto px-8 py-3 font-semibold text-white rounded-full transition-all hover:opacity-90 shadow-lg flex items-center justify-center gap-2" style={{backgroundColor: '#1A1A1A'}}>
                 <Search className="h-5 w-5" />
                 {getText("Explore Our Fitur", "Unsere Funktionen erkunden")}
@@ -390,39 +394,119 @@ const WhyChooseSection = ({ language }: LanguageProps) => {
   );
 };
 
-// Komponen Dropdown untuk Pengguna
+const UserDropdownMenu = ({ user, language, onLogout }: UserDropdownProps) => {
+  const getText = (id: string, de: string) => (language === "de" ? de : id);
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node) && 
+          triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isOpen]);
+
+  const displayName = user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
+
+  return (
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        onClick={() => setIsOpen(!isOpen)}
+        className="font-semibold flex items-center gap-2 px-3 py-2 rounded-md transition-colors hover:bg-gray-700"
+        style={{ color: "#FFFFFC" }}
+      >
+        <User className="h-4 w-4" />
+        {displayName}
+        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div
+          ref={menuRef}
+          className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E5E5E5",
+            zIndex: 99999,
+            top: "100%",
+            marginTop: "8px"
+          }}
+        >
+          <div
+            className="px-4 py-2 text-sm font-medium border-b"
+            style={{ color: "#1A1A1A", borderColor: "#E5E5E5" }}
+          >
+            {displayName}
+          </div>
+
+          <button
+            onClick={() => {
+              window.location.href = "/";
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <Home className="h-4 w-4" />
+            {getText("Home", "Startseite")}
+          </button>
+
+          <button
+            onClick={() => {
+              window.location.href = "/home/teacher?tab=my-courses";
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <BookOpen className="h-4 w-4" />
+            {getText("My Courses", "Meine Kurse")}
+          </button>
+
+          <button
+            onClick={() => {
+              window.location.href = "/open-courses";
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <Globe className="h-4 w-4" />
+            {getText("Open Courses", "Offene Kurse")}
+          </button>
+
+          <div style={{ borderColor: "#E5E5E5" }} className="border-t my-1"></div>
+
+          <button
+            onClick={() => {
+              onLogout();
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+            style={{ color: "#DC2626" }}
+          >
+            {getText("Logout", "Abmelden")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const UserDropdown = ({ user, language, onLogout }: UserDropdownProps) => {
   const getText = (id: string, de: string) => (language === "de" ? de : id);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="font-semibold text-gray-900">
-          <User className="mr-2 h-4 w-4" />
-          {user.user_metadata.full_name || user.email?.split("@")[0]}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuLabel>
-          {user.user_metadata.full_name || getText("Akun Saya", "Mein Konto")}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <a href="/dashboard">
-            {getText("Dashboard", "Dashboard")}
-          </a>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <a href="/home/teacher">
-            {getText("Beranda", "Startseite")}
-          </a>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onLogout}>
-          {getText("Keluar", "Abmelden")}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <UserDropdownMenu user={user} language={language} onLogout={onLogout} />
   );
 };
 
@@ -586,8 +670,8 @@ export default function App() {
   const renderHomePage = () => (
     <div className="min-h-screen bg-white text-gray-900">
       {/* Header */}
-      <header style={{backgroundColor: 'rgba(13, 13, 13, 0.90)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)'}} className="border-b sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+      <header style={{backgroundColor: 'rgba(13, 13, 13, 0.90)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', zIndex: 40, overflow: 'visible'}} className="border-b sticky top-0 overflow-visible">
+        <div className="container mx-auto px-4 py-4 overflow-visible" style={{ overflow: 'visible' }}>
           <div className="flex items-center justify-between">
             {/* Logo */}
             <div className="flex items-center gap-3">
