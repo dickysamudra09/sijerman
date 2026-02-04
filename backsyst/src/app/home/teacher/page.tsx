@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,9 @@ import {
     User,
     LogOut,
     Bell,
+    Edit2,
+    Trash2,
+    ChevronDown,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -34,7 +37,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -48,6 +50,17 @@ interface ClassRoom {
     teacherName?: string;
 }
 
+interface OpenCourse {
+    id: string;
+    title: string;
+    description: string;
+    teacher_id: string;
+    class_type: string;
+    is_paid: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
 interface TeacherStats {
     totalClasses: number;
     totalClassExercises: number;
@@ -58,11 +71,122 @@ interface TeacherModeProps {
     onBack: () => void;
 }
 
+interface TeacherModeProps {
+    onBack: () => void;
+}
+
+// Profile Dropdown Component
+const ProfileDropdown = ({ userName, onLogout }: { userName: string; onLogout: () => void }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node) && 
+          triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isOpen]);
+
+  return (
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-center px-3 py-2 rounded-md transition-colors hover:bg-gray-700"
+        style={{ color: "#FFD903" }}
+      >
+        <User className="h-5 w-5" />
+      </button>
+
+      {isOpen && (
+        <div
+          ref={menuRef}
+          className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E5E5E5",
+            zIndex: 99999,
+            top: "100%",
+            marginTop: "8px"
+          }}
+        >
+          <div
+            className="px-4 py-2 text-sm font-medium border-b"
+            style={{ color: "#1A1A1A", borderColor: "#E5E5E5" }}
+          >
+            {userName}
+          </div>
+
+          <button
+            onClick={() => {
+              router.push("/");
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Home
+          </button>
+
+          <button
+            onClick={() => {
+              router.push("/home");
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <BookOpen className="h-4 w-4" />
+            My Courses
+          </button>
+
+          <button
+            onClick={() => {
+              router.push("/open-courses");
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <Globe className="h-4 w-4" />
+            Open Courses
+          </button>
+
+          <div style={{ borderColor: "#E5E5E5" }} className="border-t my-1"></div>
+
+          <button
+            onClick={() => {
+              onLogout();
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#DC2626" }}
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 function TeacherMode({ onBack }: TeacherModeProps) {
     const [userName, setUserName] = useState<string>("");
     const [initialLoading, setInitialLoading] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
     const [classrooms, setClassrooms] = useState<ClassRoom[]>([]);
+    const [openCourses, setOpenCourses] = useState<OpenCourse[]>([]);
     const [newClassName, setNewClassName] = useState("");
     const [newClassDescription, setNewClassDescription] = useState("");
     const [joinCode, setJoinCode] = useState("");
@@ -70,6 +194,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
     const [error, setError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [stats, setStats] = useState<TeacherStats | null>(null);
+    const [activeTab, setActiveTab] = useState<string>("classes");
     const router = useRouter();
 
     useEffect(() => {
@@ -91,6 +216,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
             }
 
             const userId = sessionData.session.user.id;
+            const authUser = sessionData.session.user;
             setUserId(userId);
 
             const { data: userData, error: userError } = await supabase
@@ -107,7 +233,9 @@ function TeacherMode({ onBack }: TeacherModeProps) {
             }
 
             if (userData && userData.role === "teacher") {
-                setUserName(userData.name);
+                // Set username dengan fallback: name dari db → full_name dari metadata → email
+                const displayName = userData.name || authUser.user_metadata?.full_name || authUser.email || "Guru";
+                setUserName(displayName);
             } else {
                 setError("Anda tidak memiliki peran sebagai guru.");
                 setIsLoading(false);
@@ -248,6 +376,41 @@ function TeacherMode({ onBack }: TeacherModeProps) {
         setIsLoading(false);
     };
 
+    const fetchOpenCourses = async () => {
+        if (!userId) return;
+        
+        try {
+            const { data, error } = await supabase
+                .from("courses")
+                .select("*")
+                .eq("teacher_id", userId)
+                .eq("class_type", "open")
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+            setOpenCourses(data || []);
+        } catch (err: any) {
+            console.error("Gagal mengambil open courses:", err);
+        }
+    };
+
+    const handleDeleteCourse = async (courseId: string) => {
+        if (!confirm("Apakah Anda yakin ingin menghapus kursus ini?")) return;
+
+        try {
+            const { error } = await supabase
+                .from("courses")
+                .delete()
+                .eq("id", courseId);
+
+            if (error) throw error;
+            setOpenCourses(openCourses.filter(c => c.id !== courseId));
+            toast.success("Kursus berhasil dihapus");
+        } catch (err: any) {
+            toast.error("Gagal menghapus kursus: " + err.message);
+        }
+    };
+
     const generateClassCode = () => {
         const code = Math.random().toString(36).substring(2, 8).toUpperCase();
         setJoinCode(code);
@@ -296,6 +459,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
     useEffect(() => {
         if (userId) {
             fetchClassrooms();
+            fetchOpenCourses();
             fetchTeacherStats(userId);
         }
     }, [userId]);
@@ -344,7 +508,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                 <div className="max-w-7xl mx-auto">
                     <div className="flex items-center justify-between mb-6">
                         <div>
-                            <h1 className="text-2xl font-bold mb-1">Selamat Datang, {userName}!</h1>
+                            <h1 className="text-2xl font-bold mb-1">Selamat Datang, {userName || "Guru"}!</h1>
                             <p className="text-blue-100 text-sm">Kelola kelas dan materi pembelajaran Anda dengan mudah</p>
                         </div>
                         <div className="flex items-center space-x-2 sm:space-x-4">
@@ -353,22 +517,11 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                 <span className="absolute top-1 right-1 h-2 w-2 bg-[#FFD903] rounded-full border border-white"></span>
                             </Button>
 
-                            <DropdownMenu modal={false}>
-                                <DropdownMenuTrigger asChild>
-                                    <Button className="rounded-full bg-[#FFD903]/20 hover:bg-[#FFD903]/30 border-2 border-[#FFD903]/40 text-[#FFD903] font-semibold shadow-sm transition-all duration-200 cursor-pointer" size="icon">
-                                        <User className="h-5 w-5" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56 bg-white border-2 border-[#FFD903] shadow-lg">
-                                    <DropdownMenuLabel className="text-[#1E1E1E] font-bold">{userName}</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer hover:bg-red-50">
-                                        <LogOut className="mr-2 h-4 w-4" />
-                                        Keluar
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            {/* Custom Profile Dropdown */}
+                            <ProfileDropdown
+                              userName={userName}
+                              onLogout={handleLogout}
+                            />
                         </div>
                     </div>
 
@@ -425,30 +578,45 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                 </div>
 
                 {/* Tabs */}
-                <Tabs defaultValue="classes" className="w-full">
+                <Tabs defaultValue="classes" value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <div className="flex items-center justify-between mb-6">
                         <TabsList className="bg-transparent border-0 p-0">
                             <TabsTrigger 
                                 value="classes" 
                                 className="!bg-[#1E1E1E] !text-[#FFD903]/50 !border-transparent !border-b-2 !rounded-lg !px-3 !py-2 !font-semibold !transition-all !mr-2 !hover:text-[#FFD903] data-[state=active]:!text-[#FFD903] data-[state=active]:!border-[#FFD903] data-[state=inactive]:!text-[#FFD903]/50 data-[state=inactive]:!border-transparent"
                             >
-                                Kelas Saya
+                                Kelas Institusi
                             </TabsTrigger>
-                            {/* <TabsTrigger 
-                                value="create" 
-                                className="data-[state=active]:bg-transparent data-[state=active]:text-gray-900 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 py-2 font-semibold transition-all text-gray-500"
+                            <TabsTrigger 
+                                value="open-courses" 
+                                className="!bg-[#1E1E1E] !text-[#FFD903]/50 !border-transparent !border-b-2 !rounded-lg !px-3 !py-2 !font-semibold !transition-all !mr-2 !hover:text-[#FFD903] data-[state=active]:!text-[#FFD903] data-[state=active]:!border-[#FFD903] data-[state=inactive]:!text-[#FFD903]/50 data-[state=inactive]:!border-transparent"
                             >
-                                Kelas Baru
-                            </TabsTrigger> */}
+                                <Globe className="h-4 w-4 mr-2" />
+                                Kelas Terbuka
+                            </TabsTrigger>
                         </TabsList>
                         
-                        <Button 
-                            className="bg-[#FFD903] hover:bg-[#FFD903]/90 text-[#1E1E1E] font-semibold"
-                            onClick={() => setIsModalOpen(true)}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Buat Kelas Baru
-                        </Button>
+                        {/* Only show "Buat Kelas Baru" button for institutional classes tab */}
+                        {activeTab === "classes" && (
+                            <Button 
+                                className="bg-[#FFD903] hover:bg-[#FFD903]/90 text-[#1E1E1E] font-semibold"
+                                onClick={() => setIsModalOpen(true)}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Buat Kelas Baru
+                            </Button>
+                        )}
+                        
+                        {/* Only show "Buat Baru" button for open courses tab */}
+                        {activeTab === "open-courses" && openCourses.length > 0 && (
+                            <Button 
+                                className="bg-[#FFD903] hover:bg-[#FFD903]/90 text-[#1E1E1E] font-semibold"
+                                onClick={() => router.push('/teacher/courses/new')}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Buat Baru
+                            </Button>
+                        )}
                     </div>
 
                     <TabsContent value="classes" className="space-y-6 mt-0">
@@ -566,6 +734,128 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                 </Button>
                             </CardContent>
                         </Card>
+                    </TabsContent>
+
+                    <TabsContent value="open-courses" className="space-y-6 mt-0">
+                        {openCourses.length === 0 ? (
+                            <Card 
+                                className="rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+                                style={{backgroundColor: '#1E1E1E', borderColor: '#FFD903', borderWidth: '2px'}}
+                            >
+                                <CardHeader>
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                            <CardTitle className="text-2xl font-bold text-[#FFD903] flex items-center gap-2 mb-2">
+                                                <Globe className="h-6 w-6" />
+                                                Kelas Terbuka
+                                            </CardTitle>
+                                            <CardDescription className="text-base text-gray-300">
+                                                Buat kelas mandiri yang dapat diakses oleh siapa saja. Tambahkan modul pembelajaran dan kelola siswa dengan mudah.
+                                            </CardDescription>
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="p-4 rounded-lg" style={{backgroundColor: '#0A0A0A', borderColor: '#333333', borderWidth: '1px'}}>
+                                            <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                                                <Globe className="h-4 w-4 text-[#FFD903]" />
+                                                Akses Publik
+                                            </h4>
+                                            <p className="text-sm text-gray-400">Kelas dapat ditemukan dan dipelajari oleh semua orang</p>
+                                        </div>
+                                        <div className="p-4 rounded-lg" style={{backgroundColor: '#0A0A0A', borderColor: '#333333', borderWidth: '1px'}}>
+                                            <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                                                <Target className="h-4 w-4 text-[#FFD903]" />
+                                                Mandiri
+                                            </h4>
+                                            <p className="text-sm text-gray-400">Siswa belajar dengan kecepatan mereka sendiri</p>
+                                        </div>
+                                    </div>
+                                    <Button 
+                                        onClick={() => router.push('/teacher/courses/new')}
+                                        className="w-full bg-[#FFD903] hover:bg-[#FFD903]/90 text-[#1E1E1E] font-semibold h-11"
+                                    >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Buat Kelas Terbuka Pertama Anda
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {openCourses.map((course) => (
+                                        <Card 
+                                            key={course.id} 
+                                            className="rounded-2xl flex flex-col shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+                                            style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}}
+                                        >
+                                            <CardHeader className="pb-2 flex-shrink-0">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <CardTitle className="text-xl font-bold text-white flex-1 pr-2 line-clamp-2">
+                                                        {course.title}
+                                                    </CardTitle>
+                                                    <Badge className="bg-blue-100 text-blue-700 border-0 px-3 py-1 text-xs font-medium flex-shrink-0">
+                                                        Terbuka
+                                                    </Badge>
+                                                </div>
+                                                <CardDescription className="text-sm text-gray-300 leading-relaxed line-clamp-2">
+                                                    {course.description}
+                                                </CardDescription>
+                                            </CardHeader>
+                                            
+                                            <CardContent className="space-y-3 pt-2 mt-auto flex-shrink-0">
+                                                <div className="text-xs text-gray-500">
+                                                    Dibuat: {new Date(course.created_at).toLocaleDateString('id-ID')}
+                                                </div>
+                                                
+                                                <div className="flex gap-2 pt-2">
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => router.push(`/teacher/courses/${course.id}/modules`)}
+                                                        className="flex-1 text-xs font-semibold"
+                                                        style={{
+                                                            backgroundColor: '#FFD903',
+                                                            color: '#1A1A1A',
+                                                            border: 'none',
+                                                        }}
+                                                    >
+                                                        <Edit2 className="h-3 w-3 mr-1" />
+                                                        Edit Modul
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => router.push(`/open-courses/${course.id}/preview`)}
+                                                        className="flex-1 text-xs font-semibold"
+                                                        style={{
+                                                            backgroundColor: '#FFFFFC',
+                                                            borderColor: '#FFFFFC',
+                                                            color: '#1A1A1A',
+                                                        }}
+                                                    >
+                                                        <Eye className="h-3 w-3 mr-1" />
+                                                        Preview
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleDeleteCourse(course.id)}
+                                                        className="text-xs"
+                                                        style={{
+                                                            borderColor: '#DC2626',
+                                                            color: '#DC2626',
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </TabsContent>
                 </Tabs>
 
