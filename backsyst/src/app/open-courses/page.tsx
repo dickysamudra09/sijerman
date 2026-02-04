@@ -404,29 +404,28 @@ export default function OpenCoursesPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCourses.map((course) => (
                 <div
                   key={course.id}
-                  className="rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow"
+                  className="rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all"
                   style={{ backgroundColor: "#FFFFFC", border: "1px solid #E5E5E5" }}
                 >
+                  {/* Dark top accent bar */}
+                  <div 
+                    className="h-2"
+                    style={{ backgroundColor: '#1A1A1A' }}
+                  ></div>
+
                   {/* Card Header */}
-                  <div
-                    className="h-32 p-4 flex items-end justify-between"
-                    style={{
-                      background: `linear-gradient(135deg, #1A1A1A 0%, #2A2A2A 100%)`,
-                    }}
-                  >
-                    <div>
-                      <h3 className="text-xl font-bold text-white mb-2 line-clamp-2">
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-2 gap-2">
+                      <h3 className="text-lg font-bold line-clamp-2" style={{ color: "#1A1A1A" }}>
                         {course.title}
                       </h3>
-                    </div>
-                    <div className="flex gap-2 flex-col items-end">
                       {course.is_paid && (
                         <div
-                          className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold"
+                          className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 whitespace-nowrap"
                           style={{
                             backgroundColor: "#E8B824",
                             color: "#1A1A1A",
@@ -438,10 +437,11 @@ export default function OpenCoursesPage() {
                       )}
                       {course.isEnrolled && (
                         <div
-                          className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold"
+                          className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 whitespace-nowrap"
                           style={{
-                            backgroundColor: "#22C55E",
-                            color: "#FFFFFF",
+                            backgroundColor: "#E8F5E9",
+                            color: "#2E7D32",
+                            border: "1px solid #C8E6C9",
                           }}
                         >
                           <CheckCircle2 className="h-3 w-3" />
@@ -449,29 +449,27 @@ export default function OpenCoursesPage() {
                         </div>
                       )}
                     </div>
-                  </div>
 
-                  {/* Card Body */}
-                  <div className="p-4">
                     {/* Description */}
                     <p
-                      className="text-sm mb-4 line-clamp-2"
+                      className="text-xs line-clamp-2 mb-3"
                       style={{ color: "#4A4A4A" }}
                     >
                       {course.description || "No description available"}
                     </p>
 
                     {/* Teacher Info */}
-                    <div className="mb-4 pb-4 border-t" style={{ borderColor: "#E5E5E5" }}>
-                      <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "#999999" }}>
-                        Teacher
-                      </p>
-                      <p
-                        className="font-semibold"
-                        style={{ color: "#1A1A1A" }}
-                      >
-                        {course.teacher?.name || "Unknown Teacher"}
-                      </p>
+                    <div 
+                      className="flex items-center gap-2 text-sm p-3 rounded-lg mb-3"
+                      style={{ backgroundColor: '#F5F5F5' }}
+                    >
+                      <BookOpen className="h-4 w-4 flex-shrink-0" style={{ color: '#E8B824' }} />
+                      <div className="min-w-0">
+                        <p className="text-xs" style={{ color: "#999999" }}>Guru</p>
+                        <p className="font-semibold text-ellipsis truncate" style={{ color: "#1A1A1A" }}>
+                          {course.teacher?.name || "Unknown Teacher"}
+                        </p>
+                      </div>
                     </div>
 
                     {/* CTA Button */}
@@ -485,8 +483,8 @@ export default function OpenCoursesPage() {
                       }
                       className="w-full h-10 font-semibold rounded-lg transition-all flex items-center justify-center gap-2"
                       style={{
-                        backgroundColor: course.isEnrolled ? "#22C55E" : "#1A1A1A",
-                        color: "#FFFFFC",
+                        backgroundColor: course.isEnrolled ? "#22C55E" : "#E8B824",
+                        color: course.isEnrolled ? "#FFFFFF" : "#1A1A1A",
                       }}
                     >
                       {user ? (

@@ -504,17 +504,17 @@ function TeacherMode({ onBack }: TeacherModeProps) {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header dengan dark theme dan yellow accent */}
-            <div className="bg-[#1E1E1E] text-[#FFFFFC] px-6 py-8 shadow-lg border-b-4 border-[#FFD903]">
+            <div className="px-6 py-8 shadow-lg" style={{ backgroundColor: '#1A1A1A', borderBottom: '4px solid #E8B824' }}>
                 <div className="max-w-7xl mx-auto">
                     <div className="flex items-center justify-between mb-6">
                         <div>
-                            <h1 className="text-2xl font-bold mb-1">Selamat Datang, {userName || "Guru"}!</h1>
-                            <p className="text-blue-100 text-sm">Kelola kelas dan materi pembelajaran Anda dengan mudah</p>
+                            <h1 className="text-2xl font-bold mb-1" style={{ color: '#FFFFFC' }}>Selamat Datang, {userName || "Guru"}!</h1>
+                            <p className="text-sm" style={{ color: '#E8B824' }}>Kelola kelas dan materi pembelajaran Anda dengan mudah</p>
                         </div>
                         <div className="flex items-center space-x-2 sm:space-x-4">
-                            <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-[#FFD903]/20">
-                                <Bell className="h-5 w-5 text-[#FFD903]" />
-                                <span className="absolute top-1 right-1 h-2 w-2 bg-[#FFD903] rounded-full border border-white"></span>
+                            <Button variant="ghost" size="icon" className="relative rounded-full transition-colors hover:opacity-80">
+                                <Bell className="h-5 w-5" style={{ color: '#E8B824' }} />
+                                <span className="absolute top-1 right-1 h-2 w-2 rounded-full border border-white" style={{ backgroundColor: '#E8B824' }}></span>
                             </Button>
 
                             {/* Custom Profile Dropdown */}
@@ -528,42 +528,42 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                     {/* Stats Cards di dalam header dark dengan white accent */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Card 1 - Kelas yang dibuat */}
-                        <div style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+                        <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
                             <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                     <p className="text-gray-400 text-sm mb-2">Kelas yang Dibuat</p>
-                                    <p className="text-4xl font-bold text-[#FFD903] mb-1">{stats?.totalClasses ?? 0}</p>
+                                    <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{stats?.totalClasses ?? 0}</p>
                                     <p className="text-gray-500 text-xs">+2 kelas baru bulan ini</p>
                                 </div>
-                                <div style={{backgroundColor: '#FFD903'}} className="p-3 rounded-lg">
+                                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
                                     <BookOpen className="h-6 w-6" style={{color: '#1E1E1E'}} />
                                 </div>
                             </div>
                         </div>
 
                         {/* Card 2 - Latihan yang Dibuat */}
-                        <div style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+                        <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
                             <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                     <p className="text-gray-400 text-sm mb-2">Latihan yang Dibuat</p>
-                                    <p className="text-4xl font-bold text-[#FFD903] mb-1">{stats?.totalClassExercises ?? 0}</p>
+                                    <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{stats?.totalClassExercises ?? 0}</p>
                                     <p className="text-gray-500 text-xs">+5 latihan minggu ini</p>
                                 </div>
-                                <div style={{backgroundColor: '#FFD903'}} className="p-3 rounded-lg">
+                                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
                                     <BookOpen className="h-6 w-6" style={{color: '#1E1E1E'}} />
                                 </div>
                             </div>
                         </div>
 
                         {/* Card 3 - Latihan Soal Umum */}
-                        <div style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+                        <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
                             <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                     <p className="text-gray-400 text-sm mb-2">Latihan Soal Umum</p>
-                                    <p className="text-4xl font-bold text-[#FFD903] mb-1">{stats?.totalPublicExercises ?? 0}</p>
+                                    <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{stats?.totalPublicExercises ?? 0}</p>
                                     <p className="text-gray-500 text-xs">Untuk publik</p>
                                 </div>
-                                <div style={{backgroundColor: '#FFD903'}} className="p-3 rounded-lg">
+                                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
                                     <Users className="h-6 w-6" style={{color: '#1E1E1E'}} />
                                 </div>
                             </div>
@@ -572,24 +572,28 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-0 pt-0">
+            <div className="max-w-7xl mx-auto px-0 pt-0 pb-12">
                 {/* Section Title */}
-                <div className="mb-6">
+                <div className="flex items-center justify-between mb-8 mt-8">
+                    <div>
+                        <h2 className="text-2xl font-bold mb-1" style={{ color: "#1A1A1A" }}>Kelola Kelas</h2>
+                        <p className="text-sm" style={{ color: "#4A4A4A" }}>Kelola kelas institusi dan kelas terbuka Anda dengan mudah</p>
+                    </div>
                 </div>
 
                 {/* Tabs */}
                 <Tabs defaultValue="classes" value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <div className="flex items-center justify-between mb-6">
-                        <TabsList className="bg-transparent border-0 p-0">
+                        <TabsList className="bg-transparent border-0 p-0 shadow-none">
                             <TabsTrigger 
                                 value="classes" 
-                                className="!bg-[#1E1E1E] !text-[#FFD903]/50 !border-transparent !border-b-2 !rounded-lg !px-3 !py-2 !font-semibold !transition-all !mr-2 !hover:text-[#FFD903] data-[state=active]:!text-[#FFD903] data-[state=active]:!border-[#FFD903] data-[state=inactive]:!text-[#FFD903]/50 data-[state=inactive]:!border-transparent"
+                                className="!bg-transparent !text-[#4A4A4A] !border-b-2 !rounded-none !px-4 !py-2 !font-semibold !transition-all data-[state=active]:!text-[#E8B824] data-[state=active]:!border-[#E8B824] data-[state=inactive]:!text-[#4A4A4A] data-[state=inactive]:!border-transparent"
                             >
                                 Kelas Institusi
                             </TabsTrigger>
                             <TabsTrigger 
                                 value="open-courses" 
-                                className="!bg-[#1E1E1E] !text-[#FFD903]/50 !border-transparent !border-b-2 !rounded-lg !px-3 !py-2 !font-semibold !transition-all !mr-2 !hover:text-[#FFD903] data-[state=active]:!text-[#FFD903] data-[state=active]:!border-[#FFD903] data-[state=inactive]:!text-[#FFD903]/50 data-[state=inactive]:!border-transparent"
+                                className="!bg-transparent !text-[#4A4A4A] !border-b-2 !rounded-none !px-4 !py-2 !font-semibold !transition-all data-[state=active]:!text-[#E8B824] data-[state=active]:!border-[#E8B824] data-[state=inactive]:!text-[#4A4A4A] data-[state=inactive]:!border-transparent"
                             >
                                 <Globe className="h-4 w-4 mr-2" />
                                 Kelas Terbuka
@@ -599,7 +603,8 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                         {/* Only show "Buat Kelas Baru" button for institutional classes tab */}
                         {activeTab === "classes" && (
                             <Button 
-                                className="bg-[#FFD903] hover:bg-[#FFD903]/90 text-[#1E1E1E] font-semibold"
+                                className="font-semibold transition-all hover:opacity-90"
+                                style={{ backgroundColor: '#E8B824', color: '#1A1A1A' }}
                                 onClick={() => setIsModalOpen(true)}
                             >
                                 <Plus className="h-4 w-4 mr-2" />
@@ -610,7 +615,8 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                         {/* Only show "Buat Baru" button for open courses tab */}
                         {activeTab === "open-courses" && openCourses.length > 0 && (
                             <Button 
-                                className="bg-[#FFD903] hover:bg-[#FFD903]/90 text-[#1E1E1E] font-semibold"
+                                className="font-semibold transition-all hover:opacity-90"
+                                style={{ backgroundColor: '#E8B824', color: '#1A1A1A' }}
                                 onClick={() => router.push('/teacher/courses/new')}
                             >
                                 <Plus className="h-4 w-4 mr-2" />
@@ -620,73 +626,89 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                     </div>
 
                     <TabsContent value="classes" className="space-y-6 mt-0">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {classrooms.map((classroom) => (
                                 <Card 
                                     key={classroom.id} 
-                                    className="rounded-2xl flex flex-col shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
-                                    style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}}
+                                    className="rounded-xl flex flex-col shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group cursor-pointer" 
+                                    style={{
+                                      backgroundColor: '#FFFFFC', 
+                                      borderColor: '#E5E5E5', 
+                                      borderWidth: '1px'
+                                    }}
                                 >
-                                    <CardHeader className="pb-2 flex-shrink-0">
-                                        <div className="flex items-start justify-between mb-2">
-                                            <CardTitle className="text-xl font-bold text-white flex-1 pr-2">
-                                                {classroom.name}
-                                            </CardTitle>
-                                            <Badge className="bg-green-100 text-green-700 border-0 px-3 py-1 text-xs font-medium flex-shrink-0">
-                                                Aktif
-                                            </Badge>
-                                        </div>
-                                        <CardDescription className="text-sm text-gray-300 leading-relaxed line-clamp-2">
-                                            {classroom.description}
-                                        </CardDescription>
+                                    {/* Header dengan warna accent */}
+                                    <div 
+                                      className="h-2"
+                                      style={{ backgroundColor: '#1A1A1A' }}
+                                    ></div>
+                                    
+                                    <CardHeader className="pb-3 flex-shrink-0">
+                                      <div className="flex items-start justify-between mb-2 gap-2">
+                                        <CardTitle className="text-lg font-bold text-ellipsis line-clamp-2" style={{ color: "#1A1A1A" }}>
+                                          {classroom.name}
+                                        </CardTitle>
+                                        <Badge 
+                                          className="flex-shrink-0 text-xs font-semibold px-2 py-1 whitespace-nowrap"
+                                          style={{
+                                            backgroundColor: '#E8F5E9',
+                                            color: '#2E7D32',
+                                            border: '1px solid #C8E6C9'
+                                          }}
+                                        >
+                                          ✓ Aktif ({classroom.students.length})
+                                        </Badge>
+                                      </div>
+                                      <CardDescription className="text-xs" style={{ color: "#4A4A4A" }}>
+                                        {classroom.description || "Belum ada deskripsi"}
+                                      </CardDescription>
                                     </CardHeader>
                                     
-                                    <CardContent className="space-y-3 pt-2 mt-auto flex-shrink-0">
-                                        <div className="flex items-center gap-2 text-sm text-gray-400">
-                                            <Users className="h-4 w-4" />
-                                            <span>{classroom.students.length} Siswa</span>
-                                        </div>
-                                        
-                                        <div style={{backgroundColor: '#FFFFFC', borderColor: '#FFFFFC', borderWidth: '1px'}} className="rounded-lg p-3">
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-xs text-gray-600 mb-1">Kode Kelas</p>
-                                                    <code className="text-sm font-mono font-semibold text-black">
-                                                        {classroom.code}
-                                                    </code>
-                                                </div>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => copyClassCode(classroom.code)}
-                                                    className="text-black hover:text-gray-700 hover:bg-gray-100 p-2 h-8 w-8"
-                                                >
-                                                    <Copy className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="flex gap-2 pt-2">
-                                            <Button
-                                                className="flex-1 font-semibold hover:opacity-90 transition-opacity"
-                                                style={{backgroundColor: '#FFD903', color: '#1E1E1E'}}
-                                                onClick={() => {
-                                                    console.log("Navigating to classroom with id:", classroom.id);
-                                                    router.push(`/home/classrooms/${classroom.id}`);
-                                                }}
-                                            >
-                                                <Eye className="h-4 w-4 mr-2" />
-                                                Lihat Kelas
-                                            </Button>
-                                            <Button 
-                                                size="sm" 
-                                                variant="outline" 
-                                                className="border-white text-white hover:bg-gray-700 px-4 font-semibold"
-                                            >
-                                                Kelola
-                                            </Button>
-                                        </div>
+                                    <CardContent className="space-y-3 pt-1 flex-grow">
                                     </CardContent>
+
+                                    {/* Action Buttons */}
+                                    <div className="px-4 pb-4 pt-2 space-y-2 flex flex-col gap-2 flex-shrink-0 border-t" style={{ borderColor: '#E5E5E5' }}>
+                                      {/* Class Code Section */}
+                                      <div 
+                                        className="rounded-lg p-3 flex items-center justify-between mb-2"
+                                        style={{ backgroundColor: '#FFF8E1', borderColor: '#E8B824', borderWidth: '1px' }}
+                                      >
+                                        <div>
+                                          <p className="text-xs" style={{ color: "#4A4A4A" }}>Kode Kelas</p>
+                                          <code 
+                                            className="text-sm font-bold font-mono"
+                                            style={{ color: "#E8B824" }}
+                                          >
+                                            {classroom.code}
+                                          </code>
+                                        </div>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => copyClassCode(classroom.code)}
+                                          className="text-sm p-2 h-8 w-8 rounded-md transition-colors hover:opacity-70"
+                                          style={{ color: "#E8B824" }}
+                                        >
+                                          <Copy className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+
+                                      <Button
+                                        className="w-full font-semibold text-sm h-9 rounded-lg transition-all hover:opacity-90"
+                                        style={{
+                                          backgroundColor: '#E8B824', 
+                                          color: '#1A1A1A'
+                                        }}
+                                        onClick={() => {
+                                          console.log("Navigating to classroom with id:", classroom.id);
+                                          router.push(`/home/classrooms/${classroom.id}`);
+                                        }}
+                                      >
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        Lihat Kelas
+                                      </Button>
+                                    </div>
                                 </Card>
                             ))}
                         </div>
@@ -727,7 +749,8 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                 <Button 
                                     onClick={createNewClass} 
                                     disabled={!newClassName.trim() || isLoading} 
-                                    className="bg-[#FFD903] hover:bg-[#FFD903]/90 text-[#1E1E1E] font-semibold px-6"
+                                    className="font-semibold px-6 transition-all hover:opacity-90 disabled:opacity-50"
+                                    style={{ backgroundColor: '#E8B824', color: '#1A1A1A' }}
                                 >
                                     <Plus className="h-4 w-4 mr-2" />
                                     Buat Kelas
@@ -739,17 +762,22 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                     <TabsContent value="open-courses" className="space-y-6 mt-0">
                         {openCourses.length === 0 ? (
                             <Card 
-                                className="rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
-                                style={{backgroundColor: '#1E1E1E', borderColor: '#FFD903', borderWidth: '2px'}}
+                                className="rounded-xl shadow-sm hover:shadow-md transition-all overflow-hidden"
+                                style={{backgroundColor: '#FFFFFC', borderColor: '#E5E5E5', borderWidth: '1px'}}
                             >
+                                {/* Dark top accent bar */}
+                                <div 
+                                  className="h-2"
+                                  style={{ backgroundColor: '#1A1A1A' }}
+                                ></div>
                                 <CardHeader>
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1">
-                                            <CardTitle className="text-2xl font-bold text-[#FFD903] flex items-center gap-2 mb-2">
-                                                <Globe className="h-6 w-6" />
+                                            <CardTitle className="text-2xl font-bold flex items-center gap-2 mb-2" style={{ color: '#1A1A1A' }}>
+                                                <Globe className="h-6 w-6" style={{ color: '#E8B824' }} />
                                                 Kelas Terbuka
                                             </CardTitle>
-                                            <CardDescription className="text-base text-gray-300">
+                                            <CardDescription className="text-base" style={{ color: '#4A4A4A' }}>
                                                 Buat kelas mandiri yang dapat diakses oleh siapa saja. Tambahkan modul pembelajaran dan kelola siswa dengan mudah.
                                             </CardDescription>
                                         </div>
@@ -757,24 +785,25 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="p-4 rounded-lg" style={{backgroundColor: '#0A0A0A', borderColor: '#333333', borderWidth: '1px'}}>
-                                            <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
-                                                <Globe className="h-4 w-4 text-[#FFD903]" />
+                                        <div className="p-4 rounded-lg" style={{backgroundColor: '#F5F5F5', borderColor: '#E5E5E5', borderWidth: '1px'}}>
+                                            <h4 className="font-semibold mb-2 flex items-center gap-2" style={{ color: '#1A1A1A' }}>
+                                                <Globe className="h-4 w-4" style={{ color: '#E8B824' }} />
                                                 Akses Publik
                                             </h4>
-                                            <p className="text-sm text-gray-400">Kelas dapat ditemukan dan dipelajari oleh semua orang</p>
+                                            <p className="text-sm" style={{ color: '#4A4A4A' }}>Kelas dapat ditemukan dan dipelajari oleh semua orang</p>
                                         </div>
-                                        <div className="p-4 rounded-lg" style={{backgroundColor: '#0A0A0A', borderColor: '#333333', borderWidth: '1px'}}>
-                                            <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
-                                                <Target className="h-4 w-4 text-[#FFD903]" />
+                                        <div className="p-4 rounded-lg" style={{backgroundColor: '#F5F5F5', borderColor: '#E5E5E5', borderWidth: '1px'}}>
+                                            <h4 className="font-semibold mb-2 flex items-center gap-2" style={{ color: '#1A1A1A' }}>
+                                                <Target className="h-4 w-4" style={{ color: '#E8B824' }} />
                                                 Mandiri
                                             </h4>
-                                            <p className="text-sm text-gray-400">Siswa belajar dengan kecepatan mereka sendiri</p>
+                                            <p className="text-sm" style={{ color: '#4A4A4A' }}>Siswa belajar dengan kecepatan mereka sendiri</p>
                                         </div>
                                     </div>
                                     <Button 
                                         onClick={() => router.push('/teacher/courses/new')}
-                                        className="w-full bg-[#FFD903] hover:bg-[#FFD903]/90 text-[#1E1E1E] font-semibold h-11"
+                                        className="w-full font-semibold h-11 transition-all hover:opacity-90"
+                                        style={{ backgroundColor: '#E8B824', color: '#1A1A1A' }}
                                     >
                                         <Plus className="h-4 w-4 mr-2" />
                                         Buat Kelas Terbuka Pertama Anda
@@ -787,37 +816,53 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                     {openCourses.map((course) => (
                                         <Card 
                                             key={course.id} 
-                                            className="rounded-2xl flex flex-col shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
-                                            style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}}
+                                            className="rounded-xl flex flex-col shadow-sm hover:shadow-md transition-all overflow-hidden"
+                                            style={{backgroundColor: '#FFFFFC', borderColor: '#E5E5E5', borderWidth: '1px'}}
                                         >
-                                            <CardHeader className="pb-2 flex-shrink-0">
-                                                <div className="flex items-start justify-between mb-2">
-                                                    <CardTitle className="text-xl font-bold text-white flex-1 pr-2 line-clamp-2">
+                                            {/* Dark top accent bar */}
+                                            <div 
+                                              className="h-2"
+                                              style={{ backgroundColor: '#1A1A1A' }}
+                                            ></div>
+                                            
+                                            <CardHeader className="pb-3 flex-shrink-0">
+                                                <div className="flex items-start justify-between mb-2 gap-2">
+                                                    <CardTitle className="text-lg font-bold text-ellipsis line-clamp-2" style={{ color: '#1A1A1A' }}>
                                                         {course.title}
                                                     </CardTitle>
-                                                    <Badge className="bg-blue-100 text-blue-700 border-0 px-3 py-1 text-xs font-medium flex-shrink-0">
-                                                        Terbuka
+                                                    <Badge 
+                                                      className="flex-shrink-0 text-xs font-semibold px-2 py-1 whitespace-nowrap"
+                                                      style={{
+                                                        backgroundColor: '#E3F2FD',
+                                                        color: '#1565C0',
+                                                        border: '1px solid #BBDEFB'
+                                                      }}
+                                                    >
+                                                      <Globe className="h-3 w-3 mr-1" />
+                                                      Terbuka
                                                     </Badge>
                                                 </div>
-                                                <CardDescription className="text-sm text-gray-300 leading-relaxed line-clamp-2">
+                                                <CardDescription className="text-xs" style={{ color: '#4A4A4A' }}>
                                                     {course.description}
                                                 </CardDescription>
                                             </CardHeader>
                                             
-                                            <CardContent className="space-y-3 pt-2 mt-auto flex-shrink-0">
-                                                <div className="text-xs text-gray-500">
+                                            <CardContent className="space-y-3 pt-1 flex-grow">
+                                                <div className="text-xs" style={{ color: '#999999' }}>
                                                     Dibuat: {new Date(course.created_at).toLocaleDateString('id-ID')}
                                                 </div>
-                                                
-                                                <div className="flex gap-2 pt-2">
+                                            </CardContent>
+
+                                            {/* Action Buttons */}
+                                            <div className="px-4 pb-4 pt-2 space-y-2 flex flex-col gap-2 flex-shrink-0 border-t" style={{ borderColor: '#E5E5E5' }}>
+                                                <div className="flex gap-2">
                                                     <Button
                                                         size="sm"
                                                         onClick={() => router.push(`/teacher/courses/${course.id}/modules`)}
-                                                        className="flex-1 text-xs font-semibold"
+                                                        className="flex-1 text-xs font-semibold rounded-lg transition-all hover:opacity-90"
                                                         style={{
-                                                            backgroundColor: '#FFD903',
+                                                            backgroundColor: '#E8B824',
                                                             color: '#1A1A1A',
-                                                            border: 'none',
                                                         }}
                                                     >
                                                         <Edit2 className="h-3 w-3 mr-1" />
@@ -825,13 +870,13 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                                     </Button>
                                                     <Button
                                                         size="sm"
-                                                        variant="outline"
                                                         onClick={() => router.push(`/open-courses/${course.id}/preview`)}
-                                                        className="flex-1 text-xs font-semibold"
+                                                        className="flex-1 text-xs font-semibold rounded-lg transition-all hover:opacity-90"
                                                         style={{
-                                                            backgroundColor: '#FFFFFC',
-                                                            borderColor: '#FFFFFC',
+                                                            backgroundColor: '#F5F5F5',
+                                                            borderColor: '#E5E5E5',
                                                             color: '#1A1A1A',
+                                                            border: '1px solid'
                                                         }}
                                                     >
                                                         <Eye className="h-3 w-3 mr-1" />
@@ -839,28 +884,29 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                                     </Button>
                                                     <Button
                                                         size="sm"
-                                                        variant="outline"
                                                         onClick={() => handleDeleteCourse(course.id)}
-                                                        className="text-xs"
+                                                        className="text-xs rounded-lg transition-all hover:opacity-90"
                                                         style={{
                                                             borderColor: '#DC2626',
                                                             color: '#DC2626',
+                                                            backgroundColor: 'transparent',
+                                                            border: '1px solid'
                                                         }}
                                                     >
                                                         <Trash2 className="h-3 w-3" />
                                                     </Button>
                                                 </div>
-                                            </CardContent>
+                                            </div>
                                         </Card>
                                     ))}
                                 </div>
-                            </div>
+                            </div>  
                         )}
                     </TabsContent>
                 </Tabs>
 
                 <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                    <DialogContent className="bg-white border-2 border-[#FFD903] shadow-xl rounded-xl max-w-md">
+                    <DialogContent className="rounded-xl max-w-md" style={{ backgroundColor: '#FFFFFC', borderColor: '#E8B824', borderWidth: '2px' }}>
                         <DialogHeader>
                             <DialogTitle className="text-[#1E1E1E] text-xl">Kelas Baru</DialogTitle>
                             <DialogDescription className="text-gray-600">

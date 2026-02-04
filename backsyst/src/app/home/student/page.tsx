@@ -137,7 +137,7 @@ const ProfileDropdown = ({ userName, onLogout }: { userName: string; onLogout: (
 
           <button
             onClick={() => {
-              router.push("/home");
+              router.push("/home/student");
               setIsOpen(false);
             }}
             className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
@@ -561,18 +561,18 @@ function StudentMode({ onBack }: StudentModeProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header dengan dark theme dan yellow accent */}
-      <div className="bg-[#1E1E1E] text-[#FFFFFC] px-6 py-8 shadow-lg border-b-4 border-[#FFD903]">
+      {/* Header dengan dark theme dan gold accent */}
+      <div className="text-[#FFFFFC] px-6 py-8 shadow-lg" style={{ backgroundColor: '#1A1A1A', borderBottom: '4px solid #E8B824' }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold mb-1">Selamat Datang, {userName}!</h1>
-              <p className="text-blue-100 text-sm">Kelola kelas dan materi pembelajaran Anda dengan mudah</p>
+              <p className="text-sm" style={{ color: '#E8B824' }}>Kelola kelas dan materi pembelajaran Anda dengan mudah</p>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-[#FFD903]/20">
-                <Bell className="h-5 w-5 text-[#FFD903]" />
-                <span className="absolute top-1 right-1 h-2 w-2 bg-[#FFD903] rounded-full border border-white"></span>
+              <Button variant="ghost" size="icon" className="relative rounded-full transition-colors hover:opacity-80">
+                <Bell className="h-5 w-5" style={{ color: '#E8B824' }} />
+                <span className="absolute top-1 right-1 h-2 w-2 rounded-full border border-white" style={{ backgroundColor: '#E8B824' }}></span>
               </Button>
 
               {/* Custom Profile Dropdown */}
@@ -586,42 +586,42 @@ function StudentMode({ onBack }: StudentModeProps) {
           {/* Stats Cards di dalam header dark */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Card 1 - Kelas yang diikuti */}
-            <div style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+            <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <p className="text-gray-400 text-sm mb-2">Kelas yang diikuti</p>
-                  <p className="text-4xl font-bold text-[#FFD903] mb-1">{studentStats.totalClassrooms}</p>
+                  <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.totalClassrooms}</p>
                   <p className="text-gray-500 text-xs">Kelas</p>
                 </div>
-                <div style={{backgroundColor: '#FFD903'}} className="p-3 rounded-lg">
+                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
                   <BookOpen className="h-6 w-6" style={{color: '#1E1E1E'}} />
                 </div>
               </div>
             </div>
 
             {/* Card 2 - Latihan Soal selesai */}
-            <div style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+            <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <p className="text-gray-400 text-sm mb-2">Latihan Soal selesai</p>
-                  <p className="text-4xl font-bold text-[#FFD903] mb-1">{studentStats.completedExercises}</p>
+                  <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.completedExercises}</p>
                   <p className="text-gray-500 text-xs">Latihan</p>
                 </div>
-                <div style={{backgroundColor: '#FFD903'}} className="p-3 rounded-lg">
+                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
                   <BookOpen className="h-6 w-6" style={{color: '#1E1E1E'}} />
                 </div>
               </div>
             </div>
 
             {/* Card 3 - Rata-rata Nilai */}
-            <div style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+            <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <p className="text-gray-400 text-sm mb-2">Rata-rata Nilai</p>
-                  <p className="text-4xl font-bold text-[#FFD903] mb-1">{studentStats.averageScore}%</p>
+                  <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.averageScore}%</p>
                   <p className="text-gray-500 text-xs">Dari semua latihan</p>
                 </div>
-                <div style={{backgroundColor: '#FFD903'}} className="p-3 rounded-lg">
+                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
                   <TrendingUp className="h-6 w-6" style={{color: '#1E1E1E'}} />
                 </div>
               </div>
@@ -630,24 +630,32 @@ function StudentMode({ onBack }: StudentModeProps) {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px- pt-0">
+      <div className="max-w-7xl mx-auto px- pt-0 pb-12">
         {/* Section Title */}
         <div className="mb-6">
         </div>
 
         {/* Tabs */}
         <Tabs defaultValue="classrooms" className="w-full border-0">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl font-bold mb-1" style={{ color: "#1A1A1A" }}>
+                Kelas Saya
+              </h2>
+              <p className="text-sm" style={{ color: "#4A4A4A" }}>
+                Kelola dan ikuti perkembangan belajar kelas Anda
+              </p>
+            </div>
             <TabsList className="bg-transparent border-0 p-0 shadow-none">
               <TabsTrigger 
                 value="classrooms" 
-                className="!bg-[#1E1E1E] !text-[#FFD903]/50 !border-transparent !border-b-2 !rounded-lg !px-3 !py-2 !font-semibold !transition-all !mr-2 !hover:text-[#FFD903] data-[state=active]:!text-[#FFD903] data-[state=active]:!border-[#FFD903] data-[state=inactive]:!text-[#FFD903]/50 data-[state=inactive]:!border-transparent"
+                className="!bg-transparent !text-[#4A4A4A] !border-b-2 !rounded-none !px-4 !py-2 !font-semibold !transition-all data-[state=active]:!text-[#E8B824] data-[state=active]:!border-[#E8B824] data-[state=inactive]:!text-[#4A4A4A] data-[state=inactive]:!border-transparent"
               >
-                Kelas Saya
+                Kelas Terdaftar
               </TabsTrigger>
               <TabsTrigger 
                 value="join" 
-                className="!bg-[#1E1E1E] !text-[#FFD903]/50 !border-transparent !border-b-2 !rounded-lg !px-3 !py-2 !font-semibold !transition-all !hover:text-[#FFD903] data-[state=active]:!text-[#FFD903] data-[state=active]:!border-[#FFD903] data-[state=inactive]:!text-[#FFD903]/50 data-[state=inactive]:!border-transparent"
+                className="!bg-transparent !text-[#4A4A4A] !border-b-2 !rounded-none !px-4 !py-2 !font-semibold !transition-all data-[state=active]:!text-[#E8B824] data-[state=active]:!border-[#E8B824] data-[state=inactive]:!text-[#4A4A4A] data-[state=inactive]:!border-transparent"
               >
                 Bergabung Kelas
               </TabsTrigger>
@@ -655,100 +663,163 @@ function StudentMode({ onBack }: StudentModeProps) {
           </div>
           
           <TabsContent value="classrooms" className="space-y-6 mt-0">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {classrooms.length > 0 ? (
                 classrooms.map((classroom) => (
-                  <Card key={classroom.id} className="rounded-2xl flex flex-col shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}}>
-                    <CardHeader className="pb-2 flex-shrink-0">
-                      <div className="flex items-start justify-between mb-2">
-                        <CardTitle className="text-xl font-bold text-white flex-1 pr-2">
+                  <Card 
+                    key={classroom.id} 
+                    className="rounded-xl flex flex-col shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group cursor-pointer" 
+                    style={{
+                      backgroundColor: '#FFFFFC', 
+                      borderColor: '#E5E5E5', 
+                      borderWidth: '1px'
+                    }}
+                  >
+                    {/* Header dengan warna accent */}
+                    <div 
+                      className="h-2"
+                      style={{ backgroundColor: '#1A1A1A' }}
+                    ></div>
+                    
+                    <CardHeader className="pb-3 flex-shrink-0">
+                      <div className="flex items-start justify-between mb-2 gap-2">
+                        <CardTitle className="text-lg font-bold text-ellipsis line-clamp-2" style={{ color: "#1A1A1A" }}>
                           {classroom.name}
                         </CardTitle>
-                        <Badge className="bg-green-100 text-green-700 border-0 px-3 py-1 text-xs font-medium flex-shrink-0">
-                          Aktif
+                        <Badge 
+                          className="flex-shrink-0 text-xs font-semibold px-2 py-1 whitespace-nowrap"
+                          style={{
+                            backgroundColor: '#E8F5E9',
+                            color: '#2E7D32',
+                            border: '1px solid #C8E6C9'
+                          }}
+                        >
+                          ✓ Aktif
                         </Badge>
                       </div>
-                      <CardDescription className="text-sm text-gray-300 leading-relaxed line-clamp-2">
-                        {classroom.description}
+                      <CardDescription className="text-xs" style={{ color: "#4A4A4A" }}>
+                        {classroom.description || "Belum ada deskripsi"}
                       </CardDescription>
                     </CardHeader>
                     
-                    <CardContent className="space-y-3 pt-2 mt-auto flex-shrink-0">
-                      <div className="flex items-center gap-2 text-sm text-gray-400">
-                        <Users className="h-4 w-4" />
-                        <span>Guru: {classroom.teacherName}</span>
-                      </div>
-                      
-                      <div style={{backgroundColor: '#FFFFFC', borderColor: '#FFFFFC', borderWidth: '1px'}} className="rounded-lg p-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs text-gray-600 mb-1">Kode Kelas</p>
-                            <code className="text-sm font-mono font-semibold text-black">
-                              {classroom.code}
-                            </code>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => copyClassCode(classroom.code)}
-                            className="text-black hover:text-gray-700 hover:bg-gray-100 p-2 h-8 w-8"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
+                    <CardContent className="space-y-3 pt-1 flex-grow">
+                      {/* Teacher Info */}
+                      <div 
+                        className="flex items-center gap-2 text-sm p-3 rounded-lg"
+                        style={{ backgroundColor: '#F5F5F5' }}
+                      >
+                        <BookOpen className="h-4 w-4 flex-shrink-0" style={{ color: '#E8B824' }} />
+                        <div className="min-w-0">
+                          <p className="text-xs" style={{ color: "#999999" }}>Guru</p>
+                          <p className="font-semibold text-ellipsis truncate" style={{ color: "#1A1A1A" }}>
+                            {classroom.teacherName || "Tidak diketahui"}
+                          </p>
                         </div>
                       </div>
-                      
-                      <div className="flex gap-2 pt-2">
+                    </CardContent>
+
+                    {/* Action Buttons */}
+                    <div className="px-4 pb-4 pt-2 space-y-2 flex flex-col gap-2 flex-shrink-0 border-t" style={{ borderColor: '#E5E5E5' }}>
+                      {/* Class Code Section */}
+                      <div 
+                        className="rounded-lg p-3 flex items-center justify-between mb-2"
+                        style={{ backgroundColor: '#FFF8E1', borderColor: '#E8B824', borderWidth: '1px' }}
+                      >
+                        <div>
+                          <p className="text-xs" style={{ color: "#4A4A4A" }}>Kode Kelas</p>
+                          <code 
+                            className="text-sm font-bold font-mono"
+                            style={{ color: "#E8B824" }}
+                          >
+                            {classroom.code}
+                          </code>
+                        </div>
                         <Button
-                          className="flex-1 font-semibold hover:opacity-90 transition-opacity"
-                          style={{backgroundColor: '#FFD903', color: '#1E1E1E'}}
-                          onClick={() => handleViewClassroom(classroom.id)}
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => copyClassCode(classroom.code)}
+                          className="text-sm p-2 h-8 w-8 rounded-md transition-colors hover:opacity-70"
+                          style={{ color: "#E8B824" }}
                         >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Lihat Kelas
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="border-white text-white hover:bg-gray-700 px-4 font-semibold"
-                        >
-                          Kelola
+                          <Copy className="h-4 w-4" />
                         </Button>
                       </div>
-                    </CardContent>
+
+                      <Button
+                        className="w-full font-semibold text-sm h-9 rounded-lg transition-all hover:opacity-90"
+                        style={{
+                          backgroundColor: '#E8B824', 
+                          color: '#1A1A1A'
+                        }}
+                        onClick={() => handleViewClassroom(classroom.id)}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Buka Kelas
+                      </Button>
+                    </div>
                   </Card>
                 ))
               ) : (
-                <p className="text-gray-500 col-span-2">Anda belum bergabung dengan kelas apa pun.</p>
+                <div className="col-span-full text-center py-12">
+                  <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-30" style={{ color: "#1A1A1A" }} />
+                  <p className="text-sm" style={{ color: "#4A4A4A" }}>
+                    Anda belum bergabung dengan kelas apa pun.
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: "#999999" }}>
+                    Gunakan tab "Bergabung Kelas" untuk mendaftar
+                  </p>
+                </div>
               )}
             </div>
           </TabsContent>
 
           <TabsContent value="join" className="space-y-6 mt-0">
-            <Card className="bg-[#1E1E1E] border-l-4 border-l-[#FFD903] shadow-sm rounded-2xl">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-3 text-[#FFD903] text-lg">
-                  <div className="p-2 bg-[#FFD903]/20 rounded-lg">
-                    <UserPlus className="h-5 w-5 text-[#FFD903]" />
+            <Card 
+              className="rounded-xl shadow-sm border-l-4"
+              style={{
+                backgroundColor: '#FFFFFC',
+                borderLeftColor: '#E8B824',
+                borderColor: '#E5E5E5'
+              }}
+            >
+              <CardHeader className="pb-4">
+                <CardTitle 
+                  className="flex items-center gap-3 text-lg"
+                  style={{ color: '#1A1A1A' }}
+                >
+                  <div 
+                    className="p-2 rounded-lg"
+                    style={{ backgroundColor: '#FFF8E1' }}
+                  >
+                    <UserPlus className="h-5 w-5" style={{ color: '#E8B824' }} />
                   </div>
-                  Bergabung ke Kelas
+                  Bergabung ke Kelas Baru
                 </CardTitle>
-                <CardDescription className="text-[#FFFFFC]/80">
-                  Masukkan kode kelas yang diberikan oleh guru Anda
+                <CardDescription className="text-sm mt-2" style={{ color: '#4A4A4A' }}>
+                  Masukkan kode kelas yang diberikan oleh guru Anda untuk bergabung
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-2">
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   <Input
                     placeholder="Masukkan kode kelas..."
                     value={joinCode}
                     onChange={(e) => setJoinCode(e.target.value)}
-                    className="flex-1 border-[#FFD903]/30 bg-[#1E1E1E]/50 text-[#FFFFFC] placeholder-[#FFFFFC]/50 focus:border-[#FFD903] focus:ring-[#FFD903]/20 h-11"
+                    className="flex-1 h-11 rounded-lg border text-sm"
+                    style={{
+                      borderColor: '#E5E5E5',
+                      backgroundColor: '#F5F5F5',
+                      color: '#1A1A1A'
+                    }}
                   />
                   <Button 
                     onClick={joinClass} 
-                    disabled={!joinCode.trim() || isLoading} 
-                    className="bg-[#FFD903] hover:bg-[#FFD903]/90 text-[#1E1E1E] font-semibold px-6"
+                    disabled={!joinCode.trim() || isLoading}
+                    className="px-6 h-11 font-semibold text-sm rounded-lg transition-all hover:opacity-90 disabled:opacity-50"
+                    style={{
+                      backgroundColor: '#E8B824',
+                      color: '#1A1A1A'
+                    }}
                   >
                     <Send className="h-4 w-4 mr-2" />
                     Bergabung
@@ -760,10 +831,10 @@ function StudentMode({ onBack }: StudentModeProps) {
         </Tabs>
 
         <Dialog open={isJoinConfirmOpen} onOpenChange={setIsJoinConfirmOpen}>
-          <DialogContent className="bg-white border-2 border-[#FFD903] shadow-xl rounded-xl max-w-md">
+          <DialogContent className="rounded-xl max-w-md" style={{ backgroundColor: '#FFFFFC', borderColor: '#E8B824', borderWidth: '2px' }}>
             <DialogHeader>
-              <DialogTitle className="text-[#1E1E1E] text-xl">Bergabung ke Kelas</DialogTitle>
-              <DialogDescription className="text-gray-600">
+              <DialogTitle className="text-xl" style={{ color: '#1A1A1A' }}>Bergabung ke Kelas</DialogTitle>
+              <DialogDescription style={{ color: '#4A4A4A' }}>
                 Konfirmasi detail kelas sebelum bergabung
               </DialogDescription>
             </DialogHeader>
@@ -771,18 +842,22 @@ function StudentMode({ onBack }: StudentModeProps) {
               {selectedClassToJoin && (
                 <>
                   <div className="space-y-2">
-                    <h3 className="font-semibold text-gray-900">Nama Kelas: {selectedClassToJoin.name}</h3>
-                    <p className="text-sm text-gray-600">Deskripsi: {selectedClassToJoin.description}</p>
-                    <p className="text-sm text-gray-600">
+                    <h3 className="font-semibold" style={{ color: '#1A1A1A' }}>Nama Kelas: {selectedClassToJoin.name}</h3>
+                    <p className="text-sm" style={{ color: '#4A4A4A' }}>Deskripsi: {selectedClassToJoin.description}</p>
+                    <p className="text-sm" style={{ color: '#4A4A4A' }}>
                       Dibuat pada: {new Date(selectedClassToJoin.createdAt).toLocaleDateString('id-ID')}
                     </p>
-                    <p className="text-sm text-gray-600">Guru: {selectedClassToJoin.teacherName}</p>
+                    <p className="text-sm" style={{ color: '#4A4A4A' }}>Guru: {selectedClassToJoin.teacherName}</p>
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button 
                       onClick={confirmJoinClass} 
                       disabled={isLoading} 
-                      className="bg-[#FFD903] text-[#1E1E1E] hover:bg-[#FFD903]/90 font-semibold"
+                      className="font-semibold transition-all hover:opacity-90 disabled:opacity-50"
+                      style={{
+                        backgroundColor: '#E8B824',
+                        color: '#1A1A1A'
+                      }}
                     >
                       <CheckCircle2 className="h-4 w-4 mr-2" />
                       Masuk
@@ -790,7 +865,11 @@ function StudentMode({ onBack }: StudentModeProps) {
                     <Button 
                       variant="outline" 
                       onClick={() => setIsJoinConfirmOpen(false)} 
-                      className="border-[#FFD903] text-[#FFD903] hover:bg-[#FFD903]/10"
+                      className="font-semibold transition-all hover:opacity-90"
+                      style={{
+                        borderColor: '#E8B824',
+                        color: '#E8B824'
+                      }}
                     >
                       Batal
                     </Button>
