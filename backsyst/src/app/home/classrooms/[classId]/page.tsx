@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import {
   CheckCircle2,
   Clock,
@@ -38,7 +38,8 @@ import {
   Upload,
   Download,
   UploadCloud,
-  Globe
+  Globe,
+  Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -91,7 +92,9 @@ interface StudentSubmission {
   assignment_id: string;
   submitted_at: string;
   status: string;
-  file_url?: string;
+  file_url?: string | null;
+  file_path?: string | null;
+  message?: string | null;
   student_id?: string;
 }
 
@@ -253,11 +256,19 @@ export default function ClassroomsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [studentSubmissionStatus, setStudentSubmissionStatus] = useState<Record<string, StudentSubmission>>({});
+  const [submissionMessage, setSubmissionMessage] = useState<string>("");
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
+  const [submissionToDelete, setSubmissionToDelete] = useState<string | null>(null);
 
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [selectedPertemuan, setSelectedPertemuan] = useState<number | null>(null);
   const [showContentTypeModal, setShowContentTypeModal] = useState(false);
   const [showConfirmBackModal, setShowConfirmBackModal] = useState(false);
+
+  const [detailViewMode, setDetailViewMode] = useState<boolean>(false);
+  const [selectedDetailContent, setSelectedDetailContent] = useState<ContentItem | null>(null);
 
   const checkExerciseAttempts = async (userId: string) => {
     if (userRole !== 'student') return;
@@ -306,7 +317,7 @@ export default function ClassroomsPage() {
     try {
       const { data: submissions, error } = await supabase
         .from('student_submissions')
-        .select(`id, assignment_id, submitted_at, file_url, status`)
+        .select(`id, assignment_id, submitted_at, file_url, file_path, message, status`)
         .eq('student_id', userId);
 
       if (error) {
@@ -760,38 +771,45 @@ export default function ClassroomsPage() {
   }, [meetings]);
 
   const handleFileUpload = async (contentId: string) => {
-    if (!selectedFile || isUploading || !userId) {
-      toast.error("Pilih file terlebih dahulu.");
+    if ((!selectedFile && !submissionMessage.trim()) || isUploading || !userId) {
+      toast.error("Pilih file atau tulis pesan terlebih dahulu.");
       return;
     }
 
-    if (selectedFile.size > 12 * 1024 * 1024) {
+    if (selectedFile && selectedFile.size > 12 * 1024 * 1024) {
       toast.error("Ukuran file maksimal 12MB.");
       return;
     }
 
     setIsUploading(true);
-    const uniqueFileName = `${Date.now()}_${selectedFile.name}`;
-    const filePath = `${userId}/${contentId}/${uniqueFileName}`;
+    let fileUrl = "";
+    let filePath = "";
 
     try {
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: true,
-        });
+      if (selectedFile) {
+        const uniqueFileName = `${Date.now()}_${selectedFile.name}`;
+        filePath = `${userId}/${contentId}/${uniqueFileName}`;
 
-      if (uploadError) {
-        throw new Error("Gagal mengunggah file: " + uploadError.message);
-      }
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(filePath, selectedFile, {
+            cacheControl: '3600',
+            upsert: true,
+          });
 
-      const { data: fileUrlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
+        if (uploadError) {
+          throw new Error("Gagal mengunggah file: " + uploadError.message);
+        }
 
-      if (!fileUrlData || !fileUrlData.publicUrl) {
-        throw new Error("Gagal mendapatkan URL publik.");
+        const { data: fileUrlData } = supabase.storage
+          .from('documents')
+          .getPublicUrl(filePath);
+
+        if (!fileUrlData || !fileUrlData.publicUrl) {
+          throw new Error("Gagal mendapatkan URL publik.");
+        }
+
+        fileUrl = fileUrlData.publicUrl;
       }
 
       const { error: dbError } = await supabase
@@ -799,7 +817,9 @@ export default function ClassroomsPage() {
         .upsert({
           assignment_id: contentId,
           student_id: userId,
-          file_url: fileUrlData.publicUrl,
+          file_url: fileUrl || null,
+          file_path: filePath || null,
+          message: submissionMessage.trim() || null,
           submitted_at: new Date().toISOString(),
           status: 'submitted',
         }, { onConflict: 'assignment_id,student_id', ignoreDuplicates: false });
@@ -809,23 +829,95 @@ export default function ClassroomsPage() {
       }
 
       toast.success("Tugas berhasil dikumpulkan!");
-      setStudentSubmissionStatus(prev => ({
+      setStudentSubmissions(prev => ({
         ...prev,
         [contentId]: {
           id: crypto.randomUUID(),
           assignment_id: contentId,
           student_id: userId,
-          file_url: fileUrlData.publicUrl,
+          file_url: fileUrl || null,
+          file_path: filePath || null,
+          message: submissionMessage.trim() || null,
           submitted_at: new Date().toISOString(),
           status: 'submitted'
         }
       }));
       setSelectedFile(null);
+      setSubmissionMessage("");
 
     } catch (err: any) {
       toast.error(err.message || "Terjadi kesalahan saat mengunggah tugas.");
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleImagePreview = (url: string) => {
+    const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url);
+    if (isImage) {
+      setPreviewImage(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleDeleteSubmission = async (contentId: string) => {
+    if (!userId) return;
+    
+    setIsDeletingSubmission(true);
+    
+    try {
+      const submission = studentSubmissions[contentId];
+      let filePathToDelete = submission?.file_path;
+      
+      if (!filePathToDelete && submission?.file_url) {
+        try {
+          const urlParts = submission.file_url.split('/documents/');
+          if (urlParts.length > 1) {
+            filePathToDelete = decodeURIComponent(urlParts[1]);
+          }
+        } catch (parseError) {
+          console.error("Error parsing URL:", parseError);
+        }
+      }
+
+      if (filePathToDelete) {
+        try {
+          const { error: storageError } = await supabase.storage
+            .from('documents')
+            .remove([filePathToDelete]);
+          
+          if (storageError) {
+            console.error("Storage delete error:", storageError);
+          }
+        } catch (storageError) {
+          console.error("Error deleting from storage:", storageError);
+        }
+      }
+
+      const { error } = await supabase
+        .from('student_submissions')
+        .delete()
+        .eq('assignment_id', contentId)
+        .eq('student_id', userId);
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      toast.success("Pengumpulan berhasil dihapus!");
+      setStudentSubmissions(prev => {
+        const updated = { ...prev };
+        delete updated[contentId];
+        return updated;
+      });
+      setShowDeleteModal(false);
+      setSubmissionToDelete(null);
+
+    } catch (err: any) {
+      toast.error("Gagal menghapus: " + (err.message || err));
+    } finally {
+      setIsDeletingSubmission(false);
     }
   };
 
@@ -876,6 +968,7 @@ export default function ClassroomsPage() {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-80 p-0">
+                  <SheetTitle className="sr-only">Daftar Pertemuan</SheetTitle>
                   <MeetingSidebar
                     meetings={meetings}
                     selectedMeeting={selectedMeeting}
@@ -883,6 +976,16 @@ export default function ClassroomsPage() {
                       setSelectedMeeting(num);
                       setIsMobileSidebarOpen(false);
                     }}
+                    userRole={userRole}
+                    onCreateContent={() => setShowMeetingModal(true)}
+                    selectedContentType={selectedContentType}
+                    onContentTypeChange={(type) => {
+                      setSelectedContentType(type);
+                      setDetailViewMode(false);
+                      setSelectedDetailContent(null);
+                      setIsMobileSidebarOpen(false);
+                    }}
+                    getContentCountByType={getContentCountByType}
                   />
                 </SheetContent>
               </Sheet>
@@ -1022,7 +1125,11 @@ export default function ClassroomsPage() {
               userRole={userRole}
               onCreateContent={() => setShowMeetingModal(true)}
               selectedContentType={selectedContentType}
-              onContentTypeChange={setSelectedContentType}
+              onContentTypeChange={(type) => {
+                setSelectedContentType(type);
+                setDetailViewMode(false);
+                setSelectedDetailContent(null);
+              }}
               getContentCountByType={getContentCountByType}
             />
           </aside>
@@ -1030,32 +1137,317 @@ export default function ClassroomsPage() {
           {/* Content Area */}
           <div className="w-full lg:ml-72 px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12">
             <div className="max-w-6xl mx-auto">
-              {/* Context Indicator */}
-              <div className="mb-8 flex items-center text-xs sm:text-sm text-gray-600">
-                <span className="font-semibold text-gray-900">Pertemuan {selectedMeeting}</span>
-                <ChevronRight className="h-4 w-4 mx-2 text-gray-400" />
-                <span className="text-gray-600">
-                  {selectedContentType === "all" && "Semua Konten"}
-                  {selectedContentType === "materi" && "Materi"}
-                  {selectedContentType === "tugas" && "Tugas"}
-                  {selectedContentType === "latihan" && "Latihan Soal"}
-                </span>
+              {/* Breadcrumb Navigation */}
+              <div className="mb-8 flex items-center text-xs sm:text-sm" style={{color: '#4A4A4A'}}>
+                <button 
+                  onClick={() => {
+                    setDetailViewMode(false);
+                    setSelectedDetailContent(null);
+                  }}
+                  className="font-semibold hover:opacity-80 transition-opacity"
+                  style={{color: '#1A1A1A'}}
+                >
+                  Pertemuan {selectedMeeting}
+                </button>
+                <ChevronRight className="h-4 w-4 mx-2" style={{color: '#E8B824'}} />
+                {detailViewMode && selectedDetailContent ? (
+                  <>
+                    <button 
+                      onClick={() => {
+                        setDetailViewMode(false);
+                        setSelectedDetailContent(null);
+                      }}
+                      className="font-semibold hover:opacity-80 transition-colors"
+                      style={{color: '#1A1A1A'}}
+                    >
+                      {selectedDetailContent.jenis_create === "materi" ? "Materi" : selectedDetailContent.jenis_create === "tugas" ? "Tugas" : "Latihan Soal"}
+                    </button>
+                    <ChevronRight className="h-4 w-4 mx-2" style={{color: '#E8B824'}} />
+                    <span style={{color: '#4A4A4A'}}>{selectedDetailContent.sub_judul || selectedDetailContent.judul}</span>
+                  </>
+                ) : (
+                  <span style={{color: '#4A4A4A'}}>
+                    {selectedContentType === "all" && "Semua Konten"}
+                    {selectedContentType === "materi" && "Materi"}
+                    {selectedContentType === "tugas" && "Tugas"}
+                    {selectedContentType === "latihan" && "Latihan Soal"}
+                  </span>
+                )}
               </div>
 
-              {/* Create Button for Teacher */}
-              {userRole === "teacher" && (
-                <Button
-                  onClick={() => setShowMeetingModal(true)}
-                  className="w-full text-black py-2 sm:py-3 mb-6 font-semibold hover:opacity-90 transition-opacity"
-                  style={{backgroundColor: '#E8B824'}}
-                >
-                  <Plus className="h-5 w-5 mr-2" />
-                  Buat Pertemuan
-                </Button>
-              )}
+              {/* Detail View */}
+              {detailViewMode && selectedDetailContent ? (
+                <div className="space-y-6">
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{color: '#1A1A1A'}}>
+                      {selectedDetailContent.sub_judul || selectedDetailContent.judul}
+                    </h1>
+                    <p className="text-sm" style={{color: '#4A4A4A'}}>
+                      Jenis: {selectedDetailContent.jenis_create} • Dibuat: {new Date(selectedDetailContent.created_at).toLocaleDateString('id-ID')}
+                      {selectedDetailContent.deadline && ` • Deadline: ${new Date(selectedDetailContent.deadline).toLocaleDateString('id-ID')}`}
+                    </p>
+                  </div>
 
-              {/* Content List */}
-              <div className="space-y-4">
+                  <Card className="bg-white border-2" style={{borderColor: '#E8B824'}}>
+                    <CardContent className="p-6 sm:p-8">
+                      <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: selectedDetailContent.konten }} />
+                      
+                      {selectedDetailContent.documents && selectedDetailContent.documents.length > 0 && (
+                        <div className="mt-6 pt-6" style={{borderTop: '1px solid #E8B824'}}>
+                          <h3 className="font-semibold mb-4" style={{color: '#1A1A1A'}}>File Lampiran</h3>
+                          <div className="space-y-2">
+                            {selectedDetailContent.documents.map((doc, idx) => (
+                              <a
+                                key={idx}
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 p-3 rounded-lg hover:opacity-80 transition-opacity"
+                                style={{backgroundColor: '#FFFFFC', border: '1px solid #E8B824'}}
+                              >
+                                <Download className="h-4 w-4 flex-shrink-0" style={{color: '#E8B824'}} />
+                                <span className="text-sm truncate" style={{color: '#1A1A1A'}}>{doc.name}</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Student Submission Section for Tugas */}
+                  {selectedDetailContent.jenis_create === "tugas" && userRole === "student" && (
+                    <Card className="bg-white border-2" style={{borderColor: studentSubmissions[selectedDetailContent.id] ? '#22C55E' : '#E8B824'}}>
+                      <CardHeader className="border-b py-4" style={{backgroundColor: '#0D0D0D', borderBottomColor: '#E8B824'}}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <UploadCloud className="h-5 w-5" style={{color: '#E8B824'}} />
+                            <h3 className="font-semibold text-lg" style={{color: '#FFFFFC'}}>Status Pengumpulan</h3>
+                          </div>
+                          <Badge 
+                            className="text-xs font-semibold"
+                            style={{
+                              backgroundColor: studentSubmissions[selectedDetailContent.id] ? '#22C55E' : '#E8B824',
+                              color: studentSubmissions[selectedDetailContent.id] ? '#FFFFFC' : '#1A1A1A'
+                            }}
+                          >
+                            {studentSubmissions[selectedDetailContent.id] ? (
+                              <>
+                                <CheckCircle2 className="h-3 w-3 mr-1" /> Dikumpulkan
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="h-3 w-3 mr-1" /> Belum Dikumpulkan
+                              </>
+                            )}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-6 space-y-4">
+                        {!studentSubmissions[selectedDetailContent.id] ? (
+                          <>
+                            {/* File Upload Area */}
+                            <div className="p-6 rounded-lg border-2 border-dashed" style={{borderColor: '#E8B824', backgroundColor: '#FFFFFC'}}>
+                              <div className="flex flex-col items-center justify-center">
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{backgroundColor: '#E8B824'}}>
+                                  <UploadCloud className="h-6 w-6" style={{color: '#1A1A1A'}} />
+                                </div>
+                                <p className="text-sm font-medium mb-1" style={{color: '#1A1A1A'}}>Unggah File Tugas</p>
+                                <p className="text-xs text-center mb-4" style={{color: '#4A4A4A'}}>Drag and drop atau klik untuk memilih file (max 12MB)</p>
+                                <label htmlFor={`file-input-${selectedDetailContent.id}`} className="cursor-pointer">
+                                  <div 
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                    }}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const file = e.dataTransfer.files?.[0];
+                                      if (file) setSelectedFile(file);
+                                    }}
+                                    className="px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
+                                    style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
+                                  >
+                                    Pilih File
+                                  </div>
+                                </label>
+                                <input
+                                  id={`file-input-${selectedDetailContent.id}`}
+                                  type="file"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) setSelectedFile(file);
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Selected File Display */}
+                            {selectedFile && (
+                              <div className="p-3 rounded-lg flex items-center justify-between" style={{backgroundColor: '#FFFFFC', border: '1px solid #E8B824'}}>
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
+                                    <FileText className="h-4 w-4" style={{color: '#1A1A1A'}} />
+                                  </div>
+                                  <span className="text-sm truncate" style={{color: '#1A1A1A'}}>{selectedFile.name}</span>
+                                </div>
+                                <button 
+                                  onClick={() => setSelectedFile(null)}
+                                  className="text-lg leading-none hover:opacity-70 transition-opacity flex-shrink-0"
+                                  style={{color: '#4A4A4A'}}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Submission Message */}
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold" style={{color: '#1A1A1A'}}>
+                                Atau tulis pesan pengumpulan
+                              </label>
+                              <textarea
+                                value={submissionMessage}
+                                onChange={(e) => setSubmissionMessage(e.target.value)}
+                                placeholder="Tulis pesan pengumpulan tugas (opsional)..."
+                                className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 resize-none"
+                                style={{borderColor: '#E8B824', borderWidth: '2px', color: '#1A1A1A'}}
+                                rows={3}
+                              />
+                            </div>
+
+                            {/* Upload Button */}
+                            <Button
+                              onClick={() => handleFileUpload(selectedDetailContent.id)}
+                              className="w-full font-semibold py-2 h-auto hover:opacity-90 transition-opacity"
+                              style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
+                              disabled={(!selectedFile && !submissionMessage.trim()) || isUploading}
+                            >
+                              {isUploading ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-transparent border-t-current mr-2"></div>
+                                  Mengunggah...
+                                </>
+                              ) : (
+                                <>
+                                  <UploadCloud className="h-5 w-5 mr-2" />
+                                  Kumpulkan Tugas
+                                </>
+                              )}
+                            </Button>
+
+                            {selectedDetailContent.deadline && (
+                              <p className="text-xs pt-2 border-t" style={{color: '#4A4A4A', borderColor: '#E8B824'}}>
+                                <strong>Batas Waktu:</strong> {new Date(selectedDetailContent.deadline).toLocaleDateString('id-ID', { 
+                                  weekday: 'long',
+                                  year: 'numeric', 
+                                  month: 'long', 
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {/* Submission Received */}
+                            <div className="p-4 rounded-lg" style={{backgroundColor: '#F0FDF4', border: '1px solid #22C55E'}}>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex gap-3 flex-1 min-w-0">
+                                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#DCFCE7'}}>
+                                    <CheckCircle2 className="h-6 w-6" style={{color: '#22C55E'}} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold" style={{color: '#166534'}}>Tugas Berhasil Dikumpulkan</p>
+                                    <p className="text-sm mt-1" style={{color: '#22C55E'}}>
+                                      {new Date(studentSubmissions[selectedDetailContent.id].submitted_at).toLocaleString('id-ID', { 
+                                        weekday: 'long',
+                                        year: 'numeric', 
+                                        month: 'long', 
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </p>
+                                    {studentSubmissions[selectedDetailContent.id]?.message && (
+                                      <div className="mt-3 p-3 rounded" style={{backgroundColor: '#FFFFFC', border: '1px solid #22C55E'}}>
+                                        <p className="text-xs font-semibold mb-1" style={{color: '#1A1A1A'}}>Pesan:</p>
+                                        <p className="text-sm whitespace-pre-wrap" style={{color: '#166534'}}>{studentSubmissions[selectedDetailContent.id].message}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 flex-shrink-0">
+                                  {studentSubmissions[selectedDetailContent.id]?.file_url && (
+                                    <Button
+                                      size="sm"
+                                      className="h-8 hover:opacity-80 transition-opacity"
+                                      style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
+                                      onClick={() => handleImagePreview(studentSubmissions[selectedDetailContent.id].file_url!)}
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    className="h-8 hover:opacity-80 transition-opacity"
+                                    style={{backgroundColor: '#DC2626', color: '#FFFFFC'}}
+                                    onClick={() => {
+                                      setSubmissionToDelete(selectedDetailContent.id);
+                                      setShowDeleteModal(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Late Submission Warning */}
+                            {selectedDetailContent.deadline && new Date(studentSubmissions[selectedDetailContent.id].submitted_at) > new Date(selectedDetailContent.deadline) && (
+                              <div className="p-4 rounded-lg flex gap-3" style={{backgroundColor: '#FEF2F2', border: '1px solid #DC2626'}}>
+                                <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" style={{color: '#DC2626'}} />
+                                <div>
+                                  <p className="font-semibold" style={{color: '#7F1D1D'}}>Pengumpulan Terlambat</p>
+                                  <p className="text-sm mt-1" style={{color: '#DC2626'}}>Tugas dikumpulkan setelah batas waktu yang ditentukan</p>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Back Button */}
+                  <Button
+                    onClick={() => {
+                      setDetailViewMode(false);
+                      setSelectedDetailContent(null);
+                    }}
+                    className="w-full font-semibold hover:opacity-90 transition-opacity"
+                    style={{backgroundColor: '#1A1A1A', color: '#FFFFFC'}}
+                  >
+                    Kembali ke Daftar
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {/* Create Button for Teacher */}
+                  {userRole === "teacher" && (
+                    <Button
+                      onClick={() => setShowMeetingModal(true)}
+                      className="w-full text-black py-2 sm:py-3 mb-6 font-semibold hover:opacity-90 transition-opacity"
+                      style={{backgroundColor: '#E8B824'}}
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Buat Pertemuan
+                    </Button>
+                  )}
+
+                  {/* Content List */}
+                  <div className="space-y-4">
                 {filteredContents.length > 0 ? (
                   filteredContents.map((content) => {
                     const status = getContentStatus(content);
@@ -1068,7 +1460,14 @@ export default function ClassroomsPage() {
                       <Card
                         key={content.id}
                         className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer"
-                        onClick={() => handleContentClick(content)}
+                        onClick={() => {
+                          if (content.jenis_create === "latihan soal") {
+                            router.push(`/home/classrooms/${classId}/latihan/${content.id}`);
+                          } else {
+                            setSelectedDetailContent(content);
+                            setDetailViewMode(true);
+                          }
+                        }}
                       >
                         <CardContent className="p-4 sm:p-5">
                           <div className="flex items-start gap-3 sm:gap-4">
@@ -1240,6 +1639,8 @@ export default function ClassroomsPage() {
                   </Card>
                 )}
               </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1248,6 +1649,7 @@ export default function ClassroomsPage() {
       {/* Content Panel */}
       <Sheet open={showContentPanel} onOpenChange={setShowContentPanel}>
         <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-0">
+          <SheetTitle className="sr-only">Detail Konten</SheetTitle>
           {selectedContent && (
             <div className="h-full flex flex-col">
               {/* Header */}
@@ -1846,6 +2248,64 @@ export default function ClassroomsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Submission Modal */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="bg-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <AlertCircle className="h-6 w-6" style={{color: '#DC2626'}} />
+              Hapus Pengumpulan?
+            </DialogTitle>
+            <DialogDescription>
+              Tindakan ini tidak dapat dibatalkan. Pengumpulan tugas akan dihapus secara permanen.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteModal(false);
+                setSubmissionToDelete(null);
+              }}
+              className="flex-1"
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={() => {
+                if (submissionToDelete) {
+                  handleDeleteSubmission(submissionToDelete);
+                }
+              }}
+              disabled={isDeletingSubmission}
+              className="flex-1 text-white font-semibold hover:opacity-90 transition-opacity"
+              style={{backgroundColor: '#DC2626'}}
+            >
+              {isDeletingSubmission ? "Menghapus..." : "Hapus"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+          <DialogContent className="bg-black border-0 max-w-4xl p-0 overflow-hidden">
+            <DialogTitle className="sr-only">Image Preview</DialogTitle>
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-4 right-4 z-10 p-1 rounded-lg hover:bg-white/20 transition-colors"
+            >
+              <X className="h-6 w-6 text-white" />
+            </button>
+            <div className="flex items-center justify-center min-h-screen">
+              <img src={previewImage} alt="Preview" className="max-w-full max-h-screen object-contain" />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
