@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,8 @@ import {
   User,
   LogOut,
   Bell,
+  ChevronDown,
+  Globe,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -38,7 +40,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -71,6 +72,111 @@ interface StudentStats {
   completedExercises: number;
   averageScore: number;
 }
+
+const ProfileDropdown = ({ userName, onLogout }: { userName: string; onLogout: () => void }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node) && 
+          triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isOpen]);
+
+  return (
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-center px-3 py-2 rounded-md transition-colors hover:bg-gray-700"
+        style={{ color: "#FFD903" }}
+      >
+        <User className="h-5 w-5" />
+      </button>
+
+      {isOpen && (
+        <div
+          ref={menuRef}
+          className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E5E5E5",
+            zIndex: 99999,
+            top: "100%",
+            marginTop: "8px"
+          }}
+        >
+          <div
+            className="px-4 py-2 text-sm font-medium border-b"
+            style={{ color: "#1A1A1A", borderColor: "#E5E5E5" }}
+          >
+            {userName}
+          </div>
+
+          <button
+            onClick={() => {
+              router.push("/");
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <Home className="h-4 w-4" />
+            Home
+          </button>
+
+          <button
+            onClick={() => {
+              router.push("/home");
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <BookOpen className="h-4 w-4" />
+            My Courses
+          </button>
+
+          <button
+            onClick={() => {
+              router.push("/open-courses");
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#1A1A1A" }}
+          >
+            <Globe className="h-4 w-4" />
+            Open Courses
+          </button>
+
+          <div style={{ borderColor: "#E5E5E5" }} className="border-t my-1"></div>
+
+          <button
+            onClick={() => {
+              onLogout();
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            style={{ color: "#DC2626" }}
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 function StudentMode({ onBack }: StudentModeProps) {
   const [userName, setUserName] = useState<string>("");
@@ -469,22 +575,11 @@ function StudentMode({ onBack }: StudentModeProps) {
                 <span className="absolute top-1 right-1 h-2 w-2 bg-[#FFD903] rounded-full border border-white"></span>
               </Button>
 
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <Button className="rounded-full bg-[#FFD903]/20 hover:bg-[#FFD903]/30 border-2 border-[#FFD903]/40 text-[#FFD903] font-semibold shadow-sm transition-all duration-200 cursor-pointer" size="icon">
-                    <User className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-white border-2 border-[#FFD903] shadow-lg">
-                  <DropdownMenuLabel className="text-[#1E1E1E] font-bold">{userName}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer hover:bg-red-50">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Keluar
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Custom Profile Dropdown */}
+              <ProfileDropdown
+                userName={userName}
+                onLogout={handleLogout}
+              />
             </div>
           </div>
 
