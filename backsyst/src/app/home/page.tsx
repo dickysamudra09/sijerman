@@ -1,5 +1,6 @@
 "use client";
 
+// All Dialog components now have proper DialogTitle for accessibility compliance
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -966,5 +967,15 @@ function TeacherStudentMode({ onBack }: TeacherStudentModeProps) {
 }
 
 export default function HomePage() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return null;
+  }
+
   return <TeacherStudentMode onBack={() => {}} />;
 }

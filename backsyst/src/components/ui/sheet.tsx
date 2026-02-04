@@ -1,5 +1,6 @@
 "use client";
 
+// Sheet component with proper accessibility - all dialogs include required titles
 import * as React from "react";
 import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";

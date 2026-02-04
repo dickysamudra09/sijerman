@@ -24,7 +24,7 @@ export default async function RootLayout({
   console.log('User session:', session?.user);
 
   return (
-    <html lang="id">
+    <html lang="id" suppressHydrationWarning>
       <body className="antialiased">
         {children}
       </body>
