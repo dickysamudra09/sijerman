@@ -1162,15 +1162,15 @@ export default function InteractiveQuiz() {
     const currentQuestion = state.questions[state.currentQuestionIndex];
 
     return (
-      <Card className="border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-white shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-700 pb-4">
+      <Card className="border-2" style={{borderColor: '#1A1A1A', backgroundColor: '#FFFFFF'}}>
+        <CardHeader style={{backgroundColor: '#1A1A1A'}} className="pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-yellow-400/90">
-              <Lightbulb className="h-5 w-5 text-purple-900" />
+            <div className="p-2 rounded-lg" style={{backgroundColor: '#E8B824'}}>
+              <Lightbulb className="h-5 w-5" style={{color: '#1A1A1A'}} />
             </div>
-            <CardTitle className="text-lg text-white flex items-center gap-2">
+            <CardTitle style={{color: '#FFFFFC'}} className="text-lg flex items-center gap-2">
               Analisis Feedback Lengkap
-              <Badge className="bg-purple-200 text-purple-900 border-opacity-30 text-xs">
+              <Badge style={{backgroundColor: '#E8B824', color: '#1A1A1A'}} className="border-opacity-30 text-xs">
                 {currentQuestion.question_type === 'essay' && 'Essay'}
                 {currentQuestion.question_type === 'sentence_arrangement' && 'Puzzle'}
                 {(currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && 'Pilihan'}
@@ -1180,20 +1180,20 @@ export default function InteractiveQuiz() {
         </CardHeader>
         <CardContent className="space-y-5 pt-6">
           {/* Single Comprehensive Feedback Narrative */}
-          <div className="p-6 rounded-lg border-2 border-purple-300 bg-white/95">
-            <h5 className="font-bold mb-4 flex items-center gap-2 text-purple-900 text-base">
+          <div className="p-6 rounded-lg border-2" style={{borderColor: '#1A1A1A', backgroundColor: '#FFFFFF'}}>
+            <h5 className="font-bold mb-4 flex items-center gap-2 text-base" style={{color: '#1A1A1A'}}>
               Analisis Detail
             </h5>
             
             {/* Feedback as single comprehensive narrative */}
             {state.aiFeedback.feedback_text && (
               <>
-                <div className="leading-relaxed whitespace-pre-wrap text-purple-900 mb-3">
+                <div className="leading-relaxed whitespace-pre-wrap mb-3" style={{color: '#1A1A1A'}}>
                   {state.aiFeedback.feedback_text}
                 </div>
                 {/* Sentence count info */}
-                <div className="text-xs text-purple-600 mt-4 pt-3 border-t border-purple-200">
-                  <span className="inline-block bg-purple-100 px-2 py-1 rounded">
+                <div className="text-xs mt-4 pt-3 border-t" style={{color: '#1A1A1A', borderTopColor: '#E5E5E5'}}>
+                  <span className="inline-block px-2 py-1 rounded" style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}>
                     {(() => {
                       const sentences = state.aiFeedback.feedback_text.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
                       return `${sentences.length} kalimat (60-120 ✓)`;
@@ -1207,19 +1207,19 @@ export default function InteractiveQuiz() {
           {/* Reference Materials */}
           {state.aiFeedback.reference_materials && state.aiFeedback.reference_materials.length > 0 && (
             <div>
-              <h5 className="font-bold mb-3 flex items-center gap-2 text-purple-900">
-                <BookOpen className="h-4 w-4" />
+              <h5 className="font-bold mb-3 flex items-center gap-2" style={{color: '#1A1A1A'}}>
+                <BookOpen className="h-4 w-4" style={{color: '#E8B824'}} />
                 Sumber Belajar Terkait
               </h5>
               <div className="space-y-3">
                 {state.aiFeedback.reference_materials.map((ref, index) => (
-                  <div key={index} className="p-4 rounded-lg border-2 border-purple-300 bg-white/90 hover:bg-purple-50 shadow-sm hover:shadow-md transition-all">
+                  <div key={index} className="p-4 rounded-lg border-2 transition-all" style={{borderColor: '#1A1A1A', backgroundColor: '#FFFFFF'}}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
-                        <h6 className="font-semibold mb-1 text-purple-900 text-base">
+                        <h6 className="font-semibold mb-1 text-base" style={{color: '#1A1A1A'}}>
                           {index + 1}. {ref.title}
                         </h6>
-                        <p className="text-sm leading-relaxed text-purple-800">
+                        <p className="text-sm leading-relaxed" style={{color: '#4A4A4A'}}>
                           {ref.description}
                         </p>
                       </div>
@@ -1227,7 +1227,8 @@ export default function InteractiveQuiz() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="shrink-0 shadow-sm transition-colors border-purple-400 text-purple-700 hover:bg-purple-100 bg-purple-50"
+                          className="shrink-0 shadow-sm transition-colors"
+                          style={{borderColor: '#E8B824', color: '#E8B824', backgroundColor: '#FFFFFC'}}
                           onClick={() => window.open(ref.url, '_blank')}
                         >
                           <ExternalLink className="h-4 w-4" />
@@ -1242,7 +1243,7 @@ export default function InteractiveQuiz() {
 
           {/* Processing Info */}
           {state.aiFeedback.ai_model && process.env.NODE_ENV === 'development' && (
-            <div className="text-xs text-purple-600 pt-3 border-t border-purple-200 opacity-75">
+            <div className="text-xs pt-3 border-t opacity-75" style={{color: '#1A1A1A', borderTopColor: '#E5E5E5'}}>
               {state.aiFeedback.ai_model}
               {state.aiFeedback.processing_time_ms && 
                 ` • Generated in ${state.aiFeedback.processing_time_ms}ms`
@@ -1475,11 +1476,11 @@ export default function InteractiveQuiz() {
     return (
       <div className="min-h-screen bg-white flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
+        <div style={{backgroundColor: '#0D0D0D'}} className="text-white shadow-md">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center gap-4">
               <div>
-                <h1 className="text-2xl font-bold text-white">Latihan Soal Interaktif</h1>
+                <h1 className="text-2xl font-bold" style={{color: '#FFFFFC'}}>Latihan Soal Interaktif</h1>
               </div>
             </div>
           </div>
@@ -1504,20 +1505,21 @@ export default function InteractiveQuiz() {
     return (
       <div className="min-h-screen bg-white flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
+        <div style={{backgroundColor: '#0D0D0D'}} className="text-white shadow-md">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button 
                   onClick={handleBackClick} 
-                  className="gap-2 bg-blue-800 hover:bg-blue-900 text-white"
+                  className="gap-2"
+                  style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Kembali
                 </Button>
               </div>
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-white">Latihan Soal</h1>
+                <h1 className="text-2xl font-bold" style={{color: '#FFFFFC'}}>Latihan Soal</h1>
               </div>
               <div className="w-32"></div>
             </div>
@@ -1557,20 +1559,21 @@ export default function InteractiveQuiz() {
     return (
       <div className="min-h-screen bg-white flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
+        <div style={{backgroundColor: '#0D0D0D'}} className="text-white shadow-md">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button 
                   onClick={handleBackClick} 
-                  className="gap-2 bg-blue-800 hover:bg-blue-900 text-white"
+                  className="gap-2"
+                  style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Kembali ke Kelas
                 </Button>
               </div>
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-white">Latihan Selesai!</h1>
+                <h1 className="text-2xl font-bold" style={{color: '#FFFFFC'}}>Latihan Selesai!</h1>
               </div>
               <div className="w-32"></div>
             </div>
@@ -1584,8 +1587,8 @@ export default function InteractiveQuiz() {
             <Card className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <CardContent className="p-8">
                 <div className="text-center mb-8">
-                  <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 mb-6">
-                    <Trophy className="h-12 w-12 text-white" />
+                  <div className="inline-flex items-center justify-center w-24 h-24 rounded-full mb-6" style={{backgroundColor: '#E8B824'}}>
+                    <Trophy className="h-12 w-12" style={{color: '#1A1A1A'}} />
                   </div>
                   <p className="text-gray-600 text-lg">Hasil Latihan Anda</p>
                 </div>
@@ -1638,15 +1641,16 @@ export default function InteractiveQuiz() {
                 <div className="flex gap-4">
                   <Button 
                     onClick={resetQuiz} 
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                    className="flex-1"
+                    style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Coba Lagi
                   </Button>
                   <Button 
                     onClick={handleBackClick} 
-                    variant="outline" 
-                    className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+                    className="flex-1"
+                    style={{backgroundColor: '#1A1A1A', color: '#FFFFFC'}}
                   >
                     Tutup
                   </Button>
@@ -1666,26 +1670,27 @@ export default function InteractiveQuiz() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
+      <div style={{backgroundColor: '#0D0D0D', borderBottomWidth: '2px', borderColor: '#E8B824'}} className="text-white shadow-md">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button 
                 onClick={() => setShowConfirmBack(true)}
-                className="gap-2 bg-blue-800 hover:bg-blue-900 text-white"
+                className="gap-2"
+                style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
               >
                 <ChevronLeft className="h-4 w-4" />
                 Kembali
               </Button>
               <div>
-                <h1 className="text-2xl font-bold text-white">Latihan Soal Interaktif</h1>
-                <p className="text-blue-100 text-sm mt-1">Soal {state.currentQuestionIndex + 1} dari {totalQuestions}</p>
+                <h1 className="text-2xl font-bold" style={{color: '#FFFFFC'}}>Latihan Soal Interaktif</h1>
+                <p className="text-sm mt-1" style={{color: '#FFFFFC'}}>Soal {state.currentQuestionIndex + 1} dari {totalQuestions}</p>
               </div>
             </div>
             <div className="flex items-center gap-6">
               <div className="text-right">
-                <p className="text-blue-100 text-sm">Skor Saat Ini</p>
-                <p className="text-3xl font-bold text-white">{state.score}/{maxPossibleScore}</p>
+                <p className="text-sm" style={{color: '#FFFFFC'}}>Skor Saat Ini</p>
+                <p className="text-3xl font-bold" style={{color: '#E8B824'}}>{state.score}/{maxPossibleScore}</p>
               </div>
             </div>
           </div>
@@ -1712,17 +1717,17 @@ export default function InteractiveQuiz() {
 
           {/* Question Card */}
           <Card className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 border-b border-blue-700 p-6">
+            <CardHeader style={{backgroundColor: '#1A1A1A', borderBottomWidth: '1px', borderColor: '#333333'}} className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-lg text-white">{questionTypeInfo.label}</CardTitle>
-                  <CardDescription className="text-blue-100 mt-2">
+                  <CardTitle style={{color: '#FFFFFC'}} className="text-lg">{questionTypeInfo.label}</CardTitle>
+                  <CardDescription style={{color: '#CCCCCC'}} className="mt-2">
                     {currentQuestion.question_type === 'essay' && "Tulis jawaban essay yang lengkap dan jelas"}
                     {currentQuestion.question_type === 'sentence_arrangement' && "Lengkapi kalimat rumpang dibawah ini dengan potongan kata yang benar"}
                     {(currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && "Pilih jawaban yang paling tepat"}
                   </CardDescription>
                 </div>
-                <Badge className="bg-white text-blue-700 text-xs font-medium">
+                <Badge style={{backgroundColor: '#FFFFFC', color: '#1A1A1A'}} className="text-xs font-medium">
                   {currentQuestion.points} Poin
                 </Badge>
               </div>
@@ -1761,7 +1766,8 @@ export default function InteractiveQuiz() {
                         currentQuestion.question_type === 'essay' && !state.essayAnswer.trim() ||
                         currentQuestion.question_type === 'sentence_arrangement' && blankPositions.some(pos => pos.piece === null)
                       }
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                      style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
+                      className="flex-1 font-semibold"
                     >
                       Submit Jawaban
                     </Button>
@@ -1807,12 +1813,13 @@ export default function InteractiveQuiz() {
                       className={`
                         h-10 rounded-lg font-semibold text-xs transition-all duration-200
                         ${isCurrentQuestion 
-                          ? 'bg-blue-600 text-white ring-2 ring-blue-300' 
+                          ? 'text-black ring-2' 
                           : isAnswered 
                           ? 'bg-green-100 text-green-700 hover:bg-green-200' 
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }
                       `}
+                      style={isCurrentQuestion ? {backgroundColor: '#E8B824', color: '#1A1A1A', boxShadow: '0 0 0 2px #E8B824'} : {}}
                       disabled={isCurrentQuestion}
                       title={`Soal ${index + 1}`}
                     >
