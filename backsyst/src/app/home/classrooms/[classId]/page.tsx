@@ -266,9 +266,18 @@ export default function ClassroomsPage() {
   const [selectedPertemuan, setSelectedPertemuan] = useState<number | null>(null);
   const [showContentTypeModal, setShowContentTypeModal] = useState(false);
   const [showConfirmBackModal, setShowConfirmBackModal] = useState(false);
+  const [showPresensiModal, setShowPresensiModal] = useState(false);
 
   const [detailViewMode, setDetailViewMode] = useState<boolean>(false);
   const [selectedDetailContent, setSelectedDetailContent] = useState<ContentItem | null>(null);
+  
+  // Presensi states
+  const [classroomSchedule, setClassroomSchedule] = useState<any>(null);
+  const [attendanceData, setAttendanceData] = useState<Record<string, any>>({});
+  const [selectedAttendanceDate, setSelectedAttendanceDate] = useState<string | null>(null);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [openDropdownStudentId, setOpenDropdownStudentId] = useState<string | null>(null);
 
   const checkExerciseAttempts = async (userId: string) => {
     if (userRole !== 'student') return;
@@ -383,6 +392,7 @@ export default function ClassroomsPage() {
             session_id: sessionId,
             date: today,
             is_present: true,
+            attendance_status: 'hadir',
           },
           {
             onConflict: 'student_id,classroom_id,date',
@@ -392,6 +402,109 @@ export default function ClassroomsPage() {
     } catch (err) {
       console.error("Error in recordAttendance:", err);
     }
+  };
+
+  const fetchClassroomSchedule = async () => {
+    try {
+      const { data: schedule, error } = await supabase
+        .from('classroom_schedule')
+        .select('*')
+        .eq('classroom_id', classId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error("Error fetching schedule:", error);
+        return;
+      }
+
+      setClassroomSchedule(schedule);
+    } catch (err) {
+      console.error("Error in fetchClassroomSchedule:", err);
+    }
+  };
+
+  const fetchAttendanceData = async () => {
+    if (!classId) return;
+    setAttendanceLoading(true);
+    
+    try {
+      const { data: attendanceRecords, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('classroom_id', classId);
+
+      if (error) {
+        console.error("Error fetching attendance:", error);
+        return;
+      }
+
+      const grouped: Record<string, any> = {};
+      if (attendanceRecords) {
+        attendanceRecords.forEach((record: any) => {
+          if (!grouped[record.date]) {
+            grouped[record.date] = [];
+          }
+          grouped[record.date].push(record);
+        });
+      }
+
+      setAttendanceData(grouped);
+    } catch (err) {
+      console.error("Error in fetchAttendanceData:", err);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
+  const generateCalendarDates = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+
+    const lastDay = new Date(year, month + 1, 0);
+
+    const startingDayOfWeek = firstDay.getDay();
+
+    const daysFromPrevMonth = startingDayOfWeek;
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+
+    const totalCells = 42;
+    const daysInCurrentMonth = lastDay.getDate();
+    const daysFromNextMonth = totalCells - daysFromPrevMonth - daysInCurrentMonth;
+    
+    const calendarDates = [];
+
+    for (let i = daysFromPrevMonth - 1; i >= 0; i--) {
+      const d = prevMonthLastDay - i;
+      const m = month === 0 ? 11 : month - 1;
+      const y = month === 0 ? year - 1 : year;
+      calendarDates.push({
+        date: d,
+        isCurrentMonth: false,
+        fullDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      });
+    }
+
+    for (let i = 1; i <= daysInCurrentMonth; i++) {
+      calendarDates.push({
+        date: i,
+        isCurrentMonth: true,
+        fullDate: `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`
+      });
+    }
+
+    for (let i = 1; i <= daysFromNextMonth; i++) {
+      const m = month === 11 ? 0 : month + 1;
+      const y = month === 11 ? year + 1 : year;
+      calendarDates.push({
+        date: i,
+        isCurrentMonth: false,
+        fullDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`
+      });
+    }
+    
+    return calendarDates;
   };
 
   useEffect(() => {
@@ -521,10 +634,14 @@ export default function ClassroomsPage() {
           });
         }
         
-        await recordAttendance(userId, classId);
-        await checkExerciseAttempts(userId);
-        await checkStudentSubmissions(userId);
+        if (userRole === 'student') {
+          await checkExerciseAttempts(userId);
+          await checkStudentSubmissions(userId);
+        }
       }
+
+      await fetchClassroomSchedule();
+      await fetchAttendanceData();
       
       const { data: contentsData } = await supabase
         .from("teacher_create")
@@ -1067,29 +1184,15 @@ export default function ClassroomsPage() {
 
             {/* Right: Stats Cards */}
             <div className="grid grid-cols-3 gap-3">
-              <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1A1A1A'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0F0F0F'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
+              <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1A1A1A'}} onClick={() => setShowPresensiModal(true)} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0F0F0F'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
                 <CardContent className="px-3 py-4 h-full flex items-center">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
                       <Users className="h-6 w-6" style={{color: '#1A1A1A'}} />
                     </div>
                     <div>
-                      <p className="text-xs" style={{color: '#FFFFFC'}}>Siswa</p>
-                      <h3 className="text-xl font-bold" style={{color: '#FFFFFC'}}>{classroom?.students.length || 0}</h3>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1A1A1A'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0F0F0F'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
-                <CardContent className="px-3 py-4 h-full flex items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
-                      <BookOpen className="h-6 w-6" style={{color: '#1A1A1A'}} />
-                    </div>
-                    <div>
-                      <p className="text-xs" style={{color: '#FFFFFC'}}>Pertemuan</p>
-                      <h3 className="text-xl font-bold" style={{color: '#FFFFFC'}}>{meetings.length}</h3>
+                      <p className="text-xs" style={{color: '#FFFFFC'}}>Presensi</p>
+                      <h3 className="text-xl font-bold" style={{color: '#FFFFFC'}}>-</h3>
                     </div>
                   </div>
                 </CardContent>
@@ -1102,8 +1205,22 @@ export default function ClassroomsPage() {
                       <FileText className="h-6 w-6" style={{color: '#1A1A1A'}} />
                     </div>
                     <div>
-                      <p className="text-xs" style={{color: '#FFFFFC'}}>Konten</p>
-                      <h3 className="text-xl font-bold" style={{color: '#FFFFFC'}}>{contents.length}</h3>
+                      <p className="text-xs" style={{color: '#FFFFFC'}}>Nilai</p>
+                      <h3 className="text-xl font-bold" style={{color: '#FFFFFC'}}>-</h3>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-sm transition-all h-full cursor-pointer" style={{backgroundColor: '#1A1A1A'}} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#0F0F0F'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';}}>
+                <CardContent className="px-3 py-4 h-full flex items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
+                      <Users className="h-6 w-6" style={{color: '#1A1A1A'}} />
+                    </div>
+                    <div>
+                      <p className="text-xs" style={{color: '#FFFFFC'}}>Daftar Siswa</p>
+                      <h3 className="text-xl font-bold" style={{color: '#FFFFFC'}}>{classroom?.students.length || 0}</h3>
                     </div>
                   </div>
                 </CardContent>
@@ -1462,7 +1579,7 @@ export default function ClassroomsPage() {
                         className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer"
                         onClick={() => {
                           if (content.jenis_create === "latihan soal") {
-                            router.push(`/home/classrooms/${classId}/latihan/${content.id}`);
+                            handleKerjakanLatihan(content);
                           } else {
                             setSelectedDetailContent(content);
                             setDetailViewMode(true);
@@ -1565,6 +1682,10 @@ export default function ClassroomsPage() {
                                         size="sm"
                                         className="text-xs sm:text-sm"
                                         style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleKerjakanLatihan(content);
+                                        }}
                                       >
                                         {attempts && attempts.length > 0 ? (
                                           <>
@@ -2306,6 +2427,396 @@ export default function ClassroomsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Presensi Modal */}
+      <Dialog open={showPresensiModal} onOpenChange={setShowPresensiModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden border-0 shadow-2xl rounded-2xl p-0 flex flex-col bg-gray-50">
+          {/* Header */}
+          <div className="sticky top-0 z-10 px-8 py-6" style={{backgroundColor: '#1A1A1A'}}>
+            <DialogTitle className="text-3xl font-bold text-white flex items-center gap-4 mb-2">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg" style={{backgroundColor: '#E8B824'}}>
+                <Calendar className="h-7 w-7 text-black" />
+              </div>
+              Manajemen Presensi
+            </DialogTitle>
+            <p className="text-gray-400 text-sm">Kelola kehadiran siswa dengan mudah</p>
+          </div>
+
+          <div className="flex-1 overflow-visible">
+            {selectedAttendanceDate ? (
+              // Attendance List View
+              <div className="px-8 py-6 flex flex-col h-full">
+                <button
+                  onClick={() => setSelectedAttendanceDate(null)}
+                  className="mb-6 text-sm font-semibold flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-200 transition-all flex-shrink-0"
+                  style={{color: '#E8B824'}}
+                >
+                  <span>←</span> Kembali ke Kalender
+                </button>
+
+                {/* Date Header */}
+                <div className="mb-6 p-4 rounded-xl flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
+                  <h3 className="text-lg font-bold text-black">
+                    {new Date(selectedAttendanceDate + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  </h3>
+                  <p className="text-sm text-black/70 mt-1">
+                    {userRole === 'teacher' ? 'Klik tombol siswa untuk mengubah status kehadiran' : 'Status kehadiran Anda pada tanggal ini'}
+                  </p>
+                </div>
+
+                {!classroom?.students || classroom.students.length === 0 ? (
+                  <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                    <Users className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-500 font-medium">Belum ada siswa di kelas ini</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 bg-white rounded-xl p-5 border border-gray-200 max-h-96 overflow-y-auto">
+                    {/* Stats */}
+                    <div className="grid grid-cols-3 gap-3 pb-5 border-b border-gray-200 sticky top-0 bg-white">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-green-600">
+                          {attendanceData[selectedAttendanceDate]?.filter((a: any) => a.attendance_status === 'hadir' || (a.is_present && !a.attendance_status)).length || 0}
+                        </p>
+                        <p className="text-xs text-gray-600">Hadir</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-gray-400">
+                          {(classroom?.students.length || 0) - (attendanceData[selectedAttendanceDate]?.filter((a: any) => a.attendance_status === 'hadir' || (a.is_present && !a.attendance_status)).length || 0)}
+                        </p>
+                        <p className="text-xs text-gray-600">Belum/Tidak Hadir</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-blue-600">
+                          {classroom?.students.length || 0}
+                        </p>
+                        <p className="text-xs text-gray-600">Total</p>
+                      </div>
+                    </div>
+
+                    {/* Student List */}
+                    <div className="space-y-3 pr-2">
+                      {classroom.students.map((student, idx) => {
+                        const studentAttendance = attendanceData[selectedAttendanceDate]?.find(
+                          (a: any) => a.student_id === student.id
+                        );
+                        // Determine status: prefer attendance_status, but fallback to is_present for legacy data
+                        let attendanceStatus = 'belum';
+                        if (studentAttendance?.attendance_status) {
+                          attendanceStatus = studentAttendance.attendance_status;
+                        } else if (studentAttendance?.is_present === true) {
+                          attendanceStatus = 'hadir';
+                        }
+                        
+                        const statusConfig: {[key: string]: {color: string, bgColor: string, label: string}} = {
+                          'hadir': { color: '#22C55E', bgColor: '#F0FDF4', label: '✓ Hadir' },
+                          'absen': { color: '#DC2626', bgColor: '#FEF2F2', label: '✗ Absen' },
+                          'sakit': { color: '#F59E0B', bgColor: '#FFFBEB', label: '🏥 Sakit' },
+                          'izin': { color: '#3B82F6', bgColor: '#EFF6FF', label: '📝 Izin' },
+                          'alpha': { color: '#6366F1', bgColor: '#EEF2FF', label: '❌ Alpha' },
+                          'belum': { color: '#9CA3AF', bgColor: '#FAFAFA', label: 'Belum Diisi' }
+                        };
+                        
+                        const currentConfig = statusConfig[attendanceStatus] || statusConfig['belum'];
+
+                        return (
+                          <div
+                            key={student.id}
+                            className="p-4 rounded-lg border-2 flex items-center justify-between transition-all relative"
+                            style={{
+                              backgroundColor: currentConfig.bgColor,
+                              borderColor: currentConfig.color,
+                              zIndex: 'auto',
+                              pointerEvents: 'auto'
+                            }}
+                          >
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white" style={{backgroundColor: '#E8B824'}}>
+                                {(idx + 1).toString().padStart(2, '0')}
+                              </div>
+                              <span className="font-semibold text-gray-900">{student.name || 'Siswa'}</span>
+                            </div>
+
+                            {userRole === 'teacher' && (
+                              <button
+                                onClick={async () => {
+                                  // Toggle through status options
+                                  const statusCycle = ['belum', 'hadir', 'absen', 'sakit', 'izin', 'alpha'];
+                                  const currentIndex = statusCycle.indexOf(attendanceStatus);
+                                  const nextIndex = (currentIndex + 1) % statusCycle.length;
+                                  const newStatus = statusCycle[nextIndex];
+
+                                  if (!classId) return;
+                                  try {
+                                    const { error } = await supabase.from('attendance').upsert({
+                                      classroom_id: classId,
+                                      student_id: student.id,
+                                      date: selectedAttendanceDate,
+                                      is_present: newStatus === 'hadir',
+                                      attendance_status: newStatus,
+                                      created_at: new Date().toISOString(),
+                                    }, { onConflict: 'classroom_id,student_id,date' });
+                                    
+                                    if (error) {
+                                      toast.error('Gagal update presensi');
+                                    } else {
+                                      const statusLabels: {[key: string]: string} = {
+                                        'belum': 'Belum Diisi',
+                                        'hadir': 'Hadir',
+                                        'absen': 'Absen',
+                                        'sakit': 'Sakit',
+                                        'izin': 'Izin',
+                                        'alpha': 'Alpha'
+                                      };
+                                      toast.success(`${student.name} → ${statusLabels[newStatus]}`);
+                                      await fetchAttendanceData();
+                                    }
+                                  } catch (err) {
+                                    console.error(err);
+                                    toast.error('Gagal update presensi');
+                                  }
+                                }}
+                                className="px-4 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all hover:shadow-lg active:scale-95 cursor-pointer relative"
+                                style={{
+                                  borderColor: currentConfig.color,
+                                  backgroundColor: currentConfig.bgColor,
+                                  color: currentConfig.color,
+                                  pointerEvents: 'auto',
+                                  zIndex: 10
+                                }}
+                                type="button"
+                              >
+                                {currentConfig.label}
+                              </button>
+                            )}
+
+                            {userRole === 'student' && (
+                              <button
+                                onClick={async () => {
+                                  // Toggle through status options
+                                  const statusCycle = ['belum', 'hadir', 'absen', 'sakit', 'izin', 'alpha'];
+                                  const currentIndex = statusCycle.indexOf(attendanceStatus);
+                                  const nextIndex = (currentIndex + 1) % statusCycle.length;
+                                  const newStatus = statusCycle[nextIndex];
+
+                                  if (!classId) return;
+                                  try {
+                                    const { error } = await supabase.from('attendance').upsert({
+                                      classroom_id: classId,
+                                      student_id: student.id,
+                                      date: selectedAttendanceDate,
+                                      is_present: newStatus === 'hadir',
+                                      attendance_status: newStatus,
+                                      created_at: new Date().toISOString(),
+                                    }, { onConflict: 'classroom_id,student_id,date' });
+                                    
+                                    if (error) {
+                                      toast.error('Gagal update presensi');
+                                    } else {
+                                      const statusLabels: {[key: string]: string} = {
+                                        'belum': 'Belum Diisi',
+                                        'hadir': 'Hadir',
+                                        'absen': 'Absen',
+                                        'sakit': 'Sakit',
+                                        'izin': 'Izin',
+                                        'alpha': 'Alpha'
+                                      };
+                                      toast.success(`Status Anda → ${statusLabels[newStatus]}`);
+                                      await fetchAttendanceData();
+                                    }
+                                  } catch (err) {
+                                    console.error(err);
+                                    toast.error('Gagal update presensi');
+                                  }
+                                }}
+                                className="px-4 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all hover:shadow-lg active:scale-95 cursor-pointer relative"
+                                style={{
+                                  borderColor: currentConfig.color,
+                                  backgroundColor: currentConfig.bgColor,
+                                  color: currentConfig.color,
+                                  pointerEvents: 'auto',
+                                  zIndex: 10
+                                }}
+                                type="button"
+                              >
+                                {currentConfig.label}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Calendar View
+              <div className="px-8 py-6">
+                {!classroomSchedule ? (
+                  <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                    <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-2" />
+                    <p className="text-gray-600 font-medium">Jadwal kelas belum dikonfigurasi</p>
+                    <p className="text-sm text-gray-500 mt-1">Hubungi guru untuk mengatur jadwal pertemuan</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Schedule Info Card */}
+                    <div className="bg-white rounded-xl border-2 border-gray-200 p-5 shadow-sm">
+                      <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                        <Clock className="h-5 w-5" style={{color: '#E8B824'}} />
+                        Jadwal Pertemuan
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold mb-1">Hari Pertemuan</p>
+                          <p className="text-lg font-bold text-gray-900">
+                            {['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][classroomSchedule.day_of_week]}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold mb-1">Jam Mulai</p>
+                          <p className="text-lg font-bold text-gray-900">{classroomSchedule.start_time}</p>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <p className="text-xs text-gray-600 font-semibold mb-1">Range Presensi</p>
+                          <p className="text-sm text-gray-700">
+                            <span style={{color: '#22C55E'}} className="font-semibold">{classroomSchedule.attendance_range_start}</span>
+                            <span className="text-gray-400 mx-2">—</span>
+                            <span style={{color: '#DC2626'}} className="font-semibold">{classroomSchedule.attendance_range_end}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Month Navigation */}
+                    <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 p-4">
+                      <button
+                        onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+                        className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:opacity-80 active:scale-95"
+                        style={{backgroundColor: '#1A1A1A'}}
+                      >
+                        <ChevronDown className="h-5 w-5 text-white rotate-90" />
+                      </button>
+                      <h3 className="font-bold text-gray-900 text-lg">
+                        {currentMonth.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+                      </h3>
+                      <button
+                        onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+                        className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:opacity-80 active:scale-95"
+                        style={{backgroundColor: '#1A1A1A'}}
+                      >
+                        <ChevronDown className="h-5 w-5 text-white -rotate-90" />
+                      </button>
+                    </div>
+
+                    {/* Calendar Grid */}
+                    {attendanceLoading ? (
+                      <div className="text-center py-12">
+                        <div className="w-8 h-8 border-4 border-gray-300 border-t-yellow-400 rounded-full animate-spin mx-auto"></div>
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                        {/* Day Headers */}
+                        <div className="grid grid-cols-7 gap-2 mb-4">
+                          {['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => (
+                            <div key={day} className="text-center font-bold text-xs text-gray-600 py-3">
+                              {day.substring(0, 3)}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Calendar Dates */}
+                        <div className="grid grid-cols-7 gap-2">
+                          {generateCalendarDates(currentMonth).map((dateCell, idx) => {
+                            const fullDate = dateCell.fullDate;
+                            
+                            // Get today using local timezone, not UTC
+                            const todayDate = new Date();
+                            const today = todayDate.getFullYear() + '-' + 
+                              String(todayDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                              String(todayDate.getDate()).padStart(2, '0');
+                            
+                            const isToday = fullDate === today;
+                            const isPast = fullDate < today;
+                            const isCurrentMonth = dateCell.isCurrentMonth;
+                            
+                            // Parse date properly in local timezone
+                            const [year, month, day] = fullDate.split('-').map(Number);
+                            const dateObj = new Date(year, month - 1, day);
+                            const dayOfWeek = dateObj.getDay();
+                            const isScheduledDay = dayOfWeek === classroomSchedule.day_of_week;
+                            const isClickable = isScheduledDay && (isPast || isToday) && isCurrentMonth;
+                            const isLocked = isScheduledDay && !isPast && !isToday && isCurrentMonth;
+                            
+                            const attendanceCount = attendanceData[fullDate]?.filter((a: any) => a.is_present).length || 0;
+                            const totalStudents = classroom?.students.length || 0;
+                            const hasAttendance = attendanceData[fullDate]?.length > 0;
+                            
+                            // Non-scheduled days: just show as static div
+                            if (!isScheduledDay || !isCurrentMonth) {
+                              return (
+                                <div
+                                  key={`${dateCell.fullDate}-${idx}`}
+                                  className="aspect-square rounded-lg flex flex-col items-center justify-center text-xs p-1 relative bg-gray-50 border border-gray-100"
+                                >
+                                  <div className="text-gray-400 text-sm font-medium">{dateCell.date}</div>
+                                </div>
+                              );
+                            }
+                            
+                            // Scheduled days: show as button
+                            return (
+                              <button
+                                key={`${dateCell.fullDate}-${idx}`}
+                                onClick={() => {
+                                  if (isClickable) {
+                                    setSelectedAttendanceDate(fullDate);
+                                  }
+                                }}
+                                disabled={!isClickable}
+                                className="aspect-square rounded-lg border-2 transition-all flex flex-col items-center justify-center text-xs p-1 relative font-semibold hover:shadow-md active:scale-95"
+                                style={{
+                                  borderColor: isClickable ? '#E8B824' : isLocked ? '#FCA500' : '#D1D5DB',
+                                  backgroundColor: isToday ? '#FEF9E7' : isClickable ? '#FFFBF0' : '#F5F5F5',
+                                  opacity: isClickable ? 1 : 0.6,
+                                  cursor: isClickable ? 'pointer' : 'default',
+                                }}
+                              >
+                                <div className="text-gray-900">{dateCell.date}</div>
+                                {hasAttendance && (
+                                  <div className="text-xs font-bold mt-0.5" style={{color: '#E8B824'}}>
+                                    {attendanceCount}/{totalStudents}
+                                  </div>
+                                )}
+                                {isToday && (
+                                  <div className="absolute top-1 right-1 w-2 h-2 rounded-full" style={{backgroundColor: '#E8B824'}}></div>
+                                )}
+                                {isLocked && (
+                                  <div className="text-xs mt-0.5">🔒</div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="sticky bottom-0 px-8 py-4 bg-white border-t border-gray-200 flex gap-3 justify-end">
+            <Button 
+              variant="outline"
+              onClick={() => setShowPresensiModal(false)}
+              className="font-semibold"
+            >
+              Tutup
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
