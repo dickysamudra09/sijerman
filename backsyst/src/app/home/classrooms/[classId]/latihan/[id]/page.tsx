@@ -33,6 +33,8 @@ import {
   FileText,
   Puzzle,
   AlertCircle,
+  Menu,
+  X,
 } from "lucide-react";
 
 interface Option {
@@ -160,6 +162,7 @@ export default function InteractiveQuiz() {
   const [showConfirmBack, setShowConfirmBack] = useState(false);
   const [showConfirmRefresh, setShowConfirmRefresh] = useState(false);
   const [feedbackRunId, setFeedbackRunId] = useState<string | null>(null);
+  const [showSoalList, setShowSoalList] = useState(false);
   const initializedRef = useRef(false);
 
   const clearExerciseCache = () => {
@@ -1671,7 +1674,7 @@ export default function InteractiveQuiz() {
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <div style={{backgroundColor: '#0D0D0D', borderBottomWidth: '2px', borderColor: '#E8B824'}} className="text-white shadow-md">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="w-full px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button 
@@ -1698,9 +1701,50 @@ export default function InteractiveQuiz() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 max-w-7xl mx-auto w-full gap-8 px-6 py-8">
-        {/* Left Content - 70% */}
-        <div className="flex-1">
+      <div className="flex flex-1 w-full gap-3 px-4 py-6">
+        {/* LEFT SIDEBAR - Collapsible Soal List (15%) */}
+        <div className="hidden lg:flex basis-[15%] flex-col flex-shrink-0">
+          <Card className="bg-white border border-gray-200 rounded-lg sticky top-8 h-fit">
+            <CardHeader className="border-b border-gray-200 p-5 pb-4">
+              <CardTitle className="text-sm font-semibold text-gray-800">Daftar Soal</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: totalQuestions }).map((_, index) => {
+                  const isCurrentQuestion = index === state.currentQuestionIndex;
+                  const isAnswered = state.answeredQuestions.has(index);
+
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        handleJumpToQuestion(index);
+                        setShowSoalList(false);
+                      }}
+                      className={`
+                        h-12 w-full rounded-lg font-bold text-sm transition-all duration-200
+                        ${isCurrentQuestion 
+                          ? 'text-black ring-2' 
+                          : isAnswered 
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }
+                      `}
+                      style={isCurrentQuestion ? {backgroundColor: '#E8B824', color: '#1A1A1A', boxShadow: '0 0 0 2px #E8B824'} : {}}
+                      disabled={isCurrentQuestion}
+                      title={`Soal ${index + 1}`}
+                    >
+                      {index + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* CENTER - Main Question Content (50%) */}
+        <div className="basis-1/2 min-w-0">
           {/* Progress Bar */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
@@ -1740,7 +1784,7 @@ export default function InteractiveQuiz() {
                   {renderQuestionContent(currentQuestion)}
                 </div>
 
-                {/* Explanation */}
+                {/* Explanation - Hidden on mobile */}
                 {state.showResult && currentQuestion.explanation && (
                   <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
                     <div className="flex gap-2 mb-2">
@@ -1754,7 +1798,11 @@ export default function InteractiveQuiz() {
                 )}
 
                 {/* AI Feedback */}
-                {state.showResult && renderAIFeedback()}
+                {state.showResult && (
+                  <div className="lg:hidden">
+                    {renderAIFeedback()}
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
@@ -1792,44 +1840,105 @@ export default function InteractiveQuiz() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Mobile Toggle Button for Soal List */}
+          <div className="lg:hidden mt-6">
+            <Button
+              onClick={() => setShowSoalList(!showSoalList)}
+              className="w-full font-semibold"
+              style={{backgroundColor: showSoalList ? '#1A1A1A' : '#E8B824', color: showSoalList ? '#FFFFFC' : '#1A1A1A'}}
+            >
+              {showSoalList ? (
+                <>
+                  <X className="h-4 w-4 mr-2" />
+                  Tutup Daftar Soal
+                </>
+              ) : (
+                <>
+                  <Menu className="h-4 w-4 mr-2" />
+                  Buka Daftar Soal
+                </>
+              )}
+            </Button>
+            
+            {showSoalList && (
+              <Card className="bg-white border border-gray-200 rounded-lg mt-4 animate-in fade-in">
+                <CardHeader className="border-b border-gray-200 p-5 pb-4">
+                  <CardTitle className="text-sm font-semibold text-gray-800">Daftar Soal</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-2 gap-3">
+                    {Array.from({ length: totalQuestions }).map((_, index) => {
+                      const isCurrentQuestion = index === state.currentQuestionIndex;
+                      const isAnswered = state.answeredQuestions.has(index);
+
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            handleJumpToQuestion(index);
+                            setShowSoalList(false);
+                          }}
+                          className={`
+                            h-12 w-full rounded-lg font-bold text-sm transition-all duration-200
+                            ${isCurrentQuestion 
+                              ? 'text-black ring-2' 
+                              : isAnswered 
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }
+                          `}
+                          style={isCurrentQuestion ? {backgroundColor: '#E8B824', color: '#1A1A1A', boxShadow: '0 0 0 2px #E8B824'} : {}}
+                          disabled={isCurrentQuestion}
+                          title={`Soal ${index + 1}`}
+                        >
+                          {index + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
 
-        {/* Right Sidebar - Question List - 30% */}
-        <div className="w-80">
-          <Card className="bg-white border border-gray-200 rounded-lg sticky top-8">
-            <CardHeader className="border-b border-gray-200 p-4">
-              <CardTitle className="text-base text-gray-900">Daftar Soal</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="grid grid-cols-4 gap-2">
-                {Array.from({ length: totalQuestions }).map((_, index) => {
-                  const isCurrentQuestion = index === state.currentQuestionIndex;
-                  const isAnswered = state.answeredQuestions.has(index);
-
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => handleJumpToQuestion(index)}
-                      className={`
-                        h-10 rounded-lg font-semibold text-xs transition-all duration-200
-                        ${isCurrentQuestion 
-                          ? 'text-black ring-2' 
-                          : isAnswered 
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }
-                      `}
-                      style={isCurrentQuestion ? {backgroundColor: '#E8B824', color: '#1A1A1A', boxShadow: '0 0 0 2px #E8B824'} : {}}
-                      disabled={isCurrentQuestion}
-                      title={`Soal ${index + 1}`}
-                    >
-                      {index + 1}
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+        {/* RIGHT SIDEBAR - AI Feedback (35%) */}
+        <div className="hidden lg:flex basis-[35%] flex-col flex-shrink-0">
+          {state.showResult && (
+            <>
+              {renderAIFeedback()}
+            </>
+          )}
+          {!state.showResult && (
+            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-200 rounded-lg sticky top-8">
+              <CardContent className="p-6 text-center">
+                <div className="inline-flex items-center justify-center p-3 rounded-full bg-blue-100 mb-4">
+                  <Brain className="h-8 w-8 text-blue-600" />
+                </div>
+                <p className="text-gray-700 text-sm font-semibold">Feedback AI</p>
+                <p className="text-gray-500 text-xs mt-3 leading-relaxed">
+                  Submit jawaban Anda untuk menerima analisis mendalam dan rekomendasi pembelajaran dari AI
+                </p>
+                <div className="mt-4 pt-4 border-t border-blue-200">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <Lightbulb className="h-3 w-3 text-yellow-500" />
+                      <span>Penjelasan lengkap</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <BookOpen className="h-3 w-3 text-blue-500" />
+                      <span>Sumber belajar</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <Target className="h-3 w-3 text-green-500" />
+                      <span>Tips perbaikan</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
