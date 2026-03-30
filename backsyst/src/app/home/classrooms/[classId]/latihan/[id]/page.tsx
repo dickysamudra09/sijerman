@@ -35,6 +35,8 @@ import {
   AlertCircle,
   Menu,
   X,
+  Send,
+  HelpCircle,
 } from "lucide-react";
 
 interface Option {
@@ -1143,16 +1145,67 @@ export default function InteractiveQuiz() {
     }
   };
 
+  const parseFeedbackSections = (feedbackText: string) => {
+    const sections: { number: string; title: string; content: string }[] = [];
+    
+    // Simple split approach: look for patterns like "1. RESPONSE:" "2. QUESTION:" etc
+    const text = feedbackText;
+    const titleMap: { [key: string]: string } = {
+      'RESPONSE': 'RESPONSE',
+      'QUESTION': 'QUESTION',
+      'YOUR ANSWER': 'YOUR ANSWER',
+      'CORRECT ANSWER': 'CORRECT ANSWER',
+      'AREAS TO IMPROVE': 'AREAS TO IMPROVE',
+      'WHY WRONG': 'WHY WRONG',
+      'LEARNING TIPS': 'LEARNING TIPS',
+      'LEARNING': 'LEARNING'
+    };
+    
+    // Find all numbered sections
+    for (let i = 1; i <= 6; i++) {
+      const patterns = Object.keys(titleMap);
+      for (const title of patterns) {
+        const searchStr = `${i}. ${title}:`;
+        const startIdx = text.indexOf(searchStr);
+        if (startIdx !== -1) {
+          const contentStart = startIdx + searchStr.length;
+          // Find next section number (e.g., "3. " or "4. ")
+          let endIdx = text.length;
+          for (let j = i + 1; j <= 6; j++) {
+            for (const nextTitle of patterns) {
+              const nextSearchStr = `${j}. ${nextTitle}:`;
+              const nextIdx = text.indexOf(nextSearchStr);
+              if (nextIdx !== -1 && nextIdx < endIdx) {
+                endIdx = nextIdx;
+              }
+            }
+          }
+          const content = text.substring(contentStart, endIdx).trim();
+          if (content) {
+            sections.push({
+              number: i.toString(),
+              title,
+              content
+            });
+            break;
+          }
+        }
+      }
+    }
+    
+    return sections.length > 0 ? sections : null;
+  };
+
   const renderAIFeedback = () => {
     if (state.isLoadingFeedback) {
       return (
-        <Card className="border-blue-200 bg-blue-50/50">
-          <CardContent className="p-6">
+        <Card className="border border-blue-200 bg-blue-50 rounded-lg shadow-sm">
+          <CardContent className="p-5 md:p-6">
             <div className="flex items-center gap-3">
-              <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
-              <div>
-                <h4 className="font-semibold text-blue-900 text-lg">Menghasilkan Feedback AI...</h4>
-                <p className="text-blue-700">Mohon tunggu sebentar</p>
+              <Loader2 className="h-5 md:h-6 w-5 md:w-6 text-blue-600 animate-spin flex-shrink-0" />
+              <div className="min-w-0">
+                <h4 className="font-semibold text-blue-900 text-sm md:text-base">Menghasilkan Feedback AI...</h4>
+                <p className="text-blue-700 text-xs md:text-sm">Mohon tunggu sebentar</p>
               </div>
             </div>
           </CardContent>
@@ -1163,79 +1216,115 @@ export default function InteractiveQuiz() {
     if (!state.aiFeedback) return null;
 
     const currentQuestion = state.questions[state.currentQuestionIndex];
+    const sections = parseFeedbackSections(state.aiFeedback.feedback_text);
 
     return (
-      <Card className="border-2" style={{borderColor: '#1A1A1A', backgroundColor: '#FFFFFF'}}>
-        <CardHeader style={{backgroundColor: '#1A1A1A'}} className="pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg" style={{backgroundColor: '#E8B824'}}>
-              <Lightbulb className="h-5 w-5" style={{color: '#1A1A1A'}} />
+      <Card className="border border-gray-300 bg-white rounded-lg sticky top-6 max-h-[calc(100vh-80px)] flex flex-col overflow-hidden shadow-sm">
+        <CardHeader className="bg-black px-4 md:px-5 py-3 md:py-4 flex-shrink-0 border-b border-gray-200">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 rounded-lg flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
+              <Lightbulb className="h-4 w-4 md:h-5 md:w-5 text-black" />
             </div>
-            <CardTitle style={{color: '#FFFFFC'}} className="text-lg flex items-center gap-2">
-              Analisis Feedback Lengkap
-              <Badge style={{backgroundColor: '#E8B824', color: '#1A1A1A'}} className="border-opacity-30 text-xs">
-                {currentQuestion.question_type === 'essay' && 'Essay'}
-                {currentQuestion.question_type === 'sentence_arrangement' && 'Puzzle'}
-                {(currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && 'Pilihan'}
-              </Badge>
-            </CardTitle>
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-white text-sm md:text-base font-bold flex items-center gap-2 flex-wrap">
+                Feedback AI
+                <Badge className="text-xs font-medium" style={{backgroundColor: '#E8B824', color: '#1A1A1A', border: 'none'}}>
+                  {currentQuestion.question_type === 'essay' && 'Essay'}
+                  {currentQuestion.question_type === 'sentence_arrangement' && 'Puzzle'}
+                  {(currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && 'Pilihan'}
+                </Badge>
+              </CardTitle>
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-5 pt-6">
-          {/* Single Comprehensive Feedback Narrative */}
-          <div className="p-6 rounded-lg border-2" style={{borderColor: '#1A1A1A', backgroundColor: '#FFFFFF'}}>
-            <h5 className="font-bold mb-4 flex items-center gap-2 text-base" style={{color: '#1A1A1A'}}>
-              Analisis Detail
-            </h5>
-            
-            {/* Feedback as single comprehensive narrative */}
-            {state.aiFeedback.feedback_text && (
-              <>
-                <div className="leading-relaxed whitespace-pre-wrap mb-3" style={{color: '#1A1A1A'}}>
-                  {state.aiFeedback.feedback_text}
+        <CardContent className="space-y-4 md:space-y-5 py-4 md:py-5 px-4 md:px-5 flex-1 overflow-y-auto">
+          {/* Feedback Sections */}
+          {state.aiFeedback.feedback_text && (
+            <div className="space-y-3 md:space-y-4">
+              {sections ? (
+                sections.map((section, idx) => {
+                  const sectionTitles: { [key: string]: { icon: any; color: string; label: string } } = {
+                    'RESPONSE': { icon: CheckCircle2, color: '#10b981', label: 'Status' },
+                    'QUESTION': { icon: HelpCircle, color: '#3b82f6', label: 'Pertanyaan' },
+                    'YOUR ANSWER': { icon: Edit3, color: '#f59e0b', label: 'Jawaban Anda' },
+                    'CORRECT ANSWER': { icon: CheckCircle2, color: '#10b981', label: 'Jawaban Benar' },
+                    'AREAS TO IMPROVE': { icon: AlertCircle, color: '#ef4444', label: 'Area Perbaikan' },
+                    'WHY WRONG': { icon: AlertCircle, color: '#ef4444', label: 'Mengapa Salah' },
+                    'LEARNING': { icon: Lightbulb, color: '#E8B824', label: 'Tips Pembelajaran' },
+                    'LEARNING TIPS': { icon: Lightbulb, color: '#E8B824', label: 'Tips Pembelajaran' }
+                  };
+                  
+                  const config = sectionTitles[section.title] || { icon: CheckCircle2, color: '#6b7280', label: section.title };
+                  const Icon = config.icon;
+                  
+                  return (
+                    <div key={idx} className="p-3 md:p-4 rounded-lg border border-gray-200 bg-white hover:shadow-md transition-shadow">
+                      <div className="flex items-start gap-3">
+                        <Icon className="h-4 w-4 md:h-5 md:w-5 mt-1 flex-shrink-0" style={{ color: config.color }} />
+                        <div className="flex-1 min-w-0">
+                          <h6 className="font-semibold text-gray-900 text-xs md:text-sm mb-1.5" style={{ color: config.color }}>
+                            {config.label}
+                          </h6>
+                          <p className="text-gray-700 text-sm md:text-base leading-relaxed">
+                            {section.content}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-4 md:p-5 rounded-lg border border-gray-200 bg-gray-50">
+                  <h5 className="font-bold mb-3 text-gray-900 text-sm md:text-base flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-green-600 flex-shrink-0" />
+                    Analisis Lengkap
+                  </h5>
+                  <div className="text-gray-700 text-sm md:text-base leading-relaxed">
+                    {state.aiFeedback.feedback_text}
+                  </div>
                 </div>
-                {/* Sentence count info */}
-                <div className="text-xs mt-4 pt-3 border-t" style={{color: '#1A1A1A', borderTopColor: '#E5E5E5'}}>
-                  <span className="inline-block px-2 py-1 rounded" style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}>
-                    {(() => {
-                      const sentences = state.aiFeedback.feedback_text.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
-                      return `${sentences.length} kalimat (60-120 ✓)`;
-                    })()}
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
+              )}
+              
+              {/* Sentence count badge */}
+              <div className="pt-2 flex justify-between items-center">
+                <span className="inline-block px-2.5 md:px-3 py-1 md:py-1.5 rounded-full text-xs md:text-sm font-medium" style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}>
+                  {(() => {
+                    const sentences = state.aiFeedback.feedback_text.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
+                    return `${sentences.length} kalimat`;
+                  })()}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Reference Materials */}
           {state.aiFeedback.reference_materials && state.aiFeedback.reference_materials.length > 0 && (
             <div>
-              <h5 className="font-bold mb-3 flex items-center gap-2" style={{color: '#1A1A1A'}}>
-                <BookOpen className="h-4 w-4" style={{color: '#E8B824'}} />
-                Sumber Belajar Terkait
+              <h5 className="font-bold mb-3 text-gray-900 text-sm md:text-base flex items-center gap-2">
+                <BookOpen className="h-4 w-4 md:h-5 md:w-5 flex-shrink-0" style={{color: '#E8B824'}} />
+                Sumber Belajar
               </h5>
               <div className="space-y-3">
                 {state.aiFeedback.reference_materials.map((ref, index) => (
-                  <div key={index} className="p-4 rounded-lg border-2 transition-all" style={{borderColor: '#1A1A1A', backgroundColor: '#FFFFFF'}}>
+                  <div key={index} className="p-3 md:p-4 rounded-lg border border-gray-200 bg-white hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <h6 className="font-semibold mb-1 text-base" style={{color: '#1A1A1A'}}>
+                      <div className="flex-1 min-w-0">
+                        <h6 className="font-semibold mb-1 text-gray-900 text-sm md:text-base">
                           {index + 1}. {ref.title}
                         </h6>
-                        <p className="text-sm leading-relaxed" style={{color: '#4A4A4A'}}>
+                        <p className="text-xs md:text-sm text-gray-600 leading-relaxed">
                           {ref.description}
                         </p>
                       </div>
                       {ref.url && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="shrink-0 shadow-sm transition-colors"
-                          style={{borderColor: '#E8B824', color: '#E8B824', backgroundColor: '#FFFFFC'}}
+                        <button
                           onClick={() => window.open(ref.url, '_blank')}
+                          className="shrink-0 p-2 rounded-lg transition-colors hover:bg-gray-100 active:scale-95"
+                          style={{color: '#E8B824'}}
+                          title="Buka sumber belajar"
                         >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
+                          <ExternalLink className="h-4 w-4 md:h-5 md:w-5" />
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1246,10 +1335,10 @@ export default function InteractiveQuiz() {
 
           {/* Processing Info */}
           {state.aiFeedback.ai_model && process.env.NODE_ENV === 'development' && (
-            <div className="text-xs pt-3 border-t opacity-75" style={{color: '#1A1A1A', borderTopColor: '#E5E5E5'}}>
-              {state.aiFeedback.ai_model}
+            <div className="text-xs text-gray-500 pt-3 md:pt-4 border-t border-gray-200 flex flex-col gap-1">
+              <span className="font-medium">{state.aiFeedback.ai_model}</span>
               {state.aiFeedback.processing_time_ms && 
-                ` • Generated in ${state.aiFeedback.processing_time_ms}ms`
+                <span>Generated in {state.aiFeedback.processing_time_ms}ms</span>
               }
             </div>
           )}
@@ -1672,44 +1761,46 @@ export default function InteractiveQuiz() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      {/* Header */}
-      <div style={{backgroundColor: '#0D0D0D', borderBottomWidth: '2px', borderColor: '#E8B824'}} className="text-white shadow-md">
-        <div className="w-full px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button 
+      {/* Header - Konsisten & Clean */}
+      <div className="bg-black border-b-2 text-white shadow-lg" style={{borderColor: '#E8B824'}}>
+        <div className="w-full px-4 py-6 md:px-6 md:py-8">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left: Back Button + Title */}
+            <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+              <button 
                 onClick={() => setShowConfirmBack(true)}
-                className="gap-2"
+                className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg font-semibold transition-all duration-200 hover:opacity-90 active:scale-95 flex-shrink-0"
                 style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
+                title="Kembali"
               >
                 <ChevronLeft className="h-4 w-4" />
-                Kembali
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold" style={{color: '#FFFFFC'}}>Latihan Soal Interaktif</h1>
-                <p className="text-sm mt-1" style={{color: '#FFFFFC'}}>Soal {state.currentQuestionIndex + 1} dari {totalQuestions}</p>
+                <span className="hidden sm:inline">Kembali</span>
+              </button>
+              <div className="min-w-0">
+                <h1 className="text-xl md:text-2xl font-bold text-white truncate">Latihan Soal</h1>
+                <p className="text-xs md:text-sm text-gray-300">Soal {state.currentQuestionIndex + 1} dari {totalQuestions}</p>
               </div>
             </div>
-            <div className="flex items-center gap-6">
-              <div className="text-right">
-                <p className="text-sm" style={{color: '#FFFFFC'}}>Skor Saat Ini</p>
-                <p className="text-3xl font-bold" style={{color: '#E8B824'}}>{state.score}/{maxPossibleScore}</p>
-              </div>
+            
+            {/* Right: Score */}
+            <div className="text-right flex-shrink-0">
+              <p className="text-xs md:text-sm text-gray-300">Skor</p>
+              <p className="text-2xl md:text-3xl font-bold" style={{color: '#E8B824'}}>{state.score}/{maxPossibleScore}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex flex-1 w-full gap-3 px-4 py-6">
-        {/* LEFT SIDEBAR - Collapsible Soal List (15%) */}
+      {/* Main Content Area - Clean Layout */}
+      <div className="flex flex-1 w-full gap-2 md:gap-3 px-3 md:px-4 py-4 md:py-6 overflow-hidden">
+        {/* LEFT SIDEBAR - Daftar Soal (15%) */}
         <div className="hidden lg:flex basis-[15%] flex-col flex-shrink-0">
-          <Card className="bg-white border border-gray-200 rounded-lg sticky top-8 h-fit">
-            <CardHeader className="border-b border-gray-200 p-5 pb-4">
-              <CardTitle className="text-sm font-semibold text-gray-800">Daftar Soal</CardTitle>
+          <Card className="bg-white border border-gray-200 rounded-lg sticky top-6 h-fit shadow-sm">
+            <CardHeader className="border-b border-gray-100 px-4 py-3">
+              <CardTitle className="text-xs md:text-sm font-bold text-gray-900">Daftar Soal</CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-2 gap-3">
+            <CardContent className="p-4 md:p-5">
+              <div className="grid grid-cols-2 gap-2 md:gap-3">
                 {Array.from({ length: totalQuestions }).map((_, index) => {
                   const isCurrentQuestion = index === state.currentQuestionIndex;
                   const isAnswered = state.answeredQuestions.has(index);
@@ -1721,18 +1812,17 @@ export default function InteractiveQuiz() {
                         handleJumpToQuestion(index);
                         setShowSoalList(false);
                       }}
-                      className={`
-                        h-12 w-full rounded-lg font-bold text-sm transition-all duration-200
-                        ${isCurrentQuestion 
-                          ? 'text-black ring-2' 
+                      className={`h-10 md:h-12 w-full rounded-md font-bold text-xs md:text-sm transition-all duration-200 active:scale-95 ${
+                        isCurrentQuestion 
+                          ? 'ring-2 text-gray-900 shadow-md' 
                           : isAnswered 
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }
-                      `}
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200 active:bg-green-300' 
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 active:bg-gray-300'
+                      }`}
                       style={isCurrentQuestion ? {backgroundColor: '#E8B824', color: '#1A1A1A', boxShadow: '0 0 0 2px #E8B824'} : {}}
                       disabled={isCurrentQuestion}
                       title={`Soal ${index + 1}`}
+                      aria-current={isCurrentQuestion ? "step" : undefined}
                     >
                       {index + 1}
                     </button>
@@ -1745,40 +1835,40 @@ export default function InteractiveQuiz() {
 
         {/* CENTER - Main Question Content (50%) */}
         <div className="basis-1/2 min-w-0">
-          {/* Progress Bar */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">Progress</span>
-              <span className="text-sm font-medium text-blue-600">{Math.round(progress)}%</span>
+          {/* Progress Bar - Improved */}
+          <div className="mb-5 md:mb-6">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-xs md:text-sm font-semibold text-gray-700">Progress</span>
+              <span className="text-xs md:text-sm font-bold" style={{color: '#E8B824'}}>{Math.round(progress)}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-gray-200 rounded-full h-2 md:h-2.5 overflow-hidden">
               <div 
-                className="bg-blue-600 h-full transition-all duration-300 ease-out"
-                style={{ width: `${progress}%` }}
+                className="h-full transition-all duration-300 ease-out"
+                style={{ width: `${progress}%`, backgroundColor: '#E8B824' }}
               />
             </div>
           </div>
 
-          {/* Question Card */}
-          <Card className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <CardHeader style={{backgroundColor: '#1A1A1A', borderBottomWidth: '1px', borderColor: '#333333'}} className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle style={{color: '#FFFFFC'}} className="text-lg">{questionTypeInfo.label}</CardTitle>
-                  <CardDescription style={{color: '#CCCCCC'}} className="mt-2">
+          {/* Question Card - Clean & Consistent */}
+          <Card className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm flex-1 flex flex-col">
+            <CardHeader className="bg-gray-900 border-b border-gray-700 px-4 md:px-6 py-4 md:py-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-base md:text-lg font-bold text-white">{questionTypeInfo.label}</CardTitle>
+                  <CardDescription className="text-xs md:text-sm text-gray-300 mt-1.5">
                     {currentQuestion.question_type === 'essay' && "Tulis jawaban essay yang lengkap dan jelas"}
                     {currentQuestion.question_type === 'sentence_arrangement' && "Lengkapi kalimat rumpang dibawah ini dengan potongan kata yang benar"}
                     {(currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && "Pilih jawaban yang paling tepat"}
                   </CardDescription>
                 </div>
-                <Badge style={{backgroundColor: '#FFFFFC', color: '#1A1A1A'}} className="text-xs font-medium">
+                <div className="px-3 py-1.5 rounded-md text-xs md:text-sm font-bold text-gray-900 flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
                   {currentQuestion.points} Poin
-                </Badge>
+                </div>
               </div>
             </CardHeader>
             
-            <CardContent className="p-6">
-              <div className="space-y-6">
+            <CardContent className="p-4 md:p-6 flex-1 flex flex-col overflow-y-auto">
+              <div className="space-y-5 md:space-y-6">
                 {/* Question Content */}
                 <div>
                   {renderQuestionContent(currentQuestion)}
@@ -1805,36 +1895,39 @@ export default function InteractiveQuiz() {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <div className="flex gap-2 md:gap-3 pt-4 md:pt-5 border-t border-gray-200">
                   {!state.showResult ? (
-                    <Button 
+                    <button
                       onClick={handleSubmitAnswer} 
                       disabled={
                         (currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'true_false') && !state.selectedOptionId ||
                         currentQuestion.question_type === 'essay' && !state.essayAnswer.trim() ||
                         currentQuestion.question_type === 'sentence_arrangement' && blankPositions.some(pos => pos.piece === null)
                       }
-                      style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
-                      className="flex-1 font-semibold"
+                      className="flex-1 px-4 py-2.5 md:py-3 rounded-lg font-semibold text-sm md:text-base text-black transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg flex items-center justify-center gap-2"
+                      style={{backgroundColor: '#E8B824'}}
                     >
-                      Submit Jawaban
-                    </Button>
+                      <Send className="h-4 w-4 md:h-5 md:w-5" />
+                      <span>Submit Jawaban</span>
+                    </button>
                   ) : (
-                    <Button 
+                    <button
                       onClick={handleNextQuestion} 
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                       disabled={state.isLoadingFeedback}
+                      className="flex-1 px-4 py-2.5 md:py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-sm md:text-base transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {state.currentQuestionIndex < totalQuestions - 1 ? (
                         <>
-                          Soal Berikutnya <ArrowRight className="h-4 w-4 ml-2" />
+                          Berikutnya
+                          <ArrowRight className="h-4 w-4 md:h-5 md:w-5" />
                         </>
                       ) : (
                         <>
-                          Selesai <CheckCircle2 className="h-4 w-4 ml-2" />
+                          Selesai
+                          <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5" />
                         </>
                       )}
-                    </Button>
+                    </button>
                   )}
                 </div>
               </div>
@@ -1842,32 +1935,32 @@ export default function InteractiveQuiz() {
           </Card>
 
           {/* Mobile Toggle Button for Soal List */}
-          <div className="lg:hidden mt-6">
-            <Button
+          <div className="lg:hidden mt-4 md:mt-6">
+            <button
               onClick={() => setShowSoalList(!showSoalList)}
-              className="w-full font-semibold"
-              style={{backgroundColor: showSoalList ? '#1A1A1A' : '#E8B824', color: showSoalList ? '#FFFFFC' : '#1A1A1A'}}
+              className="w-full px-4 py-2.5 md:py-3 rounded-lg font-semibold text-sm md:text-base transition-all duration-200 active:scale-95 flex items-center justify-center gap-2"
+              style={{backgroundColor: showSoalList ? '#1A1A1A' : '#E8B824', color: showSoalList ? '#FFFFFF' : '#1A1A1A'}}
             >
               {showSoalList ? (
                 <>
-                  <X className="h-4 w-4 mr-2" />
-                  Tutup Daftar Soal
+                  <X className="h-4 w-4 md:h-5 md:w-5" />
+                  <span>Tutup Soal</span>
                 </>
               ) : (
                 <>
-                  <Menu className="h-4 w-4 mr-2" />
-                  Buka Daftar Soal
+                  <Menu className="h-4 w-4 md:h-5 md:w-5" />
+                  <span>Buka Soal</span>
                 </>
               )}
-            </Button>
+            </button>
             
             {showSoalList && (
-              <Card className="bg-white border border-gray-200 rounded-lg mt-4 animate-in fade-in">
-                <CardHeader className="border-b border-gray-200 p-5 pb-4">
-                  <CardTitle className="text-sm font-semibold text-gray-800">Daftar Soal</CardTitle>
+              <Card className="bg-white border border-gray-200 rounded-lg mt-3 md:mt-4 animate-in fade-in shadow-sm">
+                <CardHeader className="border-b border-gray-100 px-4 py-3">
+                  <CardTitle className="text-xs md:text-sm font-bold text-gray-900">Daftar Soal</CardTitle>
                 </CardHeader>
-                <CardContent className="p-6">
-                  <div className="grid grid-cols-2 gap-3">
+                <CardContent className="p-4 md:p-5">
+                  <div className="grid grid-cols-2 gap-2 md:gap-3">
                     {Array.from({ length: totalQuestions }).map((_, index) => {
                       const isCurrentQuestion = index === state.currentQuestionIndex;
                       const isAnswered = state.answeredQuestions.has(index);
@@ -1911,30 +2004,30 @@ export default function InteractiveQuiz() {
             </>
           )}
           {!state.showResult && (
-            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-200 rounded-lg sticky top-8">
-              <CardContent className="p-6 text-center">
-                <div className="inline-flex items-center justify-center p-3 rounded-full bg-blue-100 mb-4">
-                  <Brain className="h-8 w-8 text-blue-600" />
+            <Card className="bg-blue-50 border-2 border-blue-200 rounded-lg sticky top-6 max-h-[calc(100vh-80px)] flex flex-col overflow-hidden shadow-sm">
+              <CardContent className="p-5 md:p-6 text-center flex-1 flex flex-col items-center justify-center">
+                <div className="inline-flex items-center justify-center p-3 md:p-4 rounded-full bg-blue-100 mb-4 md:mb-5">
+                  <Brain className="h-7 md:h-8 w-7 md:w-8 text-blue-600" />
                 </div>
-                <p className="text-gray-700 text-sm font-semibold">Feedback AI</p>
-                <p className="text-gray-500 text-xs mt-3 leading-relaxed">
-                  Submit jawaban Anda untuk menerima analisis mendalam dan rekomendasi pembelajaran dari AI
+                <h3 className="text-gray-800 text-sm md:text-base font-bold mb-2">Feedback AI</h3>
+                <p className="text-gray-600 text-xs md:text-sm leading-relaxed max-w-xs">
+                  Submit jawaban untuk menerima analisis mendalam dan rekomendasi pembelajaran
                 </p>
-                <div className="mt-4 pt-4 border-t border-blue-200">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <Lightbulb className="h-3 w-3 text-yellow-500" />
+                <div className="mt-5 md:mt-6 pt-5 md:pt-6 border-t border-blue-300 w-full">
+                  <ul className="space-y-2 md:space-y-2.5">
+                    <li className="flex items-center justify-center gap-2 text-xs md:text-sm text-gray-700">
+                      <Lightbulb className="h-3.5 md:h-4 w-3.5 md:w-4 text-yellow-500 flex-shrink-0" />
                       <span>Penjelasan lengkap</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <BookOpen className="h-3 w-3 text-blue-500" />
+                    </li>
+                    <li className="flex items-center justify-center gap-2 text-xs md:text-sm text-gray-700">
+                      <BookOpen className="h-3.5 md:h-4 w-3.5 md:w-4 text-blue-500 flex-shrink-0" />
                       <span>Sumber belajar</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <Target className="h-3 w-3 text-green-500" />
+                    </li>
+                    <li className="flex items-center justify-center gap-2 text-xs md:text-sm text-gray-700">
+                      <Target className="h-3.5 md:h-4 w-3.5 md:w-4 text-green-500 flex-shrink-0" />
                       <span>Tips perbaikan</span>
-                    </div>
-                  </div>
+                    </li>
+                  </ul>
                 </div>
               </CardContent>
             </Card>
@@ -1944,65 +2037,64 @@ export default function InteractiveQuiz() {
 
       {/* Confirm Back Modal */}
       <Dialog open={showConfirmBack} onOpenChange={setShowConfirmBack}>
-        <DialogContent className="bg-white rounded-lg">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">Tinggalkan Latihan?</DialogTitle>
-            <DialogDescription className="text-gray-600 mt-2">
-              Apakah Anda yakin ingin meninggalkan latihan? Kemajuan Anda mungkin tidak tersimpan.
+        <DialogContent className="bg-white rounded-lg border border-gray-200 shadow-lg p-0">
+          <DialogHeader className="px-5 md:px-6 py-4 md:py-5 border-b border-gray-200">
+            <DialogTitle className="text-lg md:text-xl font-bold text-gray-900">Tinggalkan Latihan?</DialogTitle>
+            <DialogDescription className="text-gray-600 text-sm md:text-base mt-2">
+              Apakah Anda yakin ingin meninggalkan latihan? Feedback yang sudah Anda terima akan tetap tersimpan.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex gap-3 mt-6">
-            <Button 
-              variant="outline"
+          <div className="px-5 md:px-6 py-4 md:py-5 flex flex-col sm:flex-row gap-3">
+            <button
               onClick={() => setShowConfirmBack(false)}
-              className="flex-1"
+              className="flex-1 px-4 py-2.5 md:py-3 rounded-lg border border-gray-300 bg-white text-gray-900 font-semibold text-sm md:text-base hover:bg-gray-50 active:scale-95 transition-all"
             >
-              Lanjutkan
-            </Button>
-            <Button 
+              Lanjutkan Latihan
+            </button>
+            <button
               onClick={handleBackClick}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              className="flex-1 px-4 py-2.5 md:py-3 rounded-lg bg-red-600 text-white font-semibold text-sm md:text-base hover:bg-red-700 active:scale-95 transition-all"
             >
               Keluar
-            </Button>
+            </button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Confirm Refresh Modal */}
       <Dialog open={showConfirmRefresh} onOpenChange={setShowConfirmRefresh}>
-        <DialogContent className="bg-white rounded-lg">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-orange-600" />
-              Yakin ingin refresh halaman?
+        <DialogContent className="bg-white rounded-lg border border-gray-200 shadow-lg p-0">
+          <DialogHeader className="px-5 md:px-6 py-4 md:py-5 border-b border-gray-200">
+            <DialogTitle className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0" />
+              <span>Refresh Halaman?</span>
             </DialogTitle>
-            <DialogDescription className="text-gray-600 mt-2">
-              Memperbarui halaman akan mereset semua jawaban Anda yang belum disimpan. Kami sudah menyimpan feedback untuk setiap soal, tapi jawaban Anda akan hilang.
+            <DialogDescription className="text-gray-600 text-sm md:text-base mt-3">
+              Memperbarui halaman akan menghapus jawaban Anda yang belum disimpan. Feedback yang sudah dibuat akan tetap tersedia di soal tersebut.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 my-4 bg-blue-50 p-3 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-900 font-semibold flex items-center gap-2">
-              Tip: Gunakan tombol "Kembali" jika ingin meninggalkan latihan dengan aman.
+          <div className="mx-5 md:mx-6 my-4 md:my-5 p-3 md:p-4 rounded-lg bg-blue-50 border border-blue-200">
+            <p className="text-xs md:text-sm text-blue-900 font-semibold flex items-start gap-2">
+              <Lightbulb className="h-4 w-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+              Gunakan tombol "Kembali" jika ingin meninggalkan latihan dengan aman.
             </p>
           </div>
-          <div className="flex gap-3 mt-6">
-            <Button 
-              variant="outline"
+          <div className="px-5 md:px-6 py-4 md:py-5 flex flex-col sm:flex-row gap-3">
+            <button
               onClick={() => setShowConfirmRefresh(false)}
-              className="flex-1"
+              className="flex-1 px-4 py-2.5 md:py-3 rounded-lg border border-gray-300 bg-white text-gray-900 font-semibold text-sm md:text-base hover:bg-gray-50 active:scale-95 transition-all"
             >
               Batalkan Refresh
-            </Button>
-            <Button 
+            </button>
+            <button
               onClick={() => {
                 setShowConfirmRefresh(false);
                 window.location.reload();
               }}
-              className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
+              className="flex-1 px-4 py-2.5 md:py-3 rounded-lg bg-orange-600 text-white font-semibold text-sm md:text-base hover:bg-orange-700 active:scale-95 transition-all"
             >
               Lanjutkan Refresh
-            </Button>
+            </button>
           </div>
         </DialogContent>
       </Dialog>
