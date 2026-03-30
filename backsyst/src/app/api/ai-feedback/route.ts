@@ -1,4 +1,57 @@
 import { createClient } from '@supabase/supabase-js';
+import { 
+  generateContextualFallback, 
+  analyzeGermanGrammar, 
+  selectBestReferences 
+} from './fallback-analyzer';
+import {
+  buildOptimizedPrompt,
+  formatPromptForAPI,
+  validatePromptConfig
+} from './prompt-engineering';
+import {
+  selectSmartReferences,
+  detectErrorCategories,
+  convertToReferenceMaterials
+} from './semantic-references';
+import {
+  validateFeedback,
+  generateRetryStrategy,
+  shouldRetry,
+  VALIDATION_CONFIG
+} from './validation-retry';
+import {
+  getCachedFeedback,
+  findSimilarCachedFeedback,
+  saveFeedbackToCache,
+  getCacheStats,
+  clearExpiredCache,
+  DEFAULT_CACHE_CONFIG,
+  type CacheEntry
+} from './feedback-cache';
+import {
+  logEvent,
+  logSuccess,
+  logApiError,
+  logDatabaseError,
+  logValidationIssue,
+  logCacheOperation,
+  logTimeout,
+  logFallbackUsage,
+  getErrorMetrics,
+  getQualityMetrics,
+  getPerformanceMetrics,
+  checkAndCreateAlerts,
+  getActiveAlerts,
+  resolveAlert,
+  generateRequestId,
+  LogLevel,
+  ErrorCategory,
+  type LogEntry,
+  type ErrorMetrics,
+  type QualityMetrics,
+  type PerformanceMetrics
+} from './error-handler-logging';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,14 +61,22 @@ const supabaseAdmin = createClient(
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-async function callGroqAPI(prompt: string): Promise<string> {
+interface GroqAPIConfig {
+  systemMessage: string;
+  userMessage: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+}
+
+async function callGroqAPI(config: GroqAPIConfig): Promise<string> {
   if (!GROQ_API_KEY) {
     console.warn('Groq API key not configured, will use local analysis');
     return '';
   }
 
   try {
-    console.log('Calling Groq API...');
+    console.log('Calling Groq API with structured prompt...');
     
     const response = await fetch(GROQ_API_URL, {
       headers: { 
@@ -28,16 +89,16 @@ async function callGroqAPI(prompt: string): Promise<string> {
         messages: [
           {
             role: 'system',
-            content: 'You are an expert German language tutor for A1-A2 level students. Provide detailed, constructive feedback in Indonesian.'
+            content: config.systemMessage
           },
           {
             role: 'user',
-            content: prompt
+            content: config.userMessage
           }
         ],
-        temperature: 0.7,
-        max_tokens: 6000,
-        top_p: 0.9
+        temperature: config.temperature || 0.75,
+        max_tokens: config.maxTokens || 2000,
+        top_p: config.topP || 0.9
       }),
     });
 
@@ -78,22 +139,165 @@ async function callGroqAPI(prompt: string): Promise<string> {
   }
 }
 
+// ============================================================================
+// GROQ API WITH VALIDATION & RETRY
+// ============================================================================
+
+interface ValidationAndRetryResult {
+  content: string;
+  validated: boolean;
+  attempts: number;
+  finalScore: number;
+  issues: string[];
+}
+
+async function callGroqAPIWithValidationAndRetry(
+  basePromptConfig: {
+    systemMessage: string;
+    userMessage: string;
+    temperature: number;
+    maxTokens: number;
+    topP: number;
+  },
+  studentAnswer: string,
+  correctAnswer: string,
+  questionText: string,
+  isCorrect: boolean,
+  maxAttempts: number = 2
+): Promise<ValidationAndRetryResult> {
+  let currentAttempt = 1;
+  let lastValidationScore = 0;
+  let bestResponse = '';
+  let allIssues: string[] = [];
+
+  while (currentAttempt <= maxAttempts) {
+    console.log(`\n=== Attempt ${currentAttempt}/${maxAttempts} ===`);
+
+    // Get Groq response
+    const response = await callGroqAPI({
+      systemMessage: basePromptConfig.systemMessage,
+      userMessage: basePromptConfig.userMessage,
+      temperature: basePromptConfig.temperature,
+      maxTokens: basePromptConfig.maxTokens,
+      topP: basePromptConfig.topP,
+    });
+
+    if (!response) {
+      console.log(`Attempt ${currentAttempt}: No response from API`);
+      currentAttempt++;
+      continue;
+    }
+
+    // Parse JSON response
+    let feedbackText = '';
+    try {
+      let cleanContent = response.trim();
+      cleanContent = cleanContent.replace(/```(?:json)?\s*|\s*```/g, '');
+      const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleanContent = jsonMatch[0];
+      }
+      const parsed = JSON.parse(cleanContent);
+      feedbackText = parsed.feedback_text || '';
+    } catch (e) {
+      console.log(`Attempt ${currentAttempt}: Failed to parse JSON`);
+      currentAttempt++;
+      continue;
+    }
+
+    if (!feedbackText) {
+      console.log(`Attempt ${currentAttempt}: Empty feedback text`);
+      currentAttempt++;
+      continue;
+    }
+
+    // VALIDATE response
+    const validation = validateFeedback(
+      feedbackText,
+      studentAnswer,
+      correctAnswer,
+      questionText,
+      isCorrect
+    );
+
+    console.log(`Attempt ${currentAttempt} - Score: ${validation.score}/100`);
+    console.log(`Issues: ${validation.issues.length} (${validation.issues.filter(i => i.severity === 'critical').length} critical)`);
+
+    lastValidationScore = validation.score;
+    bestResponse = feedbackText;
+    allIssues = validation.issues.map(i => i.message);
+
+    // Check if we should retry
+    const { shouldRetry: retryNeeded, reason } = shouldRetry(
+      validation,
+      maxAttempts,
+      currentAttempt
+    );
+
+    if (!retryNeeded) {
+      console.log(`✓ Validation passed. Score: ${validation.score}/100`);
+      return {
+        content: feedbackText,
+        validated: validation.isValid,
+        attempts: currentAttempt,
+        finalScore: validation.score,
+        issues: allIssues
+      };
+    }
+
+    console.log(`✗ Validation failed: ${reason}`);
+    console.log(`Quality score: ${validation.score}/100 (target: ${VALIDATION_CONFIG.recommendedScore})`);
+
+    // Generate retry strategy
+    if (currentAttempt < maxAttempts) {
+      const retryStrategy = generateRetryStrategy(
+        validation,
+        basePromptConfig.userMessage,
+        currentAttempt + 1
+      );
+
+      console.log(`Retry strategy: ${retryStrategy.reason}`);
+      console.log(`Modifications: ${retryStrategy.modifications.join('; ')}`);
+
+      // Update user message untuk retry
+      basePromptConfig.userMessage = retryStrategy.modifiedPrompt;
+    }
+
+    currentAttempt++;
+  }
+
+  // Return best response even if not fully valid
+  console.log(`\nFinal result after ${currentAttempt - 1} attempts:`);
+  console.log(`Score: ${lastValidationScore}/100`);
+  console.log(`Issues found: ${allIssues.length}`);
+
+  return {
+    content: bestResponse,
+    validated: lastValidationScore >= VALIDATION_CONFIG.minimumPassScore,
+    attempts: currentAttempt - 1,
+    finalScore: lastValidationScore,
+    issues: allIssues
+  };
+}
+
 function countSentences(text: string): number {
   if (!text) return 0;
   const sentences = text.split(/[.!?]+(?=\s|$)/).filter(s => s.trim().length > 0);
   return sentences.length;
 }
 
+
+
 function validateFeedbackLength(text: string): { valid: boolean; count: number; message: string } {
   const count = countSentences(text);
-  const MIN_SENTENCES = 60;
-  const MAX_SENTENCES = 120;
+  const MIN_SENTENCES = 12;  // Lowered for 6-step structured format
+  const MAX_SENTENCES = 100; // Reasonable upper limit
   
   if (count < MIN_SENTENCES) {
     return {
       valid: false,
       count,
-      message: `Feedback terlalu pendek: ${count} kalimat (minimum 60 kalimat)`
+      message: `Feedback terlalu pendek: ${count} kalimat (minimum 12 kalimat)`
     };
   }
   
@@ -101,14 +305,14 @@ function validateFeedbackLength(text: string): { valid: boolean; count: number; 
     return {
       valid: false,
       count,
-      message: `Feedback terlalu panjang: ${count} kalimat (maksimal 120 kalimat)`
+      message: `Feedback terlalu panjang: ${count} kalimat (maksimal 100 kalimat)`
     };
   }
   
   return {
     valid: true,
     count,
-    message: `Feedback memenuhi requirement: ${count} kalimat (60-120)`
+    message: `Feedback memenuhi requirement: ${count} kalimat (12-100)`
   };
 }
 
@@ -227,7 +431,7 @@ interface Question {
 
 interface AIFeedbackData {
   feedback_text: string;
-  explanation: string;
+  explanation?: string;
   reference_materials: Array<{
     title: string;
     url: string;
@@ -331,95 +535,92 @@ async function generateAIFeedbackWithGroq(
 
   try {
 
-    const relevantReferences = selectRelevantReferences(
-      question.question_text,
-      correctAnswerText,
+    // Use semantic reference selection for smart matching
+    const referenceMatches = selectSmartReferences(
       studentAnswerText,
-      question.question_type
+      correctAnswerText,
+      question.question_text,
+      3 // Return top 3 references
+    );
+    const relevantReferences = convertToReferenceMaterials(referenceMatches);
+
+    // Build structured prompt based on question type
+    const promptConfig = buildOptimizedPrompt(
+      question.question_type,
+      question.question_text,
+      studentAnswerText,
+      correctAnswerText,
+      isCorrect,
+      undefined // TODO: add allOptions if available
     );
 
-    const prompt = `
-Kamu tutor bahasa Jerman A1-A2 yang ekspresif & genuine! Tone: natural, ada emoji, encouraging tapi tidak kaku 🎯
-
-Pertanyaan: "${question.question_text}"
-Jawaban siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
-Status: ${isCorrect ? 'Oke!' : 'Tidak apa apa, mari perbaiki'}
-
-CARA FEEDBACK:
-${isCorrect
-      ? `JAWABAN BENAR 💯:
-  - Start ekspresif: "Wah keren! 😎" atau "Tepat banget! ✨" atau "Ini jawaban yang solid! 👌"
-  - Jelasin kenapa benar (konkret, singkat)
-  - Komplimen: apa yang mereka kuasai
-  - Saran advanced? Optional saja
-  - Ending: "Terus gini! 💪" atau "Mantap!" bukan "Terus semangat"`
-      : `JAWABAN PERLU PERBAIKAN 🤔:
-  - Start apresiasi-expressive: "Tidak apa apa! 😊" atau "Hampir saja! 👀" atau "Bagus dicoba, tapi mari..."
-  - Jelaskan GENTLE: "Yang benar sih..." bukan "Kamu salah"
-  - Analisis: apa kurangnya? Contoh konkret
-  - Ending: "Dengan latihan pasti click! 💡" atau "Next time kamu bisa! 🚀"`}
-
-CHECKLIST ANALISIS:
-• Grammar: Konjugasi verb? Artikel tepat? Word order German?
-• Vocabulary: Kata sesuai konteks? Ada yang lebih natural?
-• Flow: Kalimat logis & mudah dipahami?
-
-FORMAT RESPONSE (JSON - NO markdown):
-{
-  "feedback_text": "Feedback ekspresif dengan emoji (maks 150 kata). Buat siswa smile/termotivasi!",
-  "explanation": "Analisis detail dengan • bullets (maks 300 kata). Tone: natural, bukan academic kaku!"
-}`;
-
-    console.log('Calling Groq API...');
-
-    const aiContent = await callGroqAPI(prompt);
-    
-    if (!aiContent) {
-      throw new Error('No response from Groq, will use local analysis');
+    // Validate prompt before sending
+    const validation = validatePromptConfig(promptConfig);
+    if (!validation.valid) {
+      console.warn('Prompt validation warnings:', validation.errors);
     }
 
-    console.log('Groq response received');
+    console.log(`Building structured prompt for ${question.question_type} question...`);
+    console.log('Prompt config:', {
+      model: promptConfig.model,
+      temperature: promptConfig.temperature,
+      maxTokens: promptConfig.maxTokens,
+      topP: promptConfig.topP
+    });
 
-    console.log('Raw Groq content:', aiContent);
+    // Call Groq API dengan validation & retry untuk ensure quality
+    const validationResult = await callGroqAPIWithValidationAndRetry(
+      {
+        systemMessage: promptConfig.systemMessage,
+        userMessage: promptConfig.userPrompt,
+        temperature: promptConfig.temperature,
+        maxTokens: promptConfig.maxTokens,
+        topP: promptConfig.topP
+      },
+      studentAnswerText,
+      correctAnswerText,
+      question.question_text,
+      isCorrect,
+      2 // Max 2 attempts (original + 1 retry)
+    );
+
+    if (!validationResult.content) {
+      throw new Error('No valid response from Groq after validation retry');
+    }
+
+    console.log(`✓ Groq response validated - Score: ${validationResult.finalScore}/100 (${validationResult.attempts} attempt(s))`);
 
     let parsedContent: any;
     try {
-    
-      let cleanContent = aiContent.trim();
+      parsedContent = {
+        feedback_text: validationResult.content
+      };
 
-      cleanContent = cleanContent.replace(/```(?:json)?\s*|\s*```/g, '');
-
-      const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        cleanContent = jsonMatch[0];
-      }
-      
-      console.log('Cleaned content for parsing:', cleanContent);
-      
-      parsedContent = JSON.parse(cleanContent);
-
-      if (!parsedContent.feedback_text || !parsedContent.explanation) {
-        throw new Error('Missing required fields in Claude response');
+      if (!parsedContent.feedback_text) {
+        throw new Error('Missing feedback_text field in response');
       }
       
     } catch (parseError) {
-      console.error('Parse error, attempting manual extraction. Raw content:', aiContent);
+      console.error('Parse error. Using fallback analyzer.');
 
-      const feedbackMatch = aiContent.match(/"feedback_text":\s*"([^"]+)"/);
-      const explanationMatch = aiContent.match(/"explanation":\s*"([^"]+)"/);
+      const feedbackMatch = validationResult.content.match(/"feedback_text":\s*"([^"]+)"/);
       
-      if (feedbackMatch && explanationMatch) {
+      if (feedbackMatch) {
         parsedContent = {
-          feedback_text: feedbackMatch[1],
-          explanation: explanationMatch[1]
+          feedback_text: feedbackMatch[1]
         };
       } else {
-        const lines = aiContent.split('\n').filter(line => line.trim());
+        // Use fallback analyzer as last resort
+        console.log('Using fallback analyzer due to parsing failure');
+        const fallbackFeedback = generateContextualFallback(
+          studentAnswerText,
+          correctAnswerText,
+          question.question_text,
+          question.question_type,
+          isCorrect
+        );
         parsedContent = {
-          feedback_text: isCorrect ? 
-            "Jawaban Anda menunjukkan pemahaman yang baik terhadap bahasa Jerman. Terus berlatih untuk meningkatkan kemampuan menulis." :
-            "Jawaban Anda memerlukan beberapa perbaikan dalam hal tata bahasa dan struktur kalimat bahasa Jerman.",
-          explanation: lines.slice(0, 3).join(' • ') || "Silakan fokus pada penggunaan tata bahasa yang tepat dan perbanyak membaca contoh teks bahasa Jerman."
+          feedback_text: fallbackFeedback
         };
       }
     }
@@ -430,7 +631,6 @@ FORMAT RESPONSE (JSON - NO markdown):
       success: true,
       data: {
         feedback_text: parsedContent.feedback_text || "Feedback tidak tersedia",
-        explanation: parsedContent.explanation || "Penjelasan tidak tersedia",
         reference_materials: relevantReferences,
         processing_time_ms: processingTime,
         ai_model: 'groq-llama-3.1-8b-instant',
@@ -497,22 +697,17 @@ FORMAT RESPONSE (JSON - NO markdown):
     const detectedIssues = analyzeStudentText(studentAnswerText, question.question_text);
     
     const fallbackFeedback = isCorrect ?
-      `Jawaban Anda menunjukkan upaya yang baik untuk menjawab pertanyaan tentang "${question.question_text}". Secara keseluruhan struktur bahasa Jerman sudah cukup baik, namun beberapa aspek dapat diperbaiki untuk mencapai tingkat yang lebih optimal.` :
-      `Jawaban Anda untuk pertanyaan "${question.question_text}" memerlukan perbaikan dalam beberapa aspek. Mari kita analisis bagian-bagian yang perlu diperhatikan dalam bahasa Jerman.`;
-
-    const fallbackExplanation = detectedIssues.length > 0 ? 
-      `${detectedIssues.join('\n')}\n• SARAN PERBAIKAN: ${isCorrect ? 'Tingkatkan variasi kosakata dan kompleksitas kalimat sesuai konteks pertanyaan' : 'Fokus pada relevansi jawaban dengan pertanyaan dan perbaiki tata bahasa dasar'}` :
-      `• RELEVANSI: Pastikan jawaban langsung menjawab pertanyaan yang diajukan\n• GRAMMAR: Perhatikan konjugasi verb dan penggunaan artikel yang tepat\n• STRUCTURE: Susun kalimat dengan urutan kata yang benar dalam bahasa Jerman\n• SARAN PERBAIKAN: Pelajari kembali konsep dasar grammar dan perbanyak latihan menulis`;
+      `Jawaban Anda menunjukkan upaya yang baik untuk menjawab pertanyaan tentang "${question.question_text}". Secara keseluruhan struktur bahasa Jerman sudah cukup baik, namun beberapa aspek dapat diperbaiki untuk mencapai tingkat yang lebih optimal.${detectedIssues.length > 0 ? '\n\n' + detectedIssues.join('\n') : ''}` :
+      `Jawaban Anda untuk pertanyaan "${question.question_text}" memerlukan perbaikan dalam beberapa aspek. Mari kita analisis bagian-bagian yang perlu diperhatikan dalam bahasa Jerman.\n\n${detectedIssues.length > 0 ? detectedIssues.join('\n') : '• Fokus pada relevansi jawaban dengan pertanyaan dan perbaiki tata bahasa dasar'}`;
 
     return {
       success: false,
       error: errorMessage,
       data: {
         feedback_text: fallbackFeedback,
-        explanation: fallbackExplanation,
         reference_materials: fallbackReferences,
         processing_time_ms: Date.now() - startTime,
-        ai_model: 'fallback'
+        ai_model: 'fallback-analyzer'
       }
     };
   }
@@ -527,242 +722,60 @@ async function generateAIFeedback(
   const startTime = Date.now();
 
   try {
-
-    const relevantReferences = selectRelevantReferences(
-      question.question_text,
-      correctAnswerText,
+    // Use semantic reference selection for smart matching
+    const referenceMatches = selectSmartReferences(
       studentAnswerText,
-      question.question_type
+      correctAnswerText,
+      question.question_text,
+      3 // Return top 3 references
+    );
+    const relevantReferences = convertToReferenceMaterials(referenceMatches);
+
+    // Use new structured prompt system
+    const promptConfig = buildOptimizedPrompt(
+      question.question_type,
+      question.question_text,
+      studentAnswerText,
+      correctAnswerText,
+      isCorrect
     );
 
-    let prompt = '';
-    
-    if (question.question_type === 'sentence_arrangement') {
-      prompt = `
-Kamu adalah expert German teacher untuk siswa level A1-A2 yang memberikan SATU NARASI FEEDBACK LENGKAP untuk soal sentence arrangement/puzzle mengisi celah kalimat!
+    console.log('Using structured prompt for:', question.question_type);
 
-KONTEKS SOAL:
-Pertanyaan: "${question.question_text}"
-Jawaban siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
-Jawaban benar: "${correctAnswerText || 'Tidak diketahui'}"
-Status: ${isCorrect ? 'CORRECT!' : 'INCORRECT'}
+    // Call Groq API dengan validation & retry
+    const validationResult = await callGroqAPIWithValidationAndRetry(
+      {
+        systemMessage: promptConfig.systemMessage,
+        userMessage: promptConfig.userPrompt,
+        temperature: promptConfig.temperature,
+        maxTokens: promptConfig.maxTokens,
+        topP: promptConfig.topP
+      },
+      studentAnswerText,
+      correctAnswerText,
+      question.question_text,
+      isCorrect,
+      2 // Max 2 attempts
+    );
 
-INSTRUKSI - BUAT SATU NARASI LENGKAP:
-
-Mulai dengan REAKSI AWAL yang natural dan encouraging, kemudian jelaskan dengan DETAIL:
-
-REAKSI (Baris pertama - singkat, encouraging):
-   ${isCorrect 
-     ? `Berikan pujian authentic atas jawaban yang benar` 
-     : `Appreciate usaha mereka dengan gentle correction`}
-
-ANALISIS LENGKAP yang mengalir:
-   • Urutan kata (word order) dalam kalimat German - apakah V2/V-final benar?
-   • Grammar: verb conjugation, case endings (Nominatif/Akkusativ/Dativ)
-   • Vocabulary: apakah kata yang dipilih natural dan sesuai konteks?
-   • Structure: apakah penempatan kata/frasa sudah tepat?
-
-PENJELASAN SPESIFIK:
-   ${isCorrect
-     ? `Highlight part mana yang PALING TRICKY dari struktur ini
-      Explain WHY ini adalah jawaban yang CORRECT
-      Give 1 contoh kalimat lain dengan pattern yang sama
-      Share 1 common mistake yang sering students buat`
-     : `Jelaskan SPECIFICALLY MENGAPA jawaban siswa salah
-      Jelaskan apa yang SEHARUSNYA dan WHY (konkret!)
-      Show struktur/pattern yang benar dengan example
-      Give 2 contoh lain dengan pattern yang sama
-      Share tips khusus untuk soal serupa di masa depan`}
-
-FORMAT OUTPUT (JSON):
-{
-  "feedback_text": "SATU NARASI LENGKAP feedback (bukan 2 bagian, tapi satu cerita utuh yang mengalir dari reaksi → analisis → contoh). Natural tone, encouraging, specific. MINIMUM 60 KALIMAT, MAKSIMAL 120 KALIMAT."
-}
-
-CRITICAL: 
-- Return ONLY 1 field: "feedback_text" yang berisi SATU NARASI LENGKAP
-- WAJIB: Antara 60-120 kalimat (jumlah kalimat penting!)
-- NO "explanation" field, NO terpisah-pisah
-- Tone: Natural, friendly, encouraging, specific examples
-- Struktur: Reaksi → Analisis → Contoh → Tips (MENGALIR seperti percakapan)
-- Return ONLY valid JSON!`;
-    } else if (question.question_type === 'multiple_choice' || question.question_type === 'true_false') {
-      prompt = `
-Kamu adalah expert German teacher untuk siswa level A1-A2 yang memberikan SATU NARASI FEEDBACK LENGKAP, DETAIL, EDUKATIF & MOTIVATIF untuk soal pilihan ganda!
-
-KONTEKS SOAL LENGKAP:
-Tipe soal: ${question.question_type === 'multiple_choice' ? 'Multiple Choice (Pilihan Ganda)' : 'True/False'}
-Pertanyaan: "${question.question_text}"
-Jawaban siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
-Jawaban BENAR: "${correctAnswerText || 'Tidak diketahui'}"
-Status: ${isCorrect ? 'CORRECT!' : 'INCORRECT'}
-
-INSTRUKSI - BUAT SATU NARASI LENGKAP, EDUKATIF & MOTIVATIF:
-
-KHUSUS UNTUK JAWABAN SALAH - Feedback harus lebih DETAIL dengan:
-${!isCorrect ? `
-REAKSI ENCOURAGEMENT (Baris pertama):
-   • Appreciate usaha mereka dengan genuine dan gentle
-   • Jangan membuat mereka merasa buruk, tapi motivatif
-
-ANALISIS DETAIL MENGAPA JAWABAN SALAH:
-   • Apa KONSEP GRAMMAR/VOCAB yang di-test soal ini?
-   • JAWABAN SISWA mengapa SALAH? Jelaskan dengan konkret & spesifik
-   • Apa GRAMMAR/VOCAB RULE yang dilanggar atau tidak tepat?
-   • JAWABAN BENAR mengapa TEPAT? Jelaskan rule/concept-nya
-
-PENJELASAN PERBEDAAN KONKRET:
-   • Bandingkan langsung: "Jawaban Anda mengatakan [X], tapi seharusnya [Y] karena..."
-   • Jelaskan RULE/CONCEPT yang digunakan dalam jawaban benar
-   • Beri 1-2 contoh KALIMAT LAIN yang menggunakan rule yang sama
-   • Highlight common mistakes: "Banyak students buat kesalahan ini karena..."
-
-TIPS UNTUK IMPROVE:
-   • Apa yang perlu diingat untuk avoid kesalahan serupa
-   • Gimme strategy atau tips untuk identify jawaban benar di soal serupa
-   • Encourage mereka untuk terus berlatih
-
-TONE KHUSUS UNTUK JAWABAN SALAH:
-• Gentle & supportive (tidak critical)
-• Motivating ("Ini bagian dari process belajar!")
-• Clear & specific (bukan vague)
-• Constructive (fokus improvement, bukan kesalahan)
-` : `
-REAKSI (Pujian authentic):
-   • Celebrate jawaban mereka yang benar
-   • Highlight konsep mana yang mereka kuasai dengan baik
-
-PENJELASAN SINGKAT:
-   • Kenapa jawaban ini CORRECT
-   • Konsep grammar/vocab apa yang tepat
-   • Why other options wrong (brief)
-
-TIPS & CONTOH:
-   • 1-2 contoh kalimat lain dengan pattern yang sama
-   • Tips untuk confident di soal serupa
-`}
-
-FORMAT OUTPUT (JSON):
-{
-  "feedback_text": "SATU NARASI LENGKAP feedback yang DETAIL, EDUKATIF & MOTIVATIF. Untuk jawaban salah: analisis → perbedaan konkret → examples → tips. Untuk benar: lebih singkat tapi jelas. MINIMUM 60 KALIMAT, MAKSIMAL 120 KALIMAT."
-}
-
-CRITICAL REQUIREMENTS:
-- Return ONLY "feedback_text" field
-- WAJIB: Antara 60-120 kalimat (jumlah kalimat sangat penting!)
-- TONE: Motivatif & encouraging bahkan untuk jawaban salah
-- CONTENT: Spesifik & akurat (reference actual concepts)
-- STRUCTURE: Mengalir seperti percakapan dengan guru
-- DETAIL: Especially untuk jawaban SALAH - explain deeply why & how to improve
-- Return ONLY valid JSON!`;
-    } else if (question.question_type === 'essay') {
-      prompt = `
-Kamu adalah expert German teacher untuk siswa level A1-A2 yang memberikan SATU NARASI FEEDBACK LENGKAP untuk soal essay!
-
-KONTEKS SOAL:
-Pertanyaan: "${question.question_text}"
-Jawaban siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
-Jawaban ideal: "${correctAnswerText || 'Tidak diketahui'}"
-Status: ${isCorrect ? 'GOOD!' : 'PERLU PERBAIKAN'}
-
-INSTRUKSI - BUAT SATU NARASI LENGKAP & DETAIL:
-
-Mulai dengan REAKSI AWAL yang natural, kemudian jelaskan dengan DETAIL:
-
-REAKSI (Baris pertama - singkat, encouraging):
-   ${isCorrect 
-     ? `Berikan pujian authentic atas essay yang bagus` 
-     : `Appreciate usaha mereka dengan gentle constructive feedback`}
-
-ANALISIS LENGKAP yang mengalir:
-   • Apa yang BAGUS dari jawaban mereka? (spesifik!)
-   • Apa yang PERLU diperbaiki? (be gentle but specific!)
-   • Grammar issues (if any): verb conjugation, case, word order, sentence structure
-   • Vocabulary: apakah word choices natural dan sesuai context?
-   • Content/Ideas: apakah answering the question dengan lengkap?
-   • Struktur: apakah ada paragraph breaks, flow yang jelas?
-
-PENJELASAN SPESIFIK:
-   ${isCorrect
-     ? `Highlight apa yang impressive dari essay ini (grammar, vocabulary, ideas)
-      Share 1-2 examples dari essay mereka yang bagus
-      Give suggestion untuk level yang lebih advanced
-      Encourage untuk terus write more!`
-     : `Point out SPECIFIC grammar/vocab errors dengan gentle explanation
-      Show how to correct mereka dengan contoh konkret
-      Explain vocabulary/grammar rules yang violated
-      Give tips untuk improve essay next time
-      Share positive aspects juga untuk encourage!`}
-
-FORMAT OUTPUT (JSON):
-{
-  "feedback_text": "SATU NARASI LENGKAP feedback essay yang konstruktif, encouraging, DETAIL. Highlight strengths & areas for improvement dengan spesifik. MINIMUM 60 KALIMAT, MAKSIMAL 120 KALIMAT."
-}
-
-CRITICAL: 
-- Return ONLY 1 field: "feedback_text" yang berisi SATU NARASI LENGKAP
-- WAJIB: Antara 60-120 kalimat`;
-    } else {
-      prompt = `
-Kamu adalah tutor bahasa Jerman yang sangat supportive untuk siswa level A1-A2!
-
-Pertanyaan: "${question.question_text}"
-Jawaban siswa: "${studentAnswerText || 'Tidak ada jawaban'}"
-Jawaban yang benar: "${correctAnswerText || 'Tidak diketahui'}"
-Status: ${isCorrect ? 'Benar!' : 'Perlu perbaikan'}
-
-INSTRUKSI - BUAT SATU NARASI FEEDBACK LENGKAP:
-
-Tulis feedback sebagai SATU CERITA MENGALIR yang:
-1. Mulai dengan REAKSI natural dan encouraging
-2. Jelaskan detail analysis (grammar, vocab, structure)
-3. Berikan contoh konkret
-4. Akhiri dengan motivasi/tips
-
-Tone: Friendly, supportive, NOT robotic. Buat siswa merasa:
-- Didukung dan tidak dihakimi
-- Bangga dengan usahanya  
-- Termotivasi untuk belajar lebih
-
-FORMAT OUTPUT (JSON):
-{
-  "feedback_text": "SATU NARASI LENGKAP feedback (reaksi → analisis → contoh → tips) yang mengalir seperti percakapan dengan guru. 300-400 words."
-}
-
-CRITICAL: Return ONLY "feedback_text" field dengan narasi lengkap, tidak terpisah!`;
+    if (!validationResult.content) {
+      throw new Error('No valid response from Groq after validation retry');
     }
 
-    console.log('Calling Groq...');
-
-    const aiContent = await callGroqAPI(prompt);
-    
-    if (!aiContent) {
-      throw new Error('No response from Groq, will use local analysis');
-    }
-
-    console.log('Response received!');
+    console.log(`✓ Response validated - Score: ${validationResult.finalScore}/100 (${validationResult.attempts} attempt(s))`);
 
     let parsedContent: any;
     try {
-      let cleanContent = aiContent.trim();
-      cleanContent = cleanContent.replace(/```(?:json)?\s*|\s*```/g, '');
-
-      const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        cleanContent = jsonMatch[0];
-      }
-      
-      console.log('Attempting JSON parse...');
-      console.log('Cleaned content for parsing:', cleanContent.substring(0, 100) + '...');
-      
-      parsedContent = JSON.parse(cleanContent);
+      parsedContent = {
+        feedback_text: validationResult.content
+      };
 
       if (!parsedContent.feedback_text) {
         throw new Error('Missing feedback_text in AI response');
       }
       
       parsedContent.feedback_text = String(parsedContent.feedback_text).trim();
-      console.log('JSON parse successful. Feedback length:', parsedContent.feedback_text.length);
+      console.log('Feedback length:', parsedContent.feedback_text.length);
       
       const validation = validateFeedbackLength(parsedContent.feedback_text);
       console.log(validation.message);
@@ -771,178 +784,340 @@ CRITICAL: Return ONLY "feedback_text" field dengan narasi lengkap, tidak terpisa
       }
       
     } catch (parseError) {
-      console.error('JSON parse failed, attempting manual extraction...');
-      console.log('Response length:', aiContent.length, 'characters');
-      console.log('First 200 chars:', aiContent.substring(0, 200));
-      console.log('Last 200 chars:', aiContent.substring(Math.max(0, aiContent.length - 200)));
+      console.error('JSON parse failed. Using fallback analyzer...');
 
-      let feedbackText = null;
-
-      let feedbackMatch = aiContent.match(/"feedback_text"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
-      if (feedbackMatch) {
-        feedbackText = feedbackMatch[1].replace(/\\"/g, '"');
-        console.log('Pattern 1 matched. Length:', feedbackText.length);
-      }
-
-      if (!feedbackText) {
-        feedbackMatch = aiContent.match(/"feedback_text"\s*:\s*"([^"]*?)(?:"|$)/);
-        if (feedbackMatch) {
-          feedbackText = feedbackMatch[1].replace(/\\"/g, '"');
-          console.log('Pattern 2 matched (partial). Length:', feedbackText.length);
-        }
-      }
-
-      if (!feedbackText) {
-        const lines = aiContent.split('\n').filter((line: string) => line.trim().length > 0);
-        const allContent = lines.join(' ');
-        
-        if (allContent.length > 20 && !allContent.includes('error')) {
-          feedbackText = allContent.replace(/^[{"]*(feedback_text[":,\s]*)*/i, '').replace(/["}\s]*$/, '');
-          console.log('Pattern 3 matched (raw content). Length:', feedbackText.length);
-        }
-      }
-
-      if (!feedbackText || feedbackText.length < 20) {
-        console.warn('All extraction patterns failed, using fallback');
-        feedbackText = isCorrect ? 
-          "Sempurna! Jawaban Anda menunjukkan pemahaman yang baik terhadap struktur kalimat Jerman. Anda sudah menangkap word order yang benar, case endings yang tepat, dan pemilihan kata yang natural. Terus pertahankan kualitas ini dan jangan ragu untuk mencoba struktur yang lebih kompleks! Semakin banyak Anda berlatih, semakin mahir Anda akan menjadi. 💪" :
-          "Jawaban Anda memerlukan beberapa perbaikan. Mari kita analisis apa yang perlu diperbaiki. Fokus pada beberapa aspek kunci: pertama, perhatikan word order dalam kalimat German - apakah verb berada di posisi yang benar? Kedua, periksa case endings untuk nominatif, akkusativ, dan dativ. Ketiga, pastikan pemilihan kata sesuai dengan konteks. Jangan khawatir, ini adalah bagian dari proses belajar. Terus berlatih dan Anda pasti akan semakin baik! 🤔";
-      }
-
+      const fallbackFeedback = generateContextualFallback(
+        studentAnswerText,
+        correctAnswerText,
+        question.question_text,
+        question.question_type,
+        isCorrect
+      );
+      
       parsedContent = {
-        feedback_text: feedbackText.trim()
+        feedback_text: fallbackFeedback
       };
-      
-      console.log('Final feedback extracted. Length:', parsedContent.feedback_text.length);
-      
-      const extractedValidation = validateFeedbackLength(parsedContent.feedback_text);
-      console.log(extractedValidation.message);
-      if (!extractedValidation.valid) {
-        console.warn('Extracted feedback validation warning:', extractedValidation.message);
-      }
     }
 
     const processingTime = Date.now() - startTime;
-    const finalValidation = validateFeedbackLength(parsedContent.feedback_text);
-    console.log('Processing time:', processingTime, 'ms');
-    console.log(finalValidation.message);
 
     return {
       success: true,
       data: {
         feedback_text: parsedContent.feedback_text || "Feedback tidak tersedia",
-        explanation: "", 
         reference_materials: relevantReferences,
         processing_time_ms: processingTime,
-        ai_model: 'groq-llama-3.1-8b-instant',
+        ai_model: `groq-llama-3.1-8b-instant (validated: ${validationResult.validated}, score: ${validationResult.finalScore})`,
       }
     };
   } catch (error: unknown) {
     console.error('Groq Feedback generation error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    console.error('AI Feedback generation error - Message:', errorMessage);
-    console.error('AI Feedback generation error - Stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('Error Stack:', error instanceof Error ? error.stack : 'No stack trace');
 
-    const fallbackReferences = [
+    // Use fallback analyzer
+    const fallbackFeedback = generateContextualFallback(
+      studentAnswerText,
+      correctAnswerText,
+      question.question_text,
+      question.question_type,
+      isCorrect
+    );
+
+    let fallbackReferences = [
       GERMAN_REFERENCES.grammar[0],
       GERMAN_REFERENCES.vocabulary[0],
       GERMAN_REFERENCES.conjugation[0]
     ].map(({ title, url, description }) => ({ title, url, description }));
 
+    // For essay/arrangement, do more detailed analysis
+    if (question.question_type === 'essay' || question.question_type === 'sentence_arrangement') {
+      if (!isCorrect) {
+        const analysis = analyzeGermanGrammar(studentAnswerText, question.question_text);
+        fallbackReferences = selectBestReferences(analysis, GERMAN_REFERENCES);
+      }
+    }
+
     return {
       success: false,
       error: errorMessage,
       data: {
-        feedback_text: "Maaf, terjadi kesalahan saat menghasilkan feedback AI. Sistem sedang mengalami gangguan. Silakan coba submit jawaban lagi nanti. Kami akan memperbaiki segera!",
-        explanation: "",
+        feedback_text: fallbackFeedback,
         reference_materials: fallbackReferences,
         processing_time_ms: Date.now() - startTime,
-        ai_model: 'error'
+        ai_model: 'fallback-enhanced'
       }
     };
   }
 }
 
+/**
+ * GET handler - Fetch cached statistics or question details
+ */
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  const action = url.searchParams.get('action');
   const questionId = url.searchParams.get('questionId');
+  const hoursBack = parseInt(url.searchParams.get('hoursBack') || '24');
 
-  if (!questionId) {
-    return Response.json({ error: 'questionId required' });
+  // ===== MONITORING ENDPOINTS =====
+
+  // Get error metrics
+  if (action === 'error-metrics') {
+    const metrics = await getErrorMetrics(hoursBack);
+    return Response.json({
+      success: true,
+      data: metrics,
+      timeRange: `Last ${hoursBack} hours`
+    });
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('questions')
-    .select('id, question_text, question_type, options(*)')
-    .eq('id', questionId)
-    .single();
+  // Get quality metrics
+  if (action === 'quality-metrics') {
+    const metrics = await getQualityMetrics(hoursBack);
+    return Response.json({
+      success: true,
+      data: metrics,
+      timeRange: `Last ${hoursBack} hours`
+    });
+  }
 
-  return Response.json({ data, error, questionId });
+  // Get performance metrics
+  if (action === 'performance-metrics') {
+    const metrics = await getPerformanceMetrics(hoursBack);
+    return Response.json({
+      success: true,
+      data: metrics,
+      timeRange: `Last ${hoursBack} hours`
+    });
+  }
+
+  // Get active alerts
+  if (action === 'alerts') {
+    const alerts = await getActiveAlerts();
+    return Response.json({
+      success: true,
+      data: {
+        alerts,
+        activeCount: alerts.filter(a => !a.resolved).length,
+        resolvedCount: alerts.filter(a => a.resolved).length
+      }
+    });
+  }
+
+  // Get comprehensive dashboard data
+  if (action === 'dashboard') {
+    const errorMetrics = await getErrorMetrics(1); // Last 1 hour
+    const qualityMetrics = await getQualityMetrics(1);
+    const performanceMetrics = await getPerformanceMetrics(1);
+    const alerts = await getActiveAlerts();
+
+    return Response.json({
+      success: true,
+      data: {
+        summary: {
+          health: 'good',
+          lastUpdated: new Date().toISOString()
+        },
+        metrics: {
+          error: errorMetrics,
+          quality: qualityMetrics,
+          performance: performanceMetrics
+        },
+        alerts: {
+          active: alerts.filter(a => !a.resolved),
+          count: alerts.filter(a => !a.resolved).length
+        }
+      }
+    });
+  }
+
+  // Get cache statistics
+  if (action === 'stats') {
+    const stats = await getCacheStats();
+    return Response.json({
+      success: true,
+      data: {
+        cache: stats,
+        config: DEFAULT_CACHE_CONFIG
+      }
+    });
+  }
+
+  // Get question details with cache info
+  if (questionId) {
+    try {
+      const { data: questionData, error } = await supabaseAdmin
+        .from('questions')
+        .select('id, question_text, question_type, options(*)')
+        .eq('id', questionId)
+        .single();
+
+      if (error || !questionData) {
+        return Response.json(
+          { error: 'Question not found', questionId },
+          { status: 404 }
+        );
+      }
+
+      // Check if cached
+      const cachedCorrect = await getCachedFeedback(questionId, true);
+      const cachedIncorrect = await getCachedFeedback(questionId, false);
+
+      return Response.json({
+        success: true,
+        data: {
+          question: questionData,
+          cache: {
+            correct: cachedCorrect ? true : false,
+            incorrect: cachedIncorrect ? true : false
+          }
+        }
+      });
+    } catch (error) {
+      console.error('GET handler error:', error);
+      return Response.json(
+        { error: 'Internal server error' },
+        { status: 500 }
+      );
+    }
+  }
+
+  return Response.json({ error: 'Missing action parameter' }, { status: 400 });
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const startTime = Date.now();
+  const requestId = generateRequestId();
+  let questionId = '';
+  let studentAnswerId = '';
+
   try {
+    // Parse request body
     const requestBody = await request.json();
     const {
-      studentAnswerId,
-      questionId,
+      studentAnswerId: studentIdFromBody,
+      questionId: questionIdFromBody,
       attemptId,
       selectedOptionId,
       textAnswer,
-      selectedOptionsArray, 
+      selectedOptionsArray,
       isCorrect
     }: {
       studentAnswerId: string;
       questionId: string;
       attemptId: string;
       selectedOptionId: string | null;
-      textAnswer: string | null; 
+      textAnswer: string | null;
       selectedOptionsArray: string[] | null;
       isCorrect: boolean;
     } = requestBody;
 
-    console.log('AI Feedback API called with:', {
-      studentAnswerId,
-      questionId,
-      attemptId,
-      selectedOptionId,
-      textAnswer,
-      selectedOptionsArray,
-      isCorrect
+    // Assign to outer scope for error handling
+    questionId = questionIdFromBody;
+    studentAnswerId = studentIdFromBody;
+
+    // Log request received
+    await logEvent({
+      level: LogLevel.INFO,
+      message: `Request received`,
+      request_id: requestId,
+      question_id: questionId,
+      context: {
+        studentAnswerId,
+        isCorrect,
+        hasTextAnswer: !!textAnswer
+      }
     });
 
+    // Validate required fields
     if (!studentAnswerId || !questionId || !attemptId) {
-      console.error('Missing required fields:', { studentAnswerId, questionId, attemptId });
       return Response.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    console.log('Checking cache for question:', questionId);
-    const { data: cachedFeedback, error: cacheError } = await supabaseAdmin
-      .from('ai_feedback_cache')
-      .select('*')
-      .eq('question_id', questionId)
-      .eq('is_correct', isCorrect)
-      .maybeSingle();
+    await logCacheOperation(requestId, 'hit', questionId, { type: 'exact_match_check' });
+    const exactCache = await getCachedFeedback(questionId, isCorrect);
 
-    if (!cacheError && cachedFeedback) {
-      console.log('Cache HIT - Using cached feedback for question:', questionId);
+    if (exactCache) {
+      await logEvent({
+        level: LogLevel.DEBUG,
+        message: `CACHE HIT (exact): Using cached feedback`,
+        request_id: requestId,
+        question_id: questionId,
+        processing_time_ms: Date.now() - startTime,
+        context: {
+          cacheType: 'exact',
+          originalProcessingTime: exactCache.processing_time_ms,
+          timeSaved: exactCache.processing_time_ms - (Date.now() - startTime)
+        }
+      });
+
       return Response.json({
         success: true,
         data: {
-          feedback_text: cachedFeedback.feedback_text,
-          explanation: cachedFeedback.explanation,
-          reference_materials: cachedFeedback.reference_materials,
-          processing_time_ms: cachedFeedback.processing_time_ms,
-          ai_model: cachedFeedback.ai_model,
+          feedback_text: exactCache.feedback_text,
+          explanation: exactCache.explanation,
+          reference_materials: JSON.parse(exactCache.reference_materials),
+          processing_time_ms: Date.now() - startTime, // Include cache retrieval time
+          ai_model: exactCache.ai_model
         },
-        cached: true,
-        cachedAt: cachedFeedback.created_at
+        cache: {
+          hit: true,
+          type: 'exact',
+          originalProcessingTime: exactCache.processing_time_ms
+        }
       });
     }
 
+    if (DEFAULT_CACHE_CONFIG.enableSimilarityMatching) {
+      await logCacheOperation(requestId, 'hit', questionId, { type: 'fuzzy_match_check' });
+      const similarCache = await findSimilarCachedFeedback(
+        'Select question text from database', // Would get this from question fetch
+        isCorrect,
+        0.70 // 70% similarity threshold
+      );
+
+      if (similarCache) {
+        await logEvent({
+          level: LogLevel.DEBUG,
+          message: `CACHE HIT (fuzzy): ${(similarCache.similarity * 100).toFixed(1)}% match`,
+          request_id: requestId,
+          question_id: questionId,
+          processing_time_ms: Date.now() - startTime,
+          context: {
+            cacheType: 'fuzzy',
+            similarity: similarCache.similarity,
+            originalQuestionId: similarCache.questionId
+          }
+        });
+        return Response.json({
+          success: true,
+          data: {
+            feedback_text: similarCache.entry?.feedback_text || '',
+            explanation: similarCache.entry?.explanation || '',
+            reference_materials: similarCache.entry?.reference_materials
+              ? JSON.parse(similarCache.entry.reference_materials)
+              : [],
+            processing_time_ms: Date.now() - startTime,
+            ai_model: similarCache.entry?.ai_model || 'unknown'
+          },
+          cache: {
+            hit: true,
+            type: 'fuzzy',
+            similarity: similarCache.similarity,
+            originalQuestionId: similarCache.questionId,
+            originalProcessingTime: similarCache.entry?.processing_time_ms
+          }
+        });
+      }
+    }
+
+    console.log('[CACHE MISS] Generating new feedback...');
+
+    // Fetch question data
     const { data: rawQuestionData, error: questionError } = await supabaseAdmin
       .from('questions')
       .select(`
@@ -956,12 +1131,11 @@ export async function POST(request: Request): Promise<Response> {
       .single();
 
     if (questionError || !rawQuestionData) {
-      console.error('Question fetch error:', questionError);
       return Response.json(
         {
           error: 'Failed to fetch question data',
           details: questionError?.message || 'Question not found',
-          questionId: questionId
+          questionId
         },
         { status: 404 }
       );
@@ -969,17 +1143,21 @@ export async function POST(request: Request): Promise<Response> {
 
     const questionData = rawQuestionData as unknown as Question;
 
+    // Prepare answer texts based on question type
     let studentAnswerText = '';
     let correctAnswerText = '';
     let finalIsCorrect = isCorrect;
     let aiResponse: AIFeedbackResponse;
 
-    if (questionData.question_type === 'multiple_choice' || questionData.question_type === 'true_false') {
+    if (
+      questionData.question_type === 'multiple_choice' ||
+      questionData.question_type === 'true_false'
+    ) {
       const selectedOption = questionData.options.find(opt => opt.id === selectedOptionId);
       const correctOption = questionData.options.find(opt => opt.is_correct);
       studentAnswerText = selectedOption?.option_text || 'Tidak ada jawaban';
       correctAnswerText = correctOption?.option_text || 'Tidak diketahui';
-      
+
       aiResponse = await generateAIFeedback(
         questionData,
         studentAnswerText,
@@ -990,27 +1168,21 @@ export async function POST(request: Request): Promise<Response> {
       studentAnswerText = textAnswer || 'Tidak ada jawaban';
 
       let correctSentence: string = '';
-      
+
       if (questionData.sentence_arrangement_config?.complete_sentence) {
         correctSentence = questionData.sentence_arrangement_config.complete_sentence;
       } else {
-        let sentenceWithBlanks = questionData.sentence_arrangement_config?.sentence_with_blanks || "";
+        let sentenceWithBlanks = questionData.sentence_arrangement_config?.sentence_with_blanks || '';
         const correctWords = questionData.sentence_arrangement_config?.blank_words || [];
-        
+
         correctSentence = sentenceWithBlanks;
         correctWords.forEach(word => {
           correctSentence = correctSentence.replace('___', word);
         });
       }
-      
+
       correctAnswerText = correctSentence.trim() || 'Tidak diketahui (Konfigurasi tidak lengkap)';
-      
-      console.log('Sentence arrangement processing:', {
-        studentAnswerText,
-        correctAnswerText,
-        isCorrect: finalIsCorrect
-      });
-      
+
       aiResponse = await generateAIFeedback(
         questionData,
         studentAnswerText,
@@ -1020,7 +1192,7 @@ export async function POST(request: Request): Promise<Response> {
     } else if (questionData.question_type === 'essay') {
       studentAnswerText = textAnswer || 'Tidak ada jawaban';
       correctAnswerText = 'Jawaban ideal bervariasi (Essay)';
-      
+
       aiResponse = await generateAIFeedbackWithGroq(
         questionData,
         studentAnswerText,
@@ -1028,84 +1200,96 @@ export async function POST(request: Request): Promise<Response> {
         finalIsCorrect
       );
     } else {
-      console.error('Unsupported question type:', questionData.question_type);
-      return Response.json(
-        { error: 'Unsupported question type' },
-        { status: 400 }
-      );
+      return Response.json({ error: 'Unsupported question type' }, { status: 400 });
     }
 
-    console.log('Generated AI feedback with:', {
-      questionType: questionData.question_type,
-      studentAnswerText,
-      correctAnswerText,
-      finalIsCorrect,
-      aiModel: aiResponse.data.ai_model,
-      success: aiResponse.success
-    });
-
+    // ============ SAVE TO DATABASE ============
     const { data: feedback, error: saveError } = await supabaseAdmin
       .from('ai_feedback')
-      .insert([{
-        student_answer_id: studentAnswerId,
-        question_id: questionId,
-        attempt_id: attemptId,
-        feedback_type: finalIsCorrect ? 'correct' : 'incorrect',
-        feedback_text: aiResponse.data.feedback_text,
-        explanation: aiResponse.data.explanation,
-        reference_materials: aiResponse.data.reference_materials,
-        ai_model: aiResponse.data.ai_model,
-        processing_time_ms: aiResponse.data.processing_time_ms
-      }])
-      .select()
-      .single();
-
-    if (aiResponse.success || aiResponse.data?.feedback_text) {
-      console.log('Caching feedback for question:', questionId);
-      const { error: cacheInsertError } = await supabaseAdmin
-        .from('ai_feedback_cache')
-        .upsert([{
+      .insert([
+        {
+          student_answer_id: studentAnswerId,
           question_id: questionId,
-          is_correct: finalIsCorrect,
+          attempt_id: attemptId,
+          feedback_type: finalIsCorrect ? 'correct' : 'incorrect',
           feedback_text: aiResponse.data.feedback_text,
           explanation: aiResponse.data.explanation,
           reference_materials: aiResponse.data.reference_materials,
           ai_model: aiResponse.data.ai_model,
-          processing_time_ms: aiResponse.data.processing_time_ms,
-          created_at: new Date().toISOString()
-        }], {
-          onConflict: 'question_id, is_correct'
-        });
-
-      if (cacheInsertError) {
-        console.warn('Cache insert failed (non-critical):', cacheInsertError.message);
-      } else {
-        console.log('Feedback cached successfully');
-      }
-    }
+          processing_time_ms: aiResponse.data.processing_time_ms
+        }
+      ])
+      .select()
+      .single();
 
     if (saveError) {
-      console.error('Error saving AI feedback:', saveError);
-      return Response.json({
-        success: true,
-        data: aiResponse.data,
-        warning: 'Feedback generated but not saved to database'
-      });
+      console.error('Error saving feedback:', saveError);
     }
+
+    const referenceString =
+      typeof aiResponse.data.reference_materials === 'string'
+        ? aiResponse.data.reference_materials
+        : JSON.stringify(aiResponse.data.reference_materials || []);
+
+    const cacheSuccess = await saveFeedbackToCache({
+      question_id: questionId,
+      question_text: questionData.question_text,
+      is_correct: isCorrect,
+      feedback_text: aiResponse.data.feedback_text,
+      explanation: aiResponse.data.explanation || '',
+      reference_materials: referenceString,
+      ai_model: aiResponse.data.ai_model,
+      processing_time_ms: aiResponse.data.processing_time_ms
+    });
+
+    const totalTime = Date.now() - startTime;
+
+    // Log success
+    await logSuccess(requestId, questionId, totalTime, {
+      cacheStatus: 'miss_generated',
+      cacheSaved: cacheSuccess,
+      processingTime: aiResponse.data.processing_time_ms,
+      totalResponseTime: totalTime
+    });
 
     return Response.json({
       success: true,
       data: {
         ...aiResponse.data,
         id: feedback?.id
+      },
+      cache: {
+        hit: false,
+        saved: cacheSuccess,
+        processingTime: aiResponse.data.processing_time_ms
       }
     });
-
   } catch (error: unknown) {
-    console.error('AI Feedback API error - Full error object:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    console.error('AI Feedback API error - Message:', errorMessage);
-    console.error('AI Feedback API error - Stack:', error instanceof Error ? error.stack : 'No stack trace');
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    // Log error with full context
+    await logApiError(
+      requestId,
+      error,
+      questionId,
+      'Fallback system engaged'
+    );
+
+    // Determine error category
+    let errorCategory = ErrorCategory.UNKNOWN_ERROR;
+    if (errorMessage.includes('rate limit')) {
+      errorCategory = ErrorCategory.API_ERROR;
+    } else if (errorMessage.includes('network') || errorMessage.includes('timeout')) {
+      errorCategory = ErrorCategory.TIMEOUT_ERROR;
+    } else if (errorMessage.includes('parse') || errorMessage.includes('JSON')) {
+      errorCategory = ErrorCategory.PARSING_ERROR;
+    }
+
+    // Create alert if critical error
+    if (errorMessage.includes('critical') || errorMessage.includes('fatal')) {
+      await checkAndCreateAlerts();
+    }
 
     return Response.json(
       { error: 'Internal server error', details: errorMessage },
