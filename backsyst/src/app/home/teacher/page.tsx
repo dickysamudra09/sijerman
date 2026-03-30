@@ -195,6 +195,11 @@ function TeacherMode({ onBack }: TeacherModeProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [stats, setStats] = useState<TeacherStats | null>(null);
     const [activeTab, setActiveTab] = useState<string>("classes");
+    const [numPertemuan, setNumPertemuan] = useState(16);
+    const [scheduleDay, setScheduleDay] = useState(1);
+    const [startTime, setStartTime] = useState("09:00");
+    const [attendanceStart, setAttendanceStart] = useState("08:45");
+    const [attendanceEnd, setAttendanceEnd] = useState("09:15");
     const router = useRouter();
 
     useEffect(() => {
@@ -423,26 +428,55 @@ function TeacherMode({ onBack }: TeacherModeProps) {
         setError(null);
 
         const code = generateClassCode();
-        const { error } = await supabase.from("classrooms").insert({
-            id: crypto.randomUUID(),
+        const classId = crypto.randomUUID();
+        
+        // Insert classroom
+        const { error: classError } = await supabase.from("classrooms").insert({
+            id: classId,
             name: newClassName,
             code,
             description: newClassDescription || "",
             teacher_id: userId,
+            pertemuan: numPertemuan,
             created_at: new Date().toISOString(),
         });
 
-        if (error) {
-            setError("Gagal membuat kelas: " + error.message);
-        } else {
-            setNewClassName("");
-            setNewClassDescription("");
-            setIsModalOpen(false);
-            toast.success("Kelas berhasil dibuat!");
-            await fetchClassrooms();
-            if (userId) {
-                await fetchTeacherStats(userId);
-            }
+        if (classError) {
+            setError("Gagal membuat kelas: " + classError.message);
+            setIsLoading(false);
+            return;
+        }
+        
+        // Insert classroom schedule
+        const { error: scheduleError } = await supabase.from("classroom_schedule").insert({
+            id: crypto.randomUUID(),
+            classroom_id: classId,
+            day_of_week: scheduleDay,
+            start_time: startTime,
+            attendance_range_start: attendanceStart,
+            attendance_range_end: attendanceEnd,
+            created_at: new Date().toISOString(),
+        });
+
+        if (scheduleError) {
+            setError("Gagal membuat jadwal kelas: " + scheduleError.message);
+            setIsLoading(false);
+            return;
+        }
+
+        // Reset form
+        setNewClassName("");
+        setNewClassDescription("");
+        setNumPertemuan(16);
+        setScheduleDay(1);
+        setStartTime("09:00");
+        setAttendanceStart("08:45");
+        setAttendanceEnd("09:15");
+        setIsModalOpen(false);
+        toast.success("Kelas berhasil dibuat dengan jadwal!");
+        await fetchClassrooms();
+        if (userId) {
+            await fetchTeacherStats(userId);
         }
         setIsLoading(false);
     };
@@ -910,10 +944,11 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                         <DialogHeader>
                             <DialogTitle className="text-[#1E1E1E] text-xl">Kelas Baru</DialogTitle>
                             <DialogDescription className="text-gray-600">
-                                Tambahkan kelas baru untuk memulai sesi belajar Anda
+                                Tambahkan kelas baru dengan jadwal pertemuan
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-4">
+                        <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+                            {/* Nama Kelas */}
                             <div>
                                 <label className="block mb-2 text-sm font-semibold text-gray-700">Nama Kelas</label>
                                 <Input
@@ -923,6 +958,8 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                     className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
                                 />
                             </div>
+
+                            {/* Deskripsi */}
                             <div>
                                 <label className="block mb-2 text-sm font-semibold text-gray-700">Deskripsi</label>
                                 <Textarea
@@ -932,13 +969,89 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                     className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
                                 />
                             </div>
+
+                            {/* Jumlah Pertemuan */}
+                            <div>
+                                <label className="block mb-2 text-sm font-semibold text-gray-700">Jumlah Pertemuan</label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    max="20"
+                                    value={numPertemuan}
+                                    onChange={(e) => setNumPertemuan(parseInt(e.target.value) || 1)}
+                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Range: 1-20 pertemuan</p>
+                            </div>
+
+                            {/* Hari Pertemuan */}
+                            <div>
+                                <label className="block mb-2 text-sm font-semibold text-gray-700">Hari Pertemuan</label>
+                                <select
+                                    value={scheduleDay}
+                                    onChange={(e) => setScheduleDay(parseInt(e.target.value))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value={1}>Senin</option>
+                                    <option value={2}>Selasa</option>
+                                    <option value={3}>Rabu</option>
+                                    <option value={4}>Kamis</option>
+                                    <option value={5}>Jumat</option>
+                                    <option value={6}>Sabtu</option>
+                                    <option value={0}>Minggu</option>
+                                </select>
+                            </div>
+
+                            {/* Jam Mulai Pertemuan */}
+                            <div>
+                                <label className="block mb-2 text-sm font-semibold text-gray-700">Jam Mulai Pertemuan</label>
+                                <Input
+                                    type="time"
+                                    value={startTime}
+                                    onChange={(e) => setStartTime(e.target.value)}
+                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                                />
+                            </div>
+
+                            {/* Jam Mulai Presensi */}
+                            <div>
+                                <label className="block mb-2 text-sm font-semibold text-gray-700">Jam Mulai Presensi</label>
+                                <Input
+                                    type="time"
+                                    value={attendanceStart}
+                                    onChange={(e) => setAttendanceStart(e.target.value)}
+                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Biasanya 15-30 menit sebelum jam mulai</p>
+                            </div>
+
+                            {/* Jam Selesai Presensi */}
+                            <div>
+                                <label className="block mb-2 text-sm font-semibold text-gray-700">Jam Selesai Presensi</label>
+                                <Input
+                                    type="time"
+                                    value={attendanceEnd}
+                                    onChange={(e) => setAttendanceEnd(e.target.value)}
+                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Biasanya 10-15 menit setelah jam mulai</p>
+                            </div>
+
+                            {/* Error Message */}
+                            {error && (
+                                <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                                    {error}
+                                </div>
+                            )}
+
+                            {/* Buat Kelas Button */}
                             <Button 
                                 onClick={createNewClass} 
-                                disabled={isLoading} 
+                                disabled={isLoading || !newClassName.trim()} 
                                 className="bg-blue-600 hover:bg-blue-700 text-white w-full"
                             >
                                 <Plus className="h-4 w-4 mr-2" />
-                                Buat Kelas
+                                {isLoading ? "Membuat..." : "Buat Kelas"}
                             </Button>
                         </div>
                     </DialogContent>
