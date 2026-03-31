@@ -162,6 +162,36 @@
   .animate-spin {
     animation: spin 1s linear infinite;
   }
+
+  /* Open Course Responsive Sidebar */
+  .sidebar-overlay {
+    @apply fixed inset-0 bg-black/30 z-20 md:hidden;
+  }
+
+  .sidebar-content {
+    @apply transition-transform duration-300 ease-out;
+  }
+
+  /* Main content margin for fixed sidebar (desktop only) */
+  @media (min-width: 768px) {
+    .main-with-fixed-sidebar {
+      margin-left: 20%;
+    }
+  }
+
+  /* Warm progress bar animations */
+  .progress-warm {
+    @apply bg-[#F5C518] shadow-sm;
+  }
+
+  /* Module timeline card hover effects */
+  .module-card {
+    @apply transition-all duration-200;
+  }
+
+  .module-card:hover:not(:disabled) {
+    @apply shadow-md border-[#F5C518];
+  }
 }
 
 @keyframes float {
