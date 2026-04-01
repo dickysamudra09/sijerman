@@ -199,6 +199,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
     const [startTime, setStartTime] = useState("09:00");
     const [attendanceStart, setAttendanceStart] = useState("08:45");
     const [attendanceEnd, setAttendanceEnd] = useState("09:15");
+    const [hasAttendance, setHasAttendance] = useState(true);
     const [loadingSession, setLoadingSession] = useState(true);
     const router = useRouter();
 
@@ -450,6 +451,13 @@ function TeacherMode({ onBack }: TeacherModeProps) {
         const classId = crypto.randomUUID();
         
         try {
+            // Validate attendance times if attendance is enabled
+            if (hasAttendance && attendanceStart >= attendanceEnd) {
+                setError("Jam mulai presensi harus lebih awal dari jam selesai");
+                setIsLoading(false);
+                return;
+            }
+
             const { error: classError } = await supabase.from("classrooms").insert({
                 id: classId,
                 name: newClassName,
@@ -462,13 +470,17 @@ function TeacherMode({ onBack }: TeacherModeProps) {
 
             if (classError) throw classError;
             
+            // Set attendance times based on hasAttendance flag
+            const attendRangeStart = hasAttendance ? attendanceStart : startTime;
+            const attendRangeEnd = hasAttendance ? attendanceEnd : startTime;
+
             const { error: scheduleError } = await supabase.from("classroom_schedule").insert({
                 id: crypto.randomUUID(),
                 classroom_id: classId,
                 day_of_week: scheduleDay,
                 start_time: startTime,
-                attendance_range_start: attendanceStart,
-                attendance_range_end: attendanceEnd,
+                attendance_range_start: attendRangeStart,
+                attendance_range_end: attendRangeEnd,
                 created_at: new Date().toISOString(),
             });
 
@@ -481,6 +493,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
             setStartTime("09:00");
             setAttendanceStart("08:45");
             setAttendanceEnd("09:15");
+            setHasAttendance(true);
             setIsModalOpen(false);
             toast.success("Kelas berhasil dibuat dengan jadwal!");
             
@@ -1046,118 +1059,260 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                 </Tabs>
 
                 <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                    <DialogContent className="rounded-xl max-w-md" style={{ backgroundColor: '#FFFFFC', borderColor: '#E8B824', borderWidth: '2px' }}>
-                        <DialogHeader>
-                            <DialogTitle className="text-[#1E1E1E] text-xl">Kelas Baru</DialogTitle>
-                            <DialogDescription className="text-gray-600">
-                                Tambahkan kelas baru dengan jadwal pertemuan
+                    <DialogContent className="rounded-2xl max-w-2xl backdrop-blur-xl p-0 overflow-hidden" style={{ 
+                        backgroundColor: 'rgba(255, 255, 252, 0.98)',
+                        borderColor: 'rgba(232, 184, 36, 0.4)', 
+                        borderWidth: '2px',
+                        boxShadow: '0 25px 50px rgba(0, 0, 0, 0.2)'
+                    }}>
+                        {/* Header dengan Accent */}
+                        <div className="relative p-8 border-b-2" style={{ 
+                            backgroundColor: 'linear-gradient(135deg, rgba(232, 184, 36, 0.08) 0%, rgba(232, 184, 36, 0.04) 100%)',
+                            borderBottomColor: 'rgba(232, 184, 36, 0.2)'
+                        }}>
+                            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-yellow-400 to-amber-300 rounded-full blur-3xl opacity-10 pointer-events-none"></div>
+                            <DialogTitle className="text-3xl font-bold" style={{ color: '#1A1A1A' }}>Buat Kelas Baru</DialogTitle>
+                            <DialogDescription className="text-base mt-2" style={{ color: '#4A4A4A' }}>
+                                Atur jadwal pertemuan dan detail kelas Anda dengan rapi
                             </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-                            {/* Nama Kelas */}
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-8 max-h-[65vh] overflow-y-auto space-y-6">
+                            {/* Section 1: Info Dasar */}
                             <div>
-                                <label className="block mb-2 text-sm font-semibold text-gray-700">Nama Kelas</label>
-                                <Input
-                                    placeholder="Nama Kelas"
-                                    value={newClassName}
-                                    onChange={(e) => setNewClassName(e.target.value)}
-                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
-                                />
+                                <h3 className="text-sm font-bold mb-5" style={{ color: '#E8B824', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Informasi Dasar</h3>
+                                
+                                {/* Nama Kelas */}
+                                <div className="mb-5">
+                                    <label className="block mb-3 text-sm font-semibold" style={{ color: '#1A1A1A' }}>📚 Nama Kelas</label>
+                                    <Input
+                                        placeholder="Contoh: Bahasa Indonesia A2 - Lanjutan"
+                                        value={newClassName}
+                                        onChange={(e) => setNewClassName(e.target.value)}
+                                        className="border-gray-200 focus:ring-2 transition-all h-11 rounded-lg text-base"
+                                        style={{ 
+                                            '--tw-ring-color': '#E8B824',
+                                            '--tw-border-opacity': '1'
+                                        } as React.CSSProperties}
+                                    />
+                                </div>
+
+                                {/* Deskripsi */}
+                                <div className="mb-5">
+                                    <label className="block mb-3 text-sm font-semibold" style={{ color: '#1A1A1A' }}>✏️ Deskripsi Kelas</label>
+                                    <Textarea
+                                        placeholder="Jelaskan ringkas tentang kelas, materi, atau tujuan pembelajaran..."
+                                        value={newClassDescription}
+                                        onChange={(e) => setNewClassDescription(e.target.value)}
+                                        className="border-gray-200 focus:ring-2 transition-all min-h-[100px] rounded-lg text-base"
+                                        style={{ 
+                                            '--tw-ring-color': '#E8B824'
+                                        } as React.CSSProperties}
+                                    />
+                                </div>
                             </div>
 
-                            {/* Deskripsi */}
+                            {/* Divider */}
+                            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(232, 184, 36, 0.3), transparent)' }}></div>
+
+                            {/* Section 2: Jumlah Pertemuan */}
                             <div>
-                                <label className="block mb-2 text-sm font-semibold text-gray-700">Deskripsi</label>
-                                <Textarea
-                                    placeholder="Deskripsi Kelas (Opsional)"
-                                    value={newClassDescription}
-                                    onChange={(e) => setNewClassDescription(e.target.value)}
-                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
-                                />
+                                <h3 className="text-sm font-bold mb-5" style={{ color: '#E8B824', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Konfigurasi Pertemuan</h3>
+                                
+                                <div className="mb-5">
+                                    <label className="block mb-3 text-sm font-semibold" style={{ color: '#1A1A1A' }}>🗓️ Jumlah Pertemuan</label>
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        value={numPertemuan}
+                                        onChange={(e) => setNumPertemuan(parseInt(e.target.value) || 1)}
+                                        className="border-gray-200 focus:ring-2 transition-all h-11 rounded-lg text-base"
+                                        style={{ 
+                                            '--tw-ring-color': '#E8B824'
+                                        } as React.CSSProperties}
+                                    />
+                                    <p className="text-xs mt-2" style={{ color: '#4A4A4A' }}>💡 Tentukan berapa kali pertemuan dalam satu semester (1-20)</p>
+                                </div>
                             </div>
 
-                            {/* Jumlah Pertemuan */}
+                            {/* Section 3: Jadwal Mingguan */}
                             <div>
-                                <label className="block mb-2 text-sm font-semibold text-gray-700">Jumlah Pertemuan</label>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    max="20"
-                                    value={numPertemuan}
-                                    onChange={(e) => setNumPertemuan(parseInt(e.target.value) || 1)}
-                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Range: 1-20 pertemuan</p>
+                                <h3 className="text-sm font-bold mb-5" style={{ color: '#E8B824', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Jadwal Mingguan</h3>
+                                
+                                <div className="mb-5">
+                                    <label className="block mb-3 text-sm font-semibold" style={{ color: '#1A1A1A' }}>📅 Hari Pertemuan</label>
+                                    <select
+                                        value={scheduleDay}
+                                        onChange={(e) => setScheduleDay(parseInt(e.target.value))}
+                                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 transition-all text-base font-medium"
+                                        style={{ 
+                                            '--tw-ring-color': '#E8B824',
+                                            color: '#1A1A1A'
+                                        } as React.CSSProperties}
+                                    >
+                                        <option value={1}>📍 Senin</option>
+                                        <option value={2}>📍 Selasa</option>
+                                        <option value={3}>📍 Rabu</option>
+                                        <option value={4}>📍 Kamis</option>
+                                        <option value={5}>📍 Jumat</option>
+                                        <option value={6}>📍 Sabtu</option>
+                                        <option value={0}>📍 Minggu</option>
+                                    </select>
+                                </div>
+
+                                <div className="mb-5">
+                                    <label className="block mb-3 text-sm font-semibold" style={{ color: '#1A1A1A' }}>🕐 Jam Mulai Pertemuan</label>
+                                    <Input
+                                        type="time"
+                                        value={startTime}
+                                        onChange={(e) => setStartTime(e.target.value)}
+                                        className="border-gray-200 focus:ring-2 transition-all h-11 rounded-lg text-base"
+                                        style={{ 
+                                            '--tw-ring-color': '#E8B824'
+                                        } as React.CSSProperties}
+                                    />
+                                </div>
                             </div>
 
-                            {/* Hari Pertemuan */}
-                            <div>
-                                <label className="block mb-2 text-sm font-semibold text-gray-700">Hari Pertemuan</label>
-                                <select
-                                    value={scheduleDay}
-                                    onChange={(e) => setScheduleDay(parseInt(e.target.value))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value={1}>Senin</option>
-                                    <option value={2}>Selasa</option>
-                                    <option value={3}>Rabu</option>
-                                    <option value={4}>Kamis</option>
-                                    <option value={5}>Jumat</option>
-                                    <option value={6}>Sabtu</option>
-                                    <option value={0}>Minggu</option>
-                                </select>
-                            </div>
+                            {/* Divider */}
+                            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(232, 184, 36, 0.3), transparent)' }}></div>
 
-                            {/* Jam Mulai Pertemuan */}
+                            {/* Section 4: Presensi Toggle */}
                             <div>
-                                <label className="block mb-2 text-sm font-semibold text-gray-700">Jam Mulai Pertemuan</label>
-                                <Input
-                                    type="time"
-                                    value={startTime}
-                                    onChange={(e) => setStartTime(e.target.value)}
-                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
-                                />
-                            </div>
+                                <h3 className="text-sm font-bold mb-5" style={{ color: '#E8B824', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pengaturan Presensi</h3>
+                                
+                                <div className="space-y-4">
+                                    {/* Radio Button Group */}
+                                    <div className="flex gap-6">
+                                        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg transition-all" style={{
+                                            backgroundColor: hasAttendance ? 'rgba(232, 184, 36, 0.1)' : '#F3F4F6',
+                                            border: hasAttendance ? '2px solid #E8B824' : '2px solid #E5E7EB'
+                                        }}>
+                                            <input
+                                                type="radio"
+                                                name="attendance"
+                                                value="yes"
+                                                checked={hasAttendance}
+                                                onChange={() => setHasAttendance(true)}
+                                                className="w-4 h-4 cursor-pointer"
+                                                style={{ accentColor: '#E8B824' }}
+                                            />
+                                            <div>
+                                                <p className="font-semibold text-sm" style={{ color: '#1A1A1A' }}>✅ Ada Presensi</p>
+                                                <p className="text-xs" style={{ color: '#4A4A4A' }}>Aktifkan sistem presensi</p>
+                                            </div>
+                                        </label>
 
-                            {/* Jam Mulai Presensi */}
-                            <div>
-                                <label className="block mb-2 text-sm font-semibold text-gray-700">Jam Mulai Presensi</label>
-                                <Input
-                                    type="time"
-                                    value={attendanceStart}
-                                    onChange={(e) => setAttendanceStart(e.target.value)}
-                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Biasanya 15-30 menit sebelum jam mulai</p>
-                            </div>
+                                        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg transition-all" style={{
+                                            backgroundColor: !hasAttendance ? 'rgba(232, 184, 36, 0.1)' : '#F3F4F6',
+                                            border: !hasAttendance ? '2px solid #E8B824' : '2px solid #E5E7EB'
+                                        }}>
+                                            <input
+                                                type="radio"
+                                                name="attendance"
+                                                value="no"
+                                                checked={!hasAttendance}
+                                                onChange={() => setHasAttendance(false)}
+                                                className="w-4 h-4 cursor-pointer"
+                                                style={{ accentColor: '#E8B824' }}
+                                            />
+                                            <div>
+                                                <p className="font-semibold text-sm" style={{ color: '#1A1A1A' }}>❌ Tanpa Presensi</p>
+                                                <p className="text-xs" style={{ color: '#4A4A4A' }}>Tidak pakai sistem presensi</p>
+                                            </div>
+                                        </label>
+                                    </div>
 
-                            {/* Jam Selesai Presensi */}
-                            <div>
-                                <label className="block mb-2 text-sm font-semibold text-gray-700">Jam Selesai Presensi</label>
-                                <Input
-                                    type="time"
-                                    value={attendanceEnd}
-                                    onChange={(e) => setAttendanceEnd(e.target.value)}
-                                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-200"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Biasanya 10-15 menit setelah jam mulai</p>
+                                    {/* Conditional Attendance Time Inputs */}
+                                    {hasAttendance && (
+                                        <div className="mt-4 pt-4 border-t" style={{ borderTopColor: 'rgba(232, 184, 36, 0.2)' }}>
+                                            <p className="text-sm mb-4" style={{ color: '#4A4A4A' }}>⏱️ Tentukan waktu pembukaan dan penutupan presensi</p>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block mb-2 text-sm font-semibold" style={{ color: '#1A1A1A' }}>Jam Mulai</label>
+                                                    <Input
+                                                        type="time"
+                                                        value={attendanceStart}
+                                                        onChange={(e) => setAttendanceStart(e.target.value)}
+                                                        className="border-gray-200 focus:ring-2 transition-all h-11 rounded-lg text-base"
+                                                        style={{ 
+                                                            '--tw-ring-color': '#E8B824'
+                                                        } as React.CSSProperties}
+                                                    />
+                                                    <p className="text-xs mt-2" style={{ color: '#4A4A4A' }}>15-30 min sebelum mulai</p>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block mb-2 text-sm font-semibold" style={{ color: '#1A1A1A' }}>Jam Selesai</label>
+                                                    <Input
+                                                        type="time"
+                                                        value={attendanceEnd}
+                                                        onChange={(e) => setAttendanceEnd(e.target.value)}
+                                                        className="border-gray-200 focus:ring-2 transition-all h-11 rounded-lg text-base"
+                                                        style={{ 
+                                                            '--tw-ring-color': '#E8B824'
+                                                        } as React.CSSProperties}
+                                                    />
+                                                    <p className="text-xs mt-2" style={{ color: '#4A4A4A' }}>10-15 min setelah mulai</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Error Message */}
                             {error && (
-                                <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-                                    {error}
+                                <div className="p-4 border-l-4 rounded-lg backdrop-blur-sm" style={{
+                                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                                    borderLeftColor: '#DC2626',
+                                    color: '#DC2626'
+                                }}>
+                                    <p className="font-semibold text-sm">⚠️ Terjadi Kesalahan</p>
+                                    <p className="text-sm mt-1">{error}</p>
                                 </div>
                             )}
+                        </div>
 
-                            {/* Buat Kelas Button */}
+                        {/* Footer Actions */}
+                        <div className="px-8 py-6 border-t-2 flex gap-3 bg-gradient-to-r from-gray-50 to-white" style={{ 
+                            borderTopColor: 'rgba(232, 184, 36, 0.1)'
+                        }}>
+                            <Button
+                                onClick={() => setIsModalOpen(false)}
+                                className="flex-1 font-semibold h-12 rounded-lg transition-all text-base"
+                                style={{
+                                    backgroundColor: '#F3F4F6',
+                                    color: '#1A1A1A',
+                                    border: '1px solid #E5E7EB'
+                                }}
+                            >
+                                Batal
+                            </Button>
                             <Button 
                                 onClick={createNewClass} 
-                                disabled={isLoading || !newClassName.trim()} 
-                                className="bg-blue-600 hover:bg-blue-700 text-white w-full"
+                                disabled={isLoading || !newClassName.trim()}
+                                className="flex-1 font-semibold h-12 rounded-lg transition-all text-base text-lg flex items-center justify-center gap-2"
+                                style={{ 
+                                    backgroundColor: isLoading || !newClassName.trim() ? '#D4AF37' : '#E8B824',
+                                    color: '#1A1A1A',
+                                    opacity: isLoading || !newClassName.trim() ? 0.6 : 1,
+                                    cursor: isLoading || !newClassName.trim() ? 'not-allowed' : 'pointer'
+                                }}
                             >
-                                <Plus className="h-4 w-4 mr-2" />
-                                {isLoading ? "Membuat..." : "Buat Kelas"}
+                                {isLoading ? (
+                                    <>
+                                        <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-gray-200 rounded-full"></div>
+                                        Membuat...
+                                    </>
+                                ) : (
+                                    <>
+                                        ✨ Buat Kelas
+                                    </>
+                                )}
                             </Button>
                         </div>
                     </DialogContent>
