@@ -176,6 +176,13 @@
   @media (min-width: 768px) {
     .main-with-fixed-sidebar {
       margin-left: 20%;
+      padding-left: 0;
+    }
+
+    .footer-with-sidebar {
+      left: 20%;
+      right: 0;
+      width: auto;
     }
   }
 
@@ -191,6 +198,127 @@
 
   .module-card:hover:not(:disabled) {
     @apply shadow-md border-[#F5C518];
+  }
+
+  /* Smooth hover scale effect */
+  .hover\:scale-102:hover {
+    transform: scale(1.02);
+  }
+
+  .hover\:-translate-y-1:hover {
+    transform: translateY(-4px);
+  }
+
+  /* Gradient text utility */
+  .text-gradient-to-r {
+    background: linear-gradient(to right, var(--tw-gradient-stops));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Enhanced module cards animations */
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-in-up {
+    animation: slideInUp 0.5s ease-out;
+  }
+
+  /* Module outcome badges animation */
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-fade-in-scale {
+    animation: fadeInScale 0.3s ease-out;
+  }
+
+  /* Smooth accordion transition */
+  .transition-max-height {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  /* ===== Syllabus Page Styling ===== */
+  
+  /* Syllabus page white background */
+  .syllabus-page-bg {
+    background: #FFFFFF;
+    position: relative;
+    overflow: auto;
+  }
+
+  /* Grid pattern overlay */
+  .syllabus-page-bg::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(0deg, transparent 24%, rgba(200, 200, 200, 0.05) 25%, rgba(200, 200, 200, 0.05) 26%, transparent 27%, transparent 74%, rgba(200, 200, 200, 0.05) 75%, rgba(200, 200, 200, 0.05) 76%, transparent 77%, transparent 100%),
+      linear-gradient(90deg, transparent 24%, rgba(200, 200, 200, 0.05) 25%, rgba(200, 200, 200, 0.05) 26%, transparent 27%, transparent 74%, rgba(200, 200, 200, 0.05) 75%, rgba(200, 200, 200, 0.05) 76%, transparent 77%, transparent 100%);
+    background-size: 50px 50px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Floating blob animations */
+  @keyframes floatLeft {
+    0%, 100% { transform: translateY(0px) translateX(0px); }
+    25% { transform: translateY(-20px) translateX(-10px); }
+    50% { transform: translateY(-40px) translateX(0px); }
+    75% { transform: translateY(-20px) translateX(10px); }
+  }
+
+  @keyframes floatRight {
+    0%, 100% { transform: translateY(0px) translateX(0px); }
+    25% { transform: translateY(20px) translateX(10px); }
+    50% { transform: translateY(40px) translateX(0px); }
+    75% { transform: translateY(20px) translateX(-10px); }
+  }
+
+  @keyframes floatCenter {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-30px) rotate(180deg); }
+  }
+
+  .blob-left {
+    display: none;
+  }
+
+  .blob-right {
+    display: none;
+  }
+
+  .blob-center {
+    display: none;
+  }
+
+  /* Content wrapper relative positioning */
+  .syllabus-content {
+    position: relative;
+    z-index: 10;
+  }
+
+  /* Full-width sections */
+  .section-full-width {
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    position: relative;
+    z-index: 10;
   }
 }
 
