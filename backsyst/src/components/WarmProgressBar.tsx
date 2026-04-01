@@ -32,7 +32,7 @@ export const WarmProgressBar: React.FC<WarmProgressBarProps> = ({
         <div className="flex items-center justify-between mb-2">
           {label && <p className="text-sm font-medium text-gray-700">{label}</p>}
           {showPercentage && (
-            <span className="text-sm font-semibold text-[#F5C518]">{clampedPercentage}%</span>
+            <span className="text-sm font-semibold text-[#E8B824]">{clampedPercentage}%</span>
           )}
         </div>
       )}
@@ -40,7 +40,7 @@ export const WarmProgressBar: React.FC<WarmProgressBarProps> = ({
       {/* Progress Bar */}
       <div className={`w-full bg-gray-200 rounded-full overflow-hidden ${heightClass}`}>
         <div
-          className="h-full bg-[#F5C518] rounded-full transition-all duration-300 ease-out shadow-sm"
+          className="h-full bg-[#E8B824] rounded-full transition-all duration-300 ease-out shadow-sm"
           style={{ width: `${clampedPercentage}%` }}
         />
       </div>

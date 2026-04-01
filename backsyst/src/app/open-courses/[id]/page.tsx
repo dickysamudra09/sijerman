@@ -30,6 +30,10 @@ import {
   Link2,
   Download,
   ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  HelpCircle,
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -94,6 +98,18 @@ interface StudentLessonProgress {
   updated_at: string;
 }
 
+interface StudentMaterialProgress {
+  id: string;
+  student_id: string;
+  material_id: string;
+  status: "not_started" | "in_progress" | "completed";
+  viewed_at: string | null;
+  completed_at: string | null;
+  time_spent_seconds: number;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Enrollment {
   id: string;
   access_level: string;
@@ -112,6 +128,9 @@ export default function CourseDetailPage() {
   const [materials, setMaterials] = useState<ModuleMaterial[]>([]);
   const [lessonProgress, setLessonProgress] = useState<
     Record<string, StudentLessonProgress>
+  >({});
+  const [materialProgress, setMaterialProgress] = useState<
+    Record<string, StudentMaterialProgress>
   >({});
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [selectedModuleIndex, setSelectedModuleIndex] = useState(0);
@@ -262,6 +281,26 @@ export default function CourseDetailPage() {
               setLessonProgress(progressMap);
             }
           }
+
+          // Fetch student progress for all materials
+          if (materialsData && materialsData.length > 0) {
+            const { data: materialProgressData } = await supabase
+              .from("student_material_progress")
+              .select("*")
+              .eq("student_id", user.id)
+              .in(
+                "material_id",
+                materialsData.map((m) => m.id)
+              );
+
+            if (materialProgressData) {
+              const progressMap: Record<string, StudentMaterialProgress> = {};
+              materialProgressData.forEach((p) => {
+                progressMap[p.material_id] = p;
+              });
+              setMaterialProgress(progressMap);
+            }
+          }
         }
       } catch (error) {
         console.error("Error fetching course:", error);
@@ -275,58 +314,94 @@ export default function CourseDetailPage() {
 
   // Fetch lessons when module is selected
   useEffect(() => {
+    const controller = new AbortController();
+    
     const fetchModuleLessons = async () => {
       if (!modules[selectedModuleIndex]) return;
+      
+      const moduleId = modules[selectedModuleIndex].id;
 
       try {
+        // Fetch lessons for this module
         const { data: lessonsData, error: lessonsError } = await supabase
           .from("module_lessons")
           .select("*")
-          .eq("module_id", modules[selectedModuleIndex].id)
+          .eq("module_id", moduleId)
           .order("order_index", { ascending: true });
 
         if (lessonsError) throw lessonsError;
-        setLessons(lessonsData || []);
-        setSelectedLessonIndex(0);
+        
+        // Only update if this is still the current module
+        if (modules[selectedModuleIndex]?.id === moduleId) {
+          setLessons(lessonsData || []);
 
-        // Fetch materials for this module
-        const { data: materialsData, error: materialsError } = await supabase
-          .from("module_materials")
-          .select("*")
-          .eq("module_id", modules[selectedModuleIndex].id)
-          .order("order_index", { ascending: true });
+          // Handle "go to last item" marker - if selectedLessonIndex is MAX_SAFE_INTEGER, set to last lesson
+          if (selectedLessonIndex === Number.MAX_SAFE_INTEGER && lessonsData && lessonsData.length > 0) {
+            setSelectedLessonIndex(lessonsData.length - 1);
+          }
 
-        if (materialsError) throw materialsError;
-        setMaterials(materialsData || []);
-        setSelectedMaterialId(null);
-
-        // Fetch student progress for all lessons
-        if (user && lessonsData) {
-          const { data: progressData } = await supabase
-            .from("student_lesson_progress")
+          // Fetch materials for this module
+          const { data: materialsData, error: materialsError } = await supabase
+            .from("module_materials")
             .select("*")
-            .eq("student_id", user.id)
-            .in(
-              "lesson_id",
-              lessonsData.map((l) => l.id)
-            );
+            .eq("module_id", moduleId)
+            .order("order_index", { ascending: true });
 
-          if (progressData) {
-            const progressMap: Record<string, StudentLessonProgress> = {};
-            progressData.forEach((p) => {
-              progressMap[p.lesson_id] = p;
-            });
-            setLessonProgress(progressMap);
+          if (materialsError) throw materialsError;
+          setMaterials(materialsData || []);
+
+          // Fetch student progress for all lessons
+          if (user && lessonsData) {
+            const { data: progressData } = await supabase
+              .from("student_lesson_progress")
+              .select("*")
+              .eq("student_id", user.id)
+              .in(
+                "lesson_id",
+                lessonsData.map((l) => l.id)
+              );
+
+            if (progressData) {
+              const progressMap: Record<string, StudentLessonProgress> = {};
+              progressData.forEach((p) => {
+                progressMap[p.lesson_id] = p;
+              });
+              setLessonProgress(progressMap);
+            }
+          }
+
+          // Fetch student progress for all materials
+          if (user && materialsData) {
+            const { data: materialProgressData } = await supabase
+              .from("student_material_progress")
+              .select("*")
+              .eq("student_id", user.id)
+              .in(
+                "material_id",
+                materialsData.map((m) => m.id)
+              );
+
+            if (materialProgressData) {
+              const progressMap: Record<string, StudentMaterialProgress> = {};
+              materialProgressData.forEach((p) => {
+                progressMap[p.material_id] = p;
+              });
+              setMaterialProgress(progressMap);
+            }
           }
         }
       } catch (error) {
-        console.error("Error fetching lessons:", error);
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error("Error fetching lessons:", error);
+        }
       }
     };
 
-    if (modules.length > 0) {
-      fetchModuleLessons();
-    }
+    fetchModuleLessons();
+
+    return () => {
+      controller.abort();
+    };
   }, [selectedModuleIndex, modules, user]);
 
   // Mark lesson as viewed when selected
@@ -375,6 +450,146 @@ export default function CourseDetailPage() {
     }
   };
 
+  // Mark lesson as completed
+  const markLessonAsCompleted = async (lessonId: string) => {
+    if (!user) return;
+
+    try {
+      const existing = lessonProgress[lessonId];
+
+      if (existing) {
+        await supabase
+          .from("student_lesson_progress")
+          .update({
+            status: "completed",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else {
+        await supabase
+          .from("student_lesson_progress")
+          .insert({
+            student_id: user.id,
+            lesson_id: lessonId,
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            viewed_at: new Date().toISOString(),
+            time_spent_seconds: 0,
+          });
+      }
+
+      // Refresh progress
+      const { data: progressData } = await supabase
+        .from("student_lesson_progress")
+        .select("*")
+        .eq("student_id", user.id)
+        .eq("lesson_id", lessonId)
+        .single();
+
+      if (progressData) {
+        setLessonProgress({
+          ...lessonProgress,
+          [lessonId]: progressData,
+        });
+      }
+    } catch (error) {
+      console.error("Error marking lesson as completed:", error);
+    }
+  };
+
+  // Mark material as viewed
+  const markMaterialAsViewed = async (materialId: string) => {
+    if (!user) return;
+
+    try {
+      const existing = materialProgress[materialId];
+
+      if (existing) {
+        await supabase
+          .from("student_material_progress")
+          .update({
+            status: "in_progress",
+            viewed_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else {
+        await supabase
+          .from("student_material_progress")
+          .insert({
+            student_id: user.id,
+            material_id: materialId,
+            status: "in_progress",
+            viewed_at: new Date().toISOString(),
+            time_spent_seconds: 0,
+          });
+      }
+
+      // Refresh progress
+      const { data: progressData } = await supabase
+        .from("student_material_progress")
+        .select("*")
+        .eq("student_id", user.id)
+        .eq("material_id", materialId)
+        .single();
+
+      if (progressData) {
+        setMaterialProgress({
+          ...materialProgress,
+          [materialId]: progressData,
+        });
+      }
+    } catch (error) {
+      console.error("Error marking material as viewed:", error);
+    }
+  };
+
+  // Mark material as completed
+  const markMaterialAsCompleted = async (materialId: string) => {
+    if (!user) return;
+
+    try {
+      const existing = materialProgress[materialId];
+
+      if (existing) {
+        await supabase
+          .from("student_material_progress")
+          .update({
+            status: "completed",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else {
+        await supabase
+          .from("student_material_progress")
+          .insert({
+            student_id: user.id,
+            material_id: materialId,
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            viewed_at: new Date().toISOString(),
+            time_spent_seconds: 0,
+          });
+      }
+
+      // Refresh progress
+      const { data: progressData } = await supabase
+        .from("student_material_progress")
+        .select("*")
+        .eq("student_id", user.id)
+        .eq("material_id", materialId)
+        .single();
+
+      if (progressData) {
+        setMaterialProgress({
+          ...materialProgress,
+          [materialId]: progressData,
+        });
+      }
+    } catch (error) {
+      console.error("Error marking material as completed:", error);
+    }
+  };
+
   const handleAIFeedback = async () => {
     if (!user || !access) return;
 
@@ -403,6 +618,11 @@ export default function CourseDetailPage() {
     setSelectedModuleIndex(moduleIndex);
     setSelectedLessonIndex(0);
     setSelectedMaterialId(null);
+    // Clear old data immediately when switching modules
+    setLessons([]);
+    setMaterials([]);
+    setLessonProgress({});
+    setMaterialProgress({});
   };
 
   const currentModule = modules[selectedModuleIndex];
@@ -518,16 +738,27 @@ export default function CourseDetailPage() {
           }}
         >
           <div className="p-4 md:p-6 space-y-6">
+            {/* Hide Menu Button - Mobile Only */}
+            <Button
+              onClick={() => setShowSidebar(false)}
+              variant="ghost"
+              className="md:hidden w-full justify-start gap-2"
+              style={{ color: "#6B7280" }}
+            >
+              <Menu className="h-4 w-4" />
+              Hide Menu
+            </Button>
             {/* Progress Summary */}
             <div
-              className="rounded-lg p-4"
+              className="rounded-lg p-4 backdrop-blur-md"
               style={{
-                backgroundColor: "#FFFFFF",
-                border: "1px solid #E5E5E5",
+                backgroundColor: "rgba(255, 255, 255, 0.7)",
+                border: "1px solid rgba(255, 255, 255, 0.3)",
+                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
               }}
             >
               <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="h-5 w-5" style={{ color: "#F5C518" }} />
+                <TrendingUp className="h-5 w-5" style={{ color: "#E8B824" }} />
                 <h4 className="font-bold text-sm" style={{ color: "#1A1A1A" }}>
                   Progress
                 </h4>
@@ -541,21 +772,22 @@ export default function CourseDetailPage() {
 
             {/* Modules & Lessons & Materials List */}
             <div
-              className="rounded-xl"
+              className="rounded-xl overflow-hidden"
               style={{
                 backgroundColor: "#FFFFFF",
                 border: "1px solid #E5E5E5",
               }}
             >
-              <div className="space-y-1 px-3 pb-3 pt-4">
+              <div className="space-y-0">
                 {modules.map((module, moduleIndex) => {
                   const isModuleSelected = moduleIndex === selectedModuleIndex;
                   const isModuleUnlocked = unlockedModules.has(moduleIndex);
                   const isModuleCompleted = moduleIndex < selectedModuleIndex;
+                  const isModuleExpanded = expandedModules.has(moduleIndex);
 
                   return (
-                    <div key={module.id} className="space-y-1">
-                      {/* Module Button - Main Menu */}
+                    <div key={module.id}>
+                      {/* Module Header */}
                       <button
                         onClick={() => {
                           if (isModuleUnlocked) {
@@ -564,123 +796,93 @@ export default function CourseDetailPage() {
                           }
                         }}
                         disabled={!isModuleUnlocked}
-                        className={`w-full text-left px-4 py-3.5 rounded-lg transition-all font-semibold ${
-                          !isModuleUnlocked ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:shadow-md"
-                        }`}
+                        className="w-full text-left px-4 py-3 transition-all flex items-center justify-between"
                         style={{
-                          backgroundColor: isModuleSelected ? "#E8B824" : "#F7F7F7",
+                          backgroundColor: isModuleSelected ? "#E8B824" : "#F9F9F9",
                           color: isModuleSelected ? "#1A1A1A" : "#333333",
-                          border: `2px solid ${isModuleSelected ? "#E8B824" : "transparent"}`,
-                          fontSize: "14px",
-                          fontWeight: isModuleSelected ? "700" : "600",
+                          opacity: !isModuleUnlocked ? 0.5 : 1,
+                          cursor: isModuleUnlocked ? "pointer" : "not-allowed",
+                          borderBottom: "1px solid #E5E5E5",
                         }}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
                           {isModuleCompleted ? (
                             <CheckCircle className="h-5 w-5 flex-shrink-0" style={{ color: "#2E7D32" }} />
                           ) : isModuleUnlocked ? (
-                            <div className="h-5 w-5 rounded-full border-2 flex-shrink-0" style={{ borderColor: "#E8B824" }} />
+                            <div 
+                              className="h-5 w-5 rounded-full flex-shrink-0 border-2" 
+                              style={{ borderColor: isModuleSelected ? "#1A1A1A" : "#E8B824" }} 
+                            />
                           ) : (
                             <Lock className="h-5 w-5 flex-shrink-0" style={{ color: "#CCCCCC" }} />
                           )}
-                          <span className="truncate">{module.title}</span>
+                          <span className="font-semibold truncate text-md">{module.title}</span>
                         </div>
+                        {isModuleUnlocked && (
+                          isModuleExpanded ? (
+                            <ChevronUp className="h-5 w-5 flex-shrink-0 ml-2" style={{ color: isModuleSelected ? "#1A1A1A" : "#666666" }} />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 flex-shrink-0 ml-2" style={{ color: isModuleSelected ? "#1A1A1A" : "#666666" }} />
+                          )
+                        )}
                       </button>
 
-                      {/* Submenu - Lessons & Materials (Show for expanded modules) */}
-                      {expandedModules.has(moduleIndex) && (lessons.length > 0 || materials.length > 0) ? (
-                        <div className="space-y-1">
-                          {/* Lessons Submenu Items */}
+                      {/* Module Content - Lessons & Materials */}
+                      {isModuleExpanded && (lessons.length > 0 || materials.length > 0) && (
+                        <div className="bg-white">
+                          {/* Lessons */}
                           {lessons.map((lesson, lessonIndex) => {
                             const progress = lessonProgress[lesson.id];
-                            const isLessonSelected = lessonIndex === selectedLessonIndex;
-                            const isLessonLocked =
-                              lessonIndex > 0 &&
-                              !lessonProgress[lessons[lessonIndex - 1]?.id]?.completed_at;
-
-                            const getLessonIcon = (type: string) => {
-                              switch (type) {
-                                case "explanation":
-                                  return <Lightbulb className="h-4 w-4 flex-shrink-0" />;
-                                case "vocabulary":
-                                  return <BookMarked className="h-4 w-4 flex-shrink-0" />;
-                                case "dialogue":
-                                  return <MessageCircle className="h-4 w-4 flex-shrink-0" />;
-                                case "reading":
-                                  return <FileText className="h-4 w-4 flex-shrink-0" />;
-                                case "listening":
-                                  return <Headphones className="h-4 w-4 flex-shrink-0" />;
-                                default:
-                                  return <BookOpen className="h-4 w-4 flex-shrink-0" />;
-                              }
-                            };
+                            const isLessonSelected = lessonIndex === selectedLessonIndex && isModuleSelected && activeTab === "lessons";
+                            const isCompleted = !!progress?.completed_at;
 
                             return (
-                                <button
-                                  key={lesson.id}
-                                  onClick={() => {
-                                    if (!isLessonLocked) {
-                                      setSelectedModuleIndex(moduleIndex);
-                                      setSelectedLessonIndex(lessonIndex);
-                                      setSelectedMaterialId(null);
-                                      setActiveTab("lessons");
-                                      markLessonAsViewed(lesson.id);
-                                      setShowSidebar(false);
-                                    }
-                                  }}
-                                  disabled={isLessonLocked}
-                                  className={`w-full text-left py-2.5 rounded-lg transition-all flex items-center gap-3 ${
-                                    isLessonLocked
-                                      ? "cursor-not-allowed opacity-40"
-                                      : "cursor-pointer hover:bg-yellow-50"
-                                  }`}
-                                  style={{
-                                    paddingLeft: "3.5rem",
-                                    backgroundColor: isLessonSelected && isModuleSelected
-                                      ? "#FFF9E6"
-                                      : progress?.completed_at
-                                      ? "#F0F9FF"
-                                      : "transparent",
-                                    border: isLessonSelected && isModuleSelected ? "1.5px solid #E8B824" : "1px solid transparent",
-                                    fontWeight: isLessonSelected && isModuleSelected ? "600" : "500",
-                                    fontSize: "13px",
-                                    color: isLessonLocked ? "#CCCCCC" : "#333333",
-                                  }}
-                                >
-                                  {isLessonLocked ? (
-                                    <Lock className="h-4 w-4 flex-shrink-0" style={{ color: "#CCCCCC" }} />
-                                  ) : progress?.completed_at ? (
+                              <button
+                                key={lesson.id}
+                                onClick={() => {
+                                  setSelectedModuleIndex(moduleIndex);
+                                  setSelectedLessonIndex(lessonIndex);
+                                  setSelectedMaterialId(null);
+                                  setActiveTab("lessons");
+                                  markLessonAsViewed(lesson.id);
+                                  setShowSidebar(false);
+                                }}
+                                className="w-full text-left px-4 py-3 transition-all border-l-4 flex items-center justify-between hover:bg-yellow-50/50"
+                                style={{
+                                  backgroundColor: isLessonSelected ? "#FFF9E6" : isCompleted ? "#F0F9FF" : "transparent",
+                                  borderLeftColor: isLessonSelected ? "#E8B824" : "transparent",
+                                  borderBottom: "1px solid #F0F0F0",
+                                }}
+                              >
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  {isCompleted ? (
                                     <CheckCircle className="h-4 w-4 flex-shrink-0" style={{ color: "#2E7D32" }} />
-                                  ) : isLessonSelected && isModuleSelected ? (
+                                  ) : isLessonSelected ? (
                                     <div className="h-4 w-4 rounded-full flex-shrink-0" style={{ backgroundColor: "#E8B824" }} />
                                   ) : (
-                                    getLessonIcon(lesson.lesson_type)
+                                    <Play className="h-4 w-4 flex-shrink-0" style={{ color: "#6B7280" }} />
                                   )}
-                                  <span className="truncate flex-1">{lesson.title}</span>
-                                </button>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-gray-800 truncate">{lesson.title}</div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                                  {isCompleted && (
+                                    <span className="text-xs font-medium" style={{ color: "#2E7D32", whiteSpace: "nowrap" }}>
+                                      Completed
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
                             );
                           })}
 
-                          {/* Materials Submenu Items */}
+                          {/* Materials */}
                           {materials.map((material) => {
-                            const isMaterialSelected = selectedMaterialId === material.id;
-
-                            const getMaterialIcon = (type: string) => {
-                              switch (type) {
-                                case "video":
-                                  return <Video className="h-4 w-4 flex-shrink-0" />;
-                                case "audio":
-                                  return <Headphones className="h-4 w-4 flex-shrink-0" />;
-                                case "pdf":
-                                  return <FileText className="h-4 w-4 flex-shrink-0" />;
-                                case "image":
-                                  return <Image className="h-4 w-4 flex-shrink-0" />;
-                                case "resource":
-                                  return <Link2 className="h-4 w-4 flex-shrink-0" />;
-                                default:
-                                  return <BookOpen className="h-4 w-4 flex-shrink-0" />;
-                              }
-                            };
+                            const isMaterialSelected = selectedMaterialId === material.id && isModuleSelected && activeTab === "materials";
+                            const progress = materialProgress[material.id];
+                            const isCompleted = !!progress?.completed_at;
+                            const durationMinutes = material.duration_seconds ? Math.round(material.duration_seconds / 60) : null;
 
                             return (
                               <button
@@ -689,37 +891,59 @@ export default function CourseDetailPage() {
                                   setSelectedModuleIndex(moduleIndex);
                                   setSelectedMaterialId(material.id);
                                   setActiveTab("materials");
+                                  markMaterialAsViewed(material.id);
                                   setShowSidebar(false);
                                 }}
-                                className="w-full text-left py-2.5 rounded-lg transition-all flex items-center gap-3 cursor-pointer hover:bg-orange-50"
+                                className="w-full text-left px-4 py-3 transition-all border-l-4 flex items-center justify-between hover:bg-orange-50/50"
                                 style={{
-                                  paddingLeft: "3.5rem",
-                                  backgroundColor: isMaterialSelected && isModuleSelected
-                                    ? "#FFF4E6"
-                                    : "transparent",
-                                  border: isMaterialSelected && isModuleSelected ? "1.5px solid #E87835" : "1px solid transparent",
-                                  fontWeight: isMaterialSelected && isModuleSelected ? "600" : "500",
-                                  fontSize: "13px",
-                                  color: "#333333",
+                                  backgroundColor: isMaterialSelected ? "#FFF4E6" : isCompleted ? "#F0F9FF" : "transparent",
+                                  borderLeftColor: isMaterialSelected ? "#E87835" : "transparent",
+                                  borderBottom: "1px solid #F0F0F0",
                                 }}
                               >
-                                <span style={{ color: "#E87835" }}>
-                                  {getMaterialIcon(material.material_type)}
-                                </span>
-                                <span className="truncate flex-1 text-left">{material.title}</span>
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  {isCompleted ? (
+                                    <CheckCircle className="h-4 w-4 flex-shrink-0" style={{ color: "#2E7D32" }} />
+                                  ) : isMaterialSelected ? (
+                                    <div className="h-4 w-4 rounded-full flex-shrink-0" style={{ backgroundColor: "#E87835" }} />
+                                  ) : (
+                                    <span style={{ color: "#E87835" }}>
+                                      {material.material_type === "video" && <Video className="h-4 w-4 flex-shrink-0" />}
+                                      {material.material_type === "audio" && <Headphones className="h-4 w-4 flex-shrink-0" />}
+                                      {material.material_type === "pdf" && <FileText className="h-4 w-4 flex-shrink-0" />}
+                                      {material.material_type === "image" && <Image className="h-4 w-4 flex-shrink-0" />}
+                                      {material.material_type === "resource" && <Link2 className="h-4 w-4 flex-shrink-0" />}
+                                    </span>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-gray-800 truncate">{material.title}</div>
+                                    {durationMinutes && (
+                                      <div className="text-xs" style={{ color: "#999999" }}>
+                                        {durationMinutes} Minutes
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                                  {isCompleted && (
+                                    <span className="text-xs font-medium" style={{ color: "#2E7D32", whiteSpace: "nowrap" }}>
+                                      Completed
+                                    </span>
+                                  )}
+                                </div>
                               </button>
                             );
                           })}
                         </div>
-                      ) : null}
+                      )}
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            {/* Access Badge */}
-            {access.access === "limited" && (
+            {/* Access Badge - TODO: Enable when AI feedback is ready */}
+            {false && access.access === "limited" && (
               <div
                 className="rounded-lg p-3 border-2"
                 style={{
@@ -748,7 +972,7 @@ export default function CourseDetailPage() {
 
         {/* Main Content - Full width, but with margin-left on desktop for fixed sidebar */}
         <main 
-          className="flex-1 w-full overflow-y-auto main-with-fixed-sidebar pb-20 pt-24"
+          className="flex-1 w-full overflow-y-auto main-with-fixed-sidebar pb-2 pt-24"
         >
           <div className="w-full px-0 md:px-0 py-6 md:py-8 space-y-6">
             <div className="max-w-full mx-auto px-2 md:px-4">
@@ -887,6 +1111,17 @@ export default function CourseDetailPage() {
                                 >
                                   {currentMaterial.material_type}
                                 </span>
+                                {materialProgress[currentMaterial.id]?.completed_at && (
+                                  <span
+                                    className="text-xs uppercase tracking-wider font-bold px-2 py-1 rounded-lg"
+                                    style={{
+                                      color: "#2E7D32",
+                                      backgroundColor: "#E8F5E9",
+                                    }}
+                                  >
+                                    Selesai
+                                  </span>
+                                )}
                               </div>
                               <h2
                                 className="text-3xl font-bold mt-2 mb-2"
@@ -1110,8 +1345,8 @@ export default function CourseDetailPage() {
                 </>
               )}
 
-              {/* AI Feedback Button (if access allows) */}
-              {access.access === "limited" && (
+              {/* AI Feedback Button - TODO: Enable when AI feedback is ready */}
+              {false && access.access === "limited" && (
                   <div
                     className="p-4 rounded-lg mb-6 border-2"
                     style={{
@@ -1187,8 +1422,16 @@ export default function CourseDetailPage() {
                     // Go to previous lesson
                     setSelectedLessonIndex(selectedLessonIndex - 1);
                   } else if (selectedModuleIndex > 0) {
-                    // Go to previous module
-                    setSelectedModuleIndex(selectedModuleIndex - 1);
+                    // Go to previous module - use marker to go to last item after fetch
+                    const newModuleIndex = selectedModuleIndex - 1;
+                    setExpandedModules(new Set([newModuleIndex]));
+                    setSelectedModuleIndex(newModuleIndex);
+                    setSelectedLessonIndex(Number.MAX_SAFE_INTEGER); // Marker for "go to last item"
+                    setSelectedMaterialId(null);
+                    setLessons([]);
+                    setMaterials([]);
+                    setLessonProgress({});
+                    setMaterialProgress({});
                   }
                 } else if (activeTab === "materials") {
                   const currentIndex = materials.findIndex(m => m.id === selectedMaterialId);
@@ -1200,8 +1443,17 @@ export default function CourseDetailPage() {
                     setSelectedLessonIndex(lessons.length - 1);
                     setActiveTab("lessons");
                   } else if (selectedModuleIndex > 0) {
-                    // Go to previous module
-                    setSelectedModuleIndex(selectedModuleIndex - 1);
+                    // Go to previous module - use marker to go to last item after fetch
+                    const newModuleIndex = selectedModuleIndex - 1;
+                    setExpandedModules(new Set([newModuleIndex]));
+                    setSelectedModuleIndex(newModuleIndex);
+                    setSelectedMaterialId(null);
+                    setSelectedLessonIndex(Number.MAX_SAFE_INTEGER); // Marker for "go to last item"
+                    setActiveTab("lessons"); // Switch to lessons when going back to previous module
+                    setLessons([]);
+                    setMaterials([]);
+                    setLessonProgress({});
+                    setMaterialProgress({});
                   }
                 }
               }}
@@ -1225,6 +1477,11 @@ export default function CourseDetailPage() {
                 onClick={() => {
                   // Handle Lanjutkan with unified lesson/material logic
                   if (activeTab === "lessons") {
+                    // Mark current lesson as completed before moving
+                    if (currentLesson) {
+                      markLessonAsCompleted(currentLesson.id);
+                    }
+                    
                     if (selectedLessonIndex < lessons.length - 1) {
                       // Go to next lesson
                       setSelectedLessonIndex(selectedLessonIndex + 1);
@@ -1234,22 +1491,45 @@ export default function CourseDetailPage() {
                       setActiveTab("materials");
                     } else if (selectedModuleIndex < modules.length - 1) {
                       // Go to next module
+                      const newModuleIndex = selectedModuleIndex + 1;
                       const newUnlockedModules = new Set(unlockedModules);
-                      newUnlockedModules.add(selectedModuleIndex + 1);
+                      newUnlockedModules.add(newModuleIndex);
                       setUnlockedModules(newUnlockedModules);
-                      setSelectedModuleIndex(selectedModuleIndex + 1);
+                      // Expand the new module and clear old data
+                      setExpandedModules(new Set([newModuleIndex]));
+                      setSelectedModuleIndex(newModuleIndex);
+                      setSelectedLessonIndex(0);
+                      setSelectedMaterialId(null);
+                      setLessons([]);
+                      setMaterials([]);
+                      setLessonProgress({});
+                      setMaterialProgress({});
                     }
                   } else if (activeTab === "materials") {
+                    // Mark current material as completed before moving
+                    if (currentMaterial) {
+                      markMaterialAsCompleted(currentMaterial.id);
+                    }
+                    
                     const currentIndex = materials.findIndex(m => m.id === selectedMaterialId);
                     if (currentIndex < materials.length - 1) {
                       // Go to next material
                       setSelectedMaterialId(materials[currentIndex + 1].id);
                     } else if (selectedModuleIndex < modules.length - 1) {
                       // Go to next module
+                      const newModuleIndex = selectedModuleIndex + 1;
                       const newUnlockedModules = new Set(unlockedModules);
-                      newUnlockedModules.add(selectedModuleIndex + 1);
+                      newUnlockedModules.add(newModuleIndex);
                       setUnlockedModules(newUnlockedModules);
-                      setSelectedModuleIndex(selectedModuleIndex + 1);
+                      // Expand the new module and clear old data
+                      setExpandedModules(new Set([newModuleIndex]));
+                      setSelectedModuleIndex(newModuleIndex);
+                      setSelectedLessonIndex(0);
+                      setSelectedMaterialId(null);
+                      setLessons([]);
+                      setMaterials([]);
+                      setLessonProgress({});
+                      setMaterialProgress({});
                     }
                   }
                 }}
