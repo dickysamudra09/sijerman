@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 
 interface CourseSyllabusProps {
   courseTitle: string;
@@ -10,6 +12,7 @@ interface CourseSyllabusProps {
   estimatedHours?: number;
   progressPercentage?: number;
   teacherName?: string;
+  courseId?: string;
 }
 
 export const CourseSyllabus: React.FC<CourseSyllabusProps> = ({
@@ -20,6 +23,7 @@ export const CourseSyllabus: React.FC<CourseSyllabusProps> = ({
   estimatedHours = 0,
   progressPercentage = 0,
   teacherName = 'Instruktur',
+  courseId = '',
 }) => {
   const outcomes = learningOutcomes
     .split('|')
@@ -27,59 +31,42 @@ export const CourseSyllabus: React.FC<CourseSyllabusProps> = ({
     .filter((outcome) => outcome.length > 0);
 
   return (
-    <div className="w-full bg-gradient-to-br from-blue-50 to-white rounded-lg border border-blue-100 p-6 md:p-8 shadow-sm mb-4">
-      {/* Header Section */}
-      <div className="mb-8">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{courseTitle}</h1>
-            <p className="text-sm text-gray-600">Diajar oleh <span className="font-semibold">{teacherName}</span></p>
-          </div>
-        </div>
-
-        {/* Course Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
-          <div className="bg-white rounded-lg p-4 border border-gray-100">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Total Modul</p>
-            <p className="text-2xl font-bold text-gray-900">{totalModules}</p>
-          </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-100">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Waktu Estimasi</p>
-            <p className="text-2xl font-bold text-gray-900">{estimatedHours}j</p>
-          </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-100">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Progress Mu</p>
-            <p className="text-2xl font-bold text-[#F5C518]">{progressPercentage}%</p>
-          </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-100">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Status</p>
-            <p className="text-lg font-bold text-blue-600">Sedang Belajar</p>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-          <div
-            className="h-full bg-[#F5C518] rounded-full transition-all duration-300 ease-out"
-            style={{ width: `${progressPercentage}%` }}
-          />
-        </div>
+    <div className="w-full mb-4">
+      {/* Breadcrumbs */}
+      <div className="flex items-center gap-2 mb-6 px-2 md:px-0">
+        <Link href="/open-courses" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+          Kursus
+        </Link>
+        <ChevronRight className="h-4 w-4 text-gray-400" />
+        <span className="text-sm text-gray-900 font-medium truncate max-w-xs">{courseTitle}</span>
       </div>
 
-      {/* Course Description */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-3">Deskripsi Kursus</h2>
-        <p className="text-gray-700 leading-relaxed">{courseDescription}</p>
+      {/* Progress Card */}
+      <div className="w-full bg-white rounded-lg border border-gray-100 p-6 md:p-8 shadow-sm">
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-gray-900">Progress Pembelajaran</p>
+              <p className="text-lg font-bold" style={{ color: "#14B8A6" }}>{progressPercentage}%</p>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${progressPercentage}%`, backgroundColor: "#14B8A6" }}
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Learning Outcomes */}
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Apa Yang Akan Kamu Pelajari</h2>
+      <div className="w-full bg-white rounded-lg border border-gray-100 p-6 md:p-8 shadow-sm mt-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Apa Yang Akan Kamu Pelajari</h2>
         {outcomes.length > 0 ? (
           <ul className="space-y-3">
             {outcomes.map((outcome, index) => (
               <li key={index} className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#F5C518] text-[#2F3E75] flex items-center justify-center text-sm font-semibold mt-0.5">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-semibold mt-0.5" style={{ backgroundColor: "#14B8A6" }}>
                   ✓
                 </div>
                 <span className="text-gray-700">{outcome}</span>

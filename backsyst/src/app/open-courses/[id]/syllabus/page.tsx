@@ -8,7 +8,7 @@ import { CourseSyllabusPreview } from '@/components/CourseSyllabusPreview';
 import { ModuleSyllabusItem } from '@/components/ModuleSyllabusItem';
 import { Button } from '@/components/ui/button';
 import UserMenuDropdown from '@/components/UserMenuDropdown';
-import { ArrowLeft, BookOpen } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface Course {
@@ -176,18 +176,18 @@ export default function CourseSyllabusPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F5C518]"></div>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FFFFFF" }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: "#14B8A6" }}></div>
       </div>
     );
   }
 
   if (!course) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FFFFFF" }}>
         <div className="text-center">
-          <p className="text-lg text-gray-700 mb-4">Kursus tidak ditemukan</p>
-          <Button onClick={() => router.push('/open-courses')}>
+          <p className="text-lg" style={{ color: "#1A1A1A" }}>Kursus tidak ditemukan</p>
+          <Button onClick={() => router.push('/open-courses')} className="mt-4">
             Kembali ke Daftar Kursus
           </Button>
         </div>
@@ -205,56 +205,40 @@ export default function CourseSyllabusPage() {
   const outcomes = aggregatedOutcomes.split('|').filter((o) => o.trim().length > 0);
 
   return (
-    <div className="min-h-screen syllabus-page-bg relative overflow-hidden">
-      {/* Floating Blobs */}
-      <div className="blob-left"></div>
-      <div className="blob-right"></div>
-      <div className="blob-center"></div>
-
+    <div className="min-h-screen" style={{ backgroundColor: "#FFFFFF" }}>
       {/* Header */}
       <header
-        className="fixed top-0 left-0 right-0 z-30 border-b bg-white w-full"
+        className="fixed top-0 left-0 right-0 z-30 border-b w-full"
         style={{
-          backgroundColor: 'rgba(13, 13, 13, 0.95)',
-          backdropFilter: 'blur(10px)',
-          borderBottomColor: '#333333',
+          backgroundColor: "rgba(13, 13, 13, 0.90)",
+          backdropFilter: "blur(10px)",
+          borderBottomColor: "#333333",
         }}
       >
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
             <img src="/img/1.png" alt="Logo" className="h-12 w-auto" />
             <div>
-              <h1 className="text-xl font-bold text-[#F5C518]">Si Jerman</h1>
-              <p className="text-xs uppercase tracking-wider text-white">Learning Platform</p>
+              <h1 className="text-xl font-bold" style={{ color: "#E8B824" }}>Si Jerman</h1>
+              <p className="text-xs uppercase tracking-wider" style={{ color: "#FFFFFC" }}>Learning Platform</p>
             </div>
           </Link>
 
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => router.push('/open-courses')}
-              className="flex items-center gap-2 text-white"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Kembali
-            </Button>
-
-            <UserMenuDropdown
-              user={user}
-              onLogout={async () => {
-                await supabase.auth.signOut();
-                router.push('/auth/login');
-              }}
-              onNavigate={router.push}
-            />
-          </div>
+          <UserMenuDropdown
+            user={user}
+            onLogout={async () => {
+              await supabase.auth.signOut();
+              router.push('/auth/login');
+            }}
+            onNavigate={router.push}
+          />
         </div>
       </header>
 
       {/* Main Content */}
       <main className="w-full relative z-10 pt-28">
         {/* Course Overview - Full Width Section */}
-        <div className="w-full bg-white border-b border-gray-100">
+        <div className="w-full" style={{ backgroundColor: "#FFFFFF", borderBottom: "1px solid #E2E8F0" }}>
           <div className="max-w-7xl mx-auto px-4 py-12">
             <CourseSyllabusPreview
               courseTitle={course.title}
@@ -264,21 +248,22 @@ export default function CourseSyllabusPage() {
               totalModules={modules.length}
               estimatedHours={Math.ceil(totalDuration / 60)}
               learningOutcomes={aggregatedOutcomes}
+              courseId={courseId}
             />
           </div>
         </div>
 
         {/* Syllabus Section - Full Width */}
-        <div className="w-full bg-white">
+        <div className="w-full" style={{ backgroundColor: "#FFFFFF" }}>
           <div className="max-w-7xl mx-auto px-4 py-12 space-y-6">
-          {/* Section Header with Gradient */}
+          {/* Section Header */}
           <div className="flex items-center gap-4 mb-8">
-            <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 shadow-lg">
-              <BookOpen className="h-8 w-8 text-white" />
+            <div className="p-3 rounded-lg" style={{ backgroundColor: "#E0F2FE" }}>
+              <BookOpen className="h-6 w-6" style={{ color: "#0F766E" }} />
             </div>
             <div>
-              <h2 className="text-4xl font-black text-gray-900">Daftar Silabus</h2>
-              <p className="text-gray-600 mt-1">{modules.length} modul pembelajaran untuk Anda</p>
+              <h2 className="text-3xl font-bold" style={{ color: "#1A1A1A" }}>Daftar Modul</h2>
+              <p className="text-sm mt-1" style={{ color: "#64748B" }}>{modules.length} modul pembelajaran untuk Anda</p>
             </div>
           </div>
 
@@ -300,18 +285,18 @@ export default function CourseSyllabusPage() {
         </div>
 
         {/* CTA Section - Sticky */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-2xl z-20">
-          <div className="container mx-auto px-4 py-4 max-w-7xl flex items-center justify-between gap-4 mx-auto">
+        <div className="fixed bottom-0 left-0 right-0 shadow-2xl z-20" style={{ backgroundColor: "rgba(255, 255, 255, 0.95)", backdropFilter: "blur(10px)", borderTop: "1px solid #E2E8F0" }}>
+          <div className="container mx-auto px-4 py-4 max-w-7xl flex items-center justify-between gap-4">
             <div>
               {enrollment ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                  <p className="text-sm font-semibold text-emerald-700">✓ Sudah terdaftar di kursus ini</p>
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#14B8A6" }}></div>
+                  <p className="text-sm font-semibold" style={{ color: "#0F766E" }}>✓ Sudah terdaftar di kursus ini</p>
                 </div>
               ) : user ? (
-                <p className="text-sm font-semibold text-gray-700">Siap untuk memulai belajar?</p>
+                <p className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>Siap untuk memulai belajar?</p>
               ) : (
-                <p className="text-sm font-semibold text-gray-700">Login terlebih dahulu untuk mendaftar</p>
+                <p className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>Login terlebih dahulu untuk mendaftar</p>
               )}
             </div>
 
@@ -320,7 +305,8 @@ export default function CourseSyllabusPage() {
                 <Button
                   variant="outline"
                   onClick={handlePreview}
-                  className="h-10 px-6 font-semibold border-2 hover:bg-gray-50 transition-all"
+                  className="h-10 px-6 font-semibold transition-all"
+                  style={{ borderColor: "#E2E8F0", color: "#64748B" }}
                 >
                   👁️ Preview Gratis
                 </Button>
@@ -329,12 +315,10 @@ export default function CourseSyllabusPage() {
               <Button
                 onClick={handleEnroll}
                 disabled={isEnrolling}
-                className="h-10 px-8 font-bold rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                className="h-10 px-8 font-semibold rounded-lg transition-all"
                 style={{
-                  background: enrollment 
-                    ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)' 
-                    : 'linear-gradient(135deg, #F5C518 0%, #F59E0B 100%)',
-                  color: enrollment ? '#FFFFFF' : '#1A1A1A',
+                  backgroundColor: enrollment ? "#14B8A6" : "#F59E0B",
+                  color: enrollment ? "#FFFFFF" : "#FFFFFF",
                 }}
               >
                 {isEnrolling

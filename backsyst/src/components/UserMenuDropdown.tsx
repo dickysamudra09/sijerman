@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { User, ChevronDown, Home, BookOpen, Globe, LogOut } from "lucide-react";
+import { User, ChevronDown, Home, BookOpen, Globe, LogOut, Settings } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 interface UserMenuDropdownProps {
@@ -33,48 +33,71 @@ export default function UserMenuDropdown({ user, onLogout, onNavigate }: UserMen
   if (!user) return null;
 
   const displayName = user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
+  const initials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 
   return (
     <div className="relative">
       <button
         ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="font-semibold flex items-center gap-2 px-3 py-2 rounded-md transition-colors hover:bg-gray-700"
+        className="flex items-center justify-center h-12 w-12 rounded-lg transition-colors hover:bg-gray-700"
         style={{ color: "#FFFFFC" }}
+        title="Menu Profil"
       >
-        {displayName}
-        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <div className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold" style={{ backgroundColor: "#14B8A6", color: "#FFFFFF" }}>
+          {initials}
+        </div>
       </button>
 
       {isOpen && (
         <div
           ref={menuRef}
-          className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1"
+          className="absolute right-0 mt-2 w-56 rounded-lg shadow-lg py-1"
           style={{
             backgroundColor: "#FFFFFF",
-            border: "1px solid #E5E5E5",
+            border: "1px solid #E2E8F0",
             zIndex: 99999,
             top: "100%",
             marginTop: "8px"
           }}
         >
+          {/* User Info Header */}
           <div
-            className="px-4 py-2 text-sm font-medium border-b"
-            style={{ color: "#1A1A1A", borderColor: "#E5E5E5" }}
+            className="px-4 py-3 border-b"
+            style={{ color: "#1A1A1A", borderColor: "#E2E8F0" }}
           >
-            {displayName}
+            <p className="text-sm font-semibold">{displayName}</p>
+            <p className="text-xs" style={{ color: "#64748B" }}>{user.email}</p>
           </div>
+
+          {/* Navigation Items */}
+          <button
+            onClick={() => {
+              onNavigate("/");
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors flex items-center gap-3"
+            style={{ color: "#1A1A1A" }}
+          >
+            <Home className="h-4 w-4" style={{ color: "#0F766E" }} />
+            <span>Beranda</span>
+          </button>
 
           <button
             onClick={() => {
               onNavigate("/home/teacher?tab=my-courses");
               setIsOpen(false);
             }}
-            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors flex items-center gap-3"
             style={{ color: "#1A1A1A" }}
           >
-            <BookOpen className="h-4 w-4" />
-            My Courses
+            <BookOpen className="h-4 w-4" style={{ color: "#14B8A6" }} />
+            <span>Kursus Saya</span>
           </button>
 
           <button
@@ -82,25 +105,27 @@ export default function UserMenuDropdown({ user, onLogout, onNavigate }: UserMen
               onNavigate("/open-courses");
               setIsOpen(false);
             }}
-            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors flex items-center gap-3"
             style={{ color: "#1A1A1A" }}
           >
-            <Globe className="h-4 w-4" />
-            Open Courses
+            <Globe className="h-4 w-4" style={{ color: "#F59E0B" }} />
+            <span>Jelajahi Kursus</span>
           </button>
 
-          <div style={{ borderColor: "#E5E5E5" }} className="border-t my-1"></div>
+          {/* Divider */}
+          <div style={{ borderColor: "#E2E8F0" }} className="border-t my-1"></div>
 
+          {/* Logout */}
           <button
             onClick={() => {
               onLogout();
               setIsOpen(false);
             }}
-            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
+            className="w-full text-left px-4 py-2.5 text-sm hover:bg-red-50 transition-colors flex items-center gap-3"
             style={{ color: "#DC2626" }}
           >
             <LogOut className="h-4 w-4" />
-            Logout
+            <span>Keluar</span>
           </button>
         </div>
       )}

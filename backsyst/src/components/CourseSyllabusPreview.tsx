@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { WarmProgressBar } from './WarmProgressBar';
+import Link from 'next/link';
 import { BookOpen, Clock, Layers, Zap } from 'lucide-react';
 
 interface CourseSyllabusPreviewProps {
@@ -12,6 +12,7 @@ interface CourseSyllabusPreviewProps {
   totalModules: number;
   estimatedHours: number;
   learningOutcomes: string;
+  courseId?: string;
 }
 
 export const CourseSyllabusPreview: React.FC<CourseSyllabusPreviewProps> = ({
@@ -22,6 +23,7 @@ export const CourseSyllabusPreview: React.FC<CourseSyllabusPreviewProps> = ({
   totalModules,
   estimatedHours,
   learningOutcomes,
+  courseId = '',
 }) => {
   const outcomes = learningOutcomes
     .split('|')
@@ -35,83 +37,83 @@ export const CourseSyllabusPreview: React.FC<CourseSyllabusPreviewProps> = ({
 
   return (
     <div className="w-full space-y-6">
-      {/* Hero Section with White Background */}
-      <div className="relative overflow-hidden rounded-2xl p-8 md:p-12 shadow-lg bg-white border-2 border-gray-100">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden rounded-lg p-8 md:p-10" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0" }}>
         {/* Content */}
         <div className="relative z-10">
           <div className="mb-6">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-xs font-bold px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs font-bold px-3 py-1 rounded-full" style={{ backgroundColor: "#EFF6FF", color: "#0F766E" }}>
                 Level {classLevel}
               </span>
-              <span className="text-xs font-bold px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white">
+              <span className="text-xs font-bold px-3 py-1 rounded-full" style={{ backgroundColor: "#FFFBEB", color: "#B45309" }}>
                 {totalModules} Modul
               </span>
             </div>
             
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-3 leading-tight">
+            <h1 className="text-4xl md:text-5xl font-bold mb-3 leading-tight" style={{ color: "#1A1A1A" }}>
               {courseTitle}
             </h1>
             
-            <p className="text-gray-700 text-lg">
-              Diajar oleh <span className="font-semibold text-gray-900">{teacherName}</span>
+            <p style={{ color: "#64748B" }}>
+              Diajar oleh <span className="font-semibold" style={{ color: "#1A1A1A" }}>{teacherName}</span>
             </p>
           </div>
 
-          <p className="text-gray-700 leading-relaxed mb-8 text-lg">
+          <p className="leading-relaxed mb-8 text-base" style={{ color: "#4A4A4A" }}>
             {courseDescription}
           </p>
 
-          {/* Stats Grid - Enhanced with Gradients */}
+          {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white shadow-md hover:shadow-lg transition-all hover:scale-105">
+            <div className="rounded-lg p-4" style={{ backgroundColor: "#F0FAFB", border: "1px solid #E2E8F0" }}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200">
-                  <Layers className="h-5 w-5 text-blue-600" />
+                <div className="p-2 rounded-lg" style={{ backgroundColor: "#EFF6FF" }}>
+                  <Layers className="h-5 w-5" style={{ color: "#0F766E" }} />
                 </div>
-                <p className="text-xs text-gray-600 uppercase tracking-wide font-semibold">Total Modul</p>
+                <p className="text-xs uppercase tracking-wide font-semibold" style={{ color: "#64748B" }}>Total Modul</p>
               </div>
-              <p className="text-3xl font-black text-gray-900">{totalModules}</p>
+              <p className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>{totalModules}</p>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white shadow-md hover:shadow-lg transition-all hover:scale-105">
+            <div className="rounded-lg p-4" style={{ backgroundColor: "#FFFBEB", border: "1px solid #FECACA" }}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-orange-100 to-amber-200">
-                  <Clock className="h-5 w-5 text-orange-600" />
+                <div className="p-2 rounded-lg" style={{ backgroundColor: "#FEF3C7" }}>
+                  <Clock className="h-5 w-5" style={{ color: "#B45309" }} />
                 </div>
-                <p className="text-xs text-gray-600 uppercase tracking-wide font-semibold">Durasi</p>
+                <p className="text-xs uppercase tracking-wide font-semibold" style={{ color: "#64748B" }}>Durasi</p>
               </div>
-              <p className="text-3xl font-black text-gray-900">{estimatedHours}h</p>
+              <p className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>{estimatedHours}h</p>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white shadow-md hover:shadow-lg transition-all hover:scale-105">
+            <div className="rounded-lg p-4" style={{ backgroundColor: "#F0FAFB", border: "1px solid #E2E8F0" }}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-purple-100 to-pink-200">
-                  <BookOpen className="h-5 w-5 text-purple-600" />
+                <div className="p-2 rounded-lg" style={{ backgroundColor: "#EFF6FF" }}>
+                  <BookOpen className="h-5 w-5" style={{ color: "#0F766E" }} />
                 </div>
-                <p className="text-xs text-gray-600 uppercase tracking-wide font-semibold">Capaian</p>
+                <p className="text-xs uppercase tracking-wide font-semibold" style={{ color: "#64748B" }}>Capaian</p>
               </div>
-              <p className="text-3xl font-black text-gray-900">{outcomes.length}</p>
+              <p className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>{outcomes.length}</p>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white shadow-md hover:shadow-lg transition-all hover:scale-105">
+            <div className="rounded-lg p-4" style={{ backgroundColor: "#F0FAFB", border: "1px solid #E2E8F0" }}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-100 to-green-200">
-                  <Zap className="h-5 w-5 text-emerald-600" />
+                <div className="p-2 rounded-lg" style={{ backgroundColor: "#EFF6FF" }}>
+                  <Zap className="h-5 w-5" style={{ color: "#0F766E" }} />
                 </div>
-                <p className="text-xs text-gray-600 uppercase tracking-wide font-semibold">Status</p>
+                <p className="text-xs uppercase tracking-wide font-semibold" style={{ color: "#64748B" }}>Status</p>
               </div>
-              <p className="text-sm font-black text-emerald-600">Siap Mulai</p>
+              <p className="text-sm font-semibold" style={{ color: "#0F766E" }}>Siap Mulai</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Learning Outcomes Section */}
-      <div className="rounded-2xl border-2 border-gradient bg-white p-8 shadow-md">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-          <div className="p-3 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100">
-            <BookOpen className="h-6 w-6 text-gradient-to-r from-blue-600 to-purple-600" />
+      <div className="rounded-lg p-8" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0" }}>
+        <h2 className="text-2xl font-bold mb-6 flex items-center gap-3" style={{ color: "#1A1A1A" }}>
+          <div className="p-2 rounded-lg" style={{ backgroundColor: "#EFF6FF" }}>
+            <BookOpen className="h-6 w-6" style={{ color: "#0F766E" }} />
           </div>
           Capaian Pembelajaran Kursus
         </h2>
@@ -121,17 +123,18 @@ export const CourseSyllabusPreview: React.FC<CourseSyllabusPreviewProps> = ({
             {outcomes.map((outcome, index) => (
               <div
                 key={index}
-                className="flex items-start gap-3 p-3 rounded-lg hover:bg-blue-50 transition-colors"
+                className="flex items-start gap-3 p-3 rounded-lg transition-colors"
+                style={{ backgroundColor: "#F0FAFB" }}
               >
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-white flex items-center justify-center text-sm font-bold mt-0.5">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold mt-0.5" style={{ backgroundColor: "#14B8A6" }}>
                   ✓
                 </div>
-                <span className="text-gray-700 flex-1">{outcome}</span>
+                <span style={{ color: "#1A1A1A" }} className="flex-1">{outcome}</span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-gray-500 italic">Belum ada learning outcomes yang ditentukan.</p>
+          <p style={{ color: "#64748B" }} className="italic">Belum ada learning outcomes yang ditentukan.</p>
         )}
       </div>
     </div>

@@ -12,14 +12,14 @@ import { CourseSyllabus } from "@/components/CourseSyllabus";
 import { ModuleTimeline, type ModuleItem } from "@/components/ModuleTimeline";
 import { WarmProgressBar } from "@/components/WarmProgressBar";
 import {
-  ArrowLeft,
-  Lock,
   BookOpen,
+  Lock,
   TrendingUp,
   Zap,
   CheckCircle,
   Menu,
   X,
+  Home,
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -221,34 +221,16 @@ export default function CourseDetailPage() {
       >
         <div className="container mx-auto px-4 py-4 overflow-visible" style={{ overflow: 'visible' }}>
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <img
-                src="/img/1.png"
-                alt="Logo"
-                className="h-12 w-auto"
-              />
-              <div>
-                <h1 className="text-xl font-bold" style={{ color: "#E8B824" }}>Si Jerman</h1>
-                <p className="text-xs uppercase tracking-wider" style={{ color: "#FFFFFC" }}>Learning Platform</p>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#EFF6FF" }}>
+                <BookOpen className="h-6 w-6" style={{ color: "#0F766E" }} />
               </div>
-            </Link>
+              <div>
+                <h1 className="text-xl font-bold line-clamp-2" style={{ color: "#FFFFFF" }}>{course?.title || "Loading..."}</h1>
+                <p className="text-xs uppercase tracking-wider" style={{ color: "#FFFFFC" }}>Status Aktif</p>
+              </div>
+            </div>
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.push("/open-courses")}
-                className="flex items-center gap-2"
-                style={{ color: "#FFFFFC" }}
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Courses
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => router.push("/")}
-                style={{ color: "#FFFFFC" }}
-              >
-                Home
-              </Button>
               <UserMenuDropdown
                 user={user}
                 onLogout={async () => {
@@ -436,6 +418,7 @@ export default function CourseDetailPage() {
                     estimatedHours={modules.length * 2} // Estimate 2 hours per module
                     progressPercentage={Math.round((unlockedModules.size / modules.length) * 100)}
                     teacherName={course.teacher?.name || "Instruktur"}
+                    courseId={courseId}
                   />
                 </div>
               )}
