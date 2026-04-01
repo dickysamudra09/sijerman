@@ -1252,7 +1252,7 @@ export default function ClassroomsPage() {
           </aside>
 
           {/* Content Area */}
-          <div className="w-full lg:ml-72 px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12">
+          <div className="w-full lg:ml-72 px-4 sm:px-6 lg:px-6 pt-8 lg:pt-12">
             <div className="max-w-6xl mx-auto">
               {/* Breadcrumb Navigation */}
               <div className="mb-8 flex items-center text-xs sm:text-sm" style={{color: '#4A4A4A'}}>
@@ -1295,246 +1295,273 @@ export default function ClassroomsPage() {
               {/* Detail View */}
               {detailViewMode && selectedDetailContent ? (
                 <div className="space-y-6">
-                  <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{color: '#1A1A1A'}}>
-                      {selectedDetailContent.sub_judul || selectedDetailContent.judul}
-                    </h1>
-                    <p className="text-sm" style={{color: '#4A4A4A'}}>
-                      Jenis: {selectedDetailContent.jenis_create} • Dibuat: {new Date(selectedDetailContent.created_at).toLocaleDateString('id-ID')}
-                      {selectedDetailContent.deadline && ` • Deadline: ${new Date(selectedDetailContent.deadline).toLocaleDateString('id-ID')}`}
-                    </p>
+                  {/* Header Section - Color-Coded */}
+                  <div className="rounded-xl overflow-hidden shadow-lg" style={{
+                    background: selectedDetailContent.jenis_create.toLowerCase() === "materi" 
+                      ? "linear-gradient(135deg, #E8DCC8 0%, #DFD0B8 100%)"
+                      : "linear-gradient(135deg, #FAF3EB 0%, #F5E6D3 100%)"
+                  }}>
+                    <div className="p-6 sm:p-8 flex items-start gap-4 border-l-4" style={{
+                      borderLeftColor: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#A86A32" : "#E87835"
+                    }}>
+                      <div className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0" style={{
+                        backgroundColor: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#D4C5A0" : "#F0D9C6"
+                      }}>
+                        {selectedDetailContent.jenis_create.toLowerCase() === "materi" && <BookOpen className="h-7 w-7" style={{color: "#6B4423"}} />}
+                        {selectedDetailContent.jenis_create.toLowerCase() === "tugas" && <FileText className="h-7 w-7" style={{color: "#8B5A2B"}} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Badge className="mb-2 text-xs font-semibold px-3 py-1" style={{
+                          backgroundColor: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#A86A32" : "#E87835",
+                          color: "#FFFFFC"
+                        }}>
+                          {selectedDetailContent.jenis_create.toUpperCase()}
+                        </Badge>
+                        <h1 className="text-3xl sm:text-4xl font-bold mb-2" style={{color: '#1A1A1A'}}>
+                          {selectedDetailContent.sub_judul || selectedDetailContent.judul}
+                        </h1>
+                        <div className="flex flex-wrap items-center gap-4 text-sm" style={{color: '#4A4A4A'}}>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>Dibuat: {new Date(selectedDetailContent.created_at).toLocaleDateString('id-ID')}</span>
+                          </div>
+                          {selectedDetailContent.deadline && (
+                            <div className="flex items-center gap-1" style={{color: '#DC2626'}}>
+                              <Clock className="h-4 w-4" />
+                              <span>Deadline: {new Date(selectedDetailContent.deadline).toLocaleDateString('id-ID')}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <Card className="bg-white border-2" style={{borderColor: '#E8B824'}}>
-                    <CardContent className="p-6 sm:p-8">
-                      <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: selectedDetailContent.konten }} />
-                      
-                      {selectedDetailContent.documents && selectedDetailContent.documents.length > 0 && (
-                        <div className="mt-6 pt-6" style={{borderTop: '1px solid #E8B824'}}>
-                          <h3 className="font-semibold mb-4" style={{color: '#1A1A1A'}}>File Lampiran</h3>
-                          <div className="space-y-2">
-                            {selectedDetailContent.documents.map((doc, idx) => (
-                              <a
-                                key={idx}
-                                href={doc.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 p-3 rounded-lg hover:opacity-80 transition-opacity"
-                                style={{backgroundColor: '#FFFFFC', border: '1px solid #E8B824'}}
-                              >
-                                <Download className="h-4 w-4 flex-shrink-0" style={{color: '#E8B824'}} />
-                                <span className="text-sm truncate" style={{color: '#1A1A1A'}}>{doc.name}</span>
-                              </a>
-                            ))}
-                          </div>
+                  {/* Content Section */}
+                  <div className="rounded-lg border-2 overflow-hidden" style={{borderColor: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#06B6D4" : "#F97316"}}>
+                    {/* Section Header */}
+                    <div className="px-6 py-4 flex items-center gap-3" style={{
+                      backgroundColor: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#E8DCC8" : "#FAF3EB",
+                      borderBottomColor: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#A86A32" : "#E87835",
+                      borderBottomWidth: '2px'
+                    }}>
+                      <BookOpen className="h-5 w-5" style={{color: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#A86A32" : "#E87835"}} />
+                      <h3 className="text-lg font-bold" style={{color: '#1A1A1A'}}>KONTEN UTAMA</h3>
+                    </div>
+                    {/* Content Body */}
+                    <div className="p-6 sm:p-8">
+                      <div className="prose prose-sm max-w-none" style={{color: '#1A1A1A'}} dangerouslySetInnerHTML={{ __html: selectedDetailContent.konten }} />
+                    </div>
+                  </div>
+
+                  {/* Files Section */}
+                  {selectedDetailContent.documents && selectedDetailContent.documents.length > 0 && (
+                    <div className="rounded-lg border-2 overflow-hidden" style={{borderColor: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#A86A32" : "#E87835"}}>
+                      {/* Section Header */}
+                      <div className="px-6 py-4 flex items-center gap-3" style={{
+                        backgroundColor: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#E8DCC8" : "#FAF3EB",
+                        borderBottomColor: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#A86A32" : "#E87835",
+                        borderBottomWidth: '2px'
+                      }}>
+                        <Download className="h-5 w-5" style={{color: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#A86A32" : "#E87835"}} />
+                        <h3 className="text-lg font-bold" style={{color: '#1A1A1A'}}>FILE LAMPIRAN ({selectedDetailContent.documents.length})</h3>
+                      </div>
+                      {/* Files Body */}
+                      <div className="p-6 sm:p-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {selectedDetailContent.documents.map((doc, idx) => (
+                            <a
+                              key={idx}
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 p-4 rounded-lg border-2 transition-all hover:shadow-md hover:-translate-y-0.5"
+                              style={{
+                                borderColor: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#A86A32" : "#E87835",
+                                backgroundColor: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#E8DCC8" : "#FAF3EB"
+                              }}
+                            >
+                              <Download className="h-5 w-5 flex-shrink-0" style={{color: selectedDetailContent.jenis_create.toLowerCase() === "materi" ? "#A86A32" : "#E87835"}} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold truncate" style={{color: '#1A1A1A'}}>{doc.name}</p>
+                              </div>
+                            </a>
+                          ))}
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Student Submission Section for Tugas */}
-                  {selectedDetailContent.jenis_create === "tugas" && userRole === "student" && (
-                    <Card className="bg-white border-2" style={{borderColor: studentSubmissions[selectedDetailContent.id] ? '#22C55E' : '#E8B824'}}>
-                      <CardHeader className="border-b py-4" style={{backgroundColor: '#0D0D0D', borderBottomColor: '#E8B824'}}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <UploadCloud className="h-5 w-5" style={{color: '#E8B824'}} />
-                            <h3 className="font-semibold text-lg" style={{color: '#FFFFFC'}}>Status Pengumpulan</h3>
-                          </div>
-                          <Badge 
-                            className="text-xs font-semibold"
-                            style={{
-                              backgroundColor: studentSubmissions[selectedDetailContent.id] ? '#22C55E' : '#E8B824',
-                              color: studentSubmissions[selectedDetailContent.id] ? '#FFFFFC' : '#1A1A1A'
-                            }}
-                          >
-                            {studentSubmissions[selectedDetailContent.id] ? (
-                              <>
-                                <CheckCircle2 className="h-3 w-3 mr-1" /> Dikumpulkan
-                              </>
-                            ) : (
-                              <>
-                                <Clock className="h-3 w-3 mr-1" /> Belum Dikumpulkan
-                              </>
-                            )}
-                          </Badge>
+                  {selectedDetailContent.jenis_create.toLowerCase() === "tugas" && userRole === "student" && (
+                    <div className="rounded-lg border-2 overflow-hidden" style={{borderColor: studentSubmissions[selectedDetailContent.id] ? '#22C55E' : '#E87835'}}>
+                      {/* Section Header */}
+                      <div className="px-6 py-4 flex items-center justify-between" style={{
+                        backgroundColor: studentSubmissions[selectedDetailContent.id] ? '#DCFCE7' : '#FFF7ED',
+                        borderBottomColor: studentSubmissions[selectedDetailContent.id] ? '#22C55E' : '#E87835',
+                        borderBottomWidth: '2px'
+                      }}>
+                        <div className="flex items-center gap-3">
+                          <UploadCloud className="h-5 w-5" style={{color: studentSubmissions[selectedDetailContent.id] ? '#22C55E' : '#E87835'}} />
+                          <h3 className="text-lg font-bold" style={{color: '#1A1A1A'}}>STATUS PENGUMPULAN</h3>
                         </div>
-                      </CardHeader>
-                      <CardContent className="p-6 space-y-4">
+                        <Badge 
+                          className="text-sm font-bold px-3 py-1"
+                          style={{
+                            backgroundColor: studentSubmissions[selectedDetailContent.id] ? '#22C55E' : '#E87835',
+                            color: '#FFFFFC'
+                          }}
+                        >
+                          {studentSubmissions[selectedDetailContent.id] ? 'DIKUMPULKAN' : 'PENDING'}
+                        </Badge>
+                      </div>
+                      {/* Submission Body */}
+                      <div className="p-6 sm:p-8 space-y-5">
                         {!studentSubmissions[selectedDetailContent.id] ? (
                           <>
                             {/* File Upload Area */}
-                            <div className="p-6 rounded-lg border-2 border-dashed" style={{borderColor: '#E8B824', backgroundColor: '#FFFFFC'}}>
-                              <div className="flex flex-col items-center justify-center">
-                                <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{backgroundColor: '#E8B824'}}>
-                                  <UploadCloud className="h-6 w-6" style={{color: '#1A1A1A'}} />
-                                </div>
-                                <p className="text-sm font-medium mb-1" style={{color: '#1A1A1A'}}>Unggah File Tugas</p>
-                                <p className="text-xs text-center mb-4" style={{color: '#4A4A4A'}}>Drag and drop atau klik untuk memilih file (max 12MB)</p>
-                                <label htmlFor={`file-input-${selectedDetailContent.id}`} className="cursor-pointer">
-                                  <div 
-                                    onDragOver={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                    }}
-                                    onDrop={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      const file = e.dataTransfer.files?.[0];
-                                      if (file) setSelectedFile(file);
-                                    }}
-                                    className="px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
-                                    style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
-                                  >
-                                    Pilih File
-                                  </div>
-                                </label>
-                                <input
-                                  id={`file-input-${selectedDetailContent.id}`}
-                                  type="file"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) setSelectedFile(file);
-                                  }}
-                                />
+                            <div className="p-8 rounded-lg border-2 border-dashed text-center transition-all" style={{borderColor: '#E87835', backgroundColor: '#FAF3EB'}}>
+                              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{backgroundColor: '#E87835'}}>
+                                <UploadCloud className="h-8 w-8" style={{color: '#FFFFFC'}} />
                               </div>
+                              <p className="text-lg font-bold mb-2" style={{color: '#1A1A1A'}}>Unggah File Tugas</p>
+                              <p className="text-sm mb-5" style={{color: '#4A4A4A'}}>Drag and drop atau klik untuk memilih file (max 12MB)</p>
+                              <label htmlFor={`file-input-${selectedDetailContent.id}`} className="cursor-pointer inline-block">
+                                <div 
+                                  onDragOver={(e) => {e.preventDefault(); e.stopPropagation();}}
+                                  onDrop={(e) => {e.preventDefault(); e.stopPropagation(); const file = e.dataTransfer.files?.[0]; if (file) setSelectedFile(file);}}
+                                  className="px-6 py-3 rounded-lg font-bold text-base hover:opacity-90 transition-opacity inline-block"
+                                  style={{backgroundColor: '#F97316', color: '#FFFFFC'}}
+                                >
+                                  Pilih File
+                                </div>
+                              </label>
+                              <input
+                                id={`file-input-${selectedDetailContent.id}`}
+                                type="file"
+                                className="hidden"
+                                onChange={(e) => { const file = e.target.files?.[0]; if (file) setSelectedFile(file); }}
+                              />
                             </div>
 
-                            {/* Selected File Display */}
+                            {/* Selected File */}
                             {selectedFile && (
-                              <div className="p-3 rounded-lg flex items-center justify-between" style={{backgroundColor: '#FFFFFC', border: '1px solid #E8B824'}}>
+                              <div className="p-4 rounded-lg flex items-center justify-between border-2" style={{backgroundColor: '#FAF3EB', borderColor: '#E87835'}}>
                                 <div className="flex items-center gap-3 min-w-0">
-                                  <div className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
-                                    <FileText className="h-4 w-4" style={{color: '#1A1A1A'}} />
+                                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#E87835'}}>
+                                    <FileText className="h-5 w-5" style={{color: '#FFFFFC'}} />
                                   </div>
-                                  <span className="text-sm truncate" style={{color: '#1A1A1A'}}>{selectedFile.name}</span>
+                                  <span className="text-sm font-semibold truncate" style={{color: '#1A1A1A'}}>{selectedFile.name}</span>
                                 </div>
-                                <button 
-                                  onClick={() => setSelectedFile(null)}
-                                  className="text-lg leading-none hover:opacity-70 transition-opacity flex-shrink-0"
-                                  style={{color: '#4A4A4A'}}
-                                >
-                                  ✕
-                                </button>
+                                <button onClick={() => setSelectedFile(null)} className="hover:opacity-70 transition-opacity" style={{color: '#E87835'}}><X className="h-5 w-5" /></button>
                               </div>
                             )}
 
-                            {/* Submission Message */}
+                            {/* Message */}
                             <div className="space-y-2">
-                              <label className="text-sm font-semibold" style={{color: '#1A1A1A'}}>
-                                Atau tulis pesan pengumpulan
-                              </label>
+                              <label className="text-sm font-bold" style={{color: '#1A1A1A'}}>Pesan Pengumpulan (Opsional)</label>
                               <textarea
                                 value={submissionMessage}
                                 onChange={(e) => setSubmissionMessage(e.target.value)}
-                                placeholder="Tulis pesan pengumpulan tugas (opsional)..."
-                                className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 resize-none"
-                                style={{borderColor: '#E8B824', borderWidth: '2px', color: '#1A1A1A'}}
+                                placeholder="Tulis pesan atau catatan..."
+                                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 resize-none"
+                                style={{borderColor: '#E87835', borderWidth: '2px', color: '#1A1A1A'}}
                                 rows={3}
                               />
                             </div>
 
-                            {/* Upload Button */}
+                            {/* Submit Button */}
                             <Button
                               onClick={() => handleFileUpload(selectedDetailContent.id)}
-                              className="w-full font-semibold py-2 h-auto hover:opacity-90 transition-opacity"
-                              style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
+                              className="w-full font-bold py-3 text-base rounded-lg hover:opacity-90 transition-opacity"
+                              style={{backgroundColor: '#F97316', color: '#FFFFFC'}}
                               disabled={(!selectedFile && !submissionMessage.trim()) || isUploading}
                             >
                               {isUploading ? (
                                 <>
-                                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-transparent border-t-current mr-2"></div>
+                                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-transparent border-t-current mr-2"></div>
                                   Mengunggah...
                                 </>
                               ) : (
                                 <>
                                   <UploadCloud className="h-5 w-5 mr-2" />
-                                  Kumpulkan Tugas
+                                  KUMPULKAN TUGAS
                                 </>
                               )}
                             </Button>
-
-                            {selectedDetailContent.deadline && (
-                              <p className="text-xs pt-2 border-t" style={{color: '#4A4A4A', borderColor: '#E8B824'}}>
-                                <strong>Batas Waktu:</strong> {new Date(selectedDetailContent.deadline).toLocaleDateString('id-ID', { 
-                                  weekday: 'long',
-                                  year: 'numeric', 
-                                  month: 'long', 
-                                  day: 'numeric'
-                                })}
-                              </p>
-                            )}
                           </>
                         ) : (
                           <>
-                            {/* Submission Received */}
-                            <div className="p-4 rounded-lg" style={{backgroundColor: '#F0FDF4', border: '1px solid #22C55E'}}>
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex gap-3 flex-1 min-w-0">
-                                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#DCFCE7'}}>
-                                    <CheckCircle2 className="h-6 w-6" style={{color: '#22C55E'}} />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-semibold" style={{color: '#166534'}}>Tugas Berhasil Dikumpulkan</p>
-                                    <p className="text-sm mt-1" style={{color: '#22C55E'}}>
-                                      {new Date(studentSubmissions[selectedDetailContent.id].submitted_at).toLocaleString('id-ID', { 
-                                        weekday: 'long',
-                                        year: 'numeric', 
-                                        month: 'long', 
-                                        day: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                      })}
-                                    </p>
-                                    {studentSubmissions[selectedDetailContent.id]?.message && (
-                                      <div className="mt-3 p-3 rounded" style={{backgroundColor: '#FFFFFC', border: '1px solid #22C55E'}}>
-                                        <p className="text-xs font-semibold mb-1" style={{color: '#1A1A1A'}}>Pesan:</p>
-                                        <p className="text-sm whitespace-pre-wrap" style={{color: '#166534'}}>{studentSubmissions[selectedDetailContent.id].message}</p>
-                                      </div>
-                                    )}
-                                  </div>
+                            {/* Success State */}
+                            <div className="p-5 rounded-lg" style={{backgroundColor: '#DCFCE7', border: '2px solid #22C55E'}}>
+                              <div className="flex gap-4">
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#BBFCE0'}}>
+                                  <CheckCircle2 className="h-6 w-6" style={{color: '#22C55E'}} />
                                 </div>
-                                <div className="flex gap-2 flex-shrink-0">
-                                  {studentSubmissions[selectedDetailContent.id]?.file_url && (
-                                    <Button
-                                      size="sm"
-                                      className="h-8 hover:opacity-80 transition-opacity"
-                                      style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
-                                      onClick={() => handleImagePreview(studentSubmissions[selectedDetailContent.id].file_url!)}
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                  <Button
-                                    size="sm"
-                                    className="h-8 hover:opacity-80 transition-opacity"
-                                    style={{backgroundColor: '#DC2626', color: '#FFFFFC'}}
-                                    onClick={() => {
-                                      setSubmissionToDelete(selectedDetailContent.id);
-                                      setShowDeleteModal(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-lg" style={{color: '#166534'}}>Tugas Berhasil Dikumpulkan!</p>
+                                  <p className="text-sm mt-1" style={{color: '#15803D'}}>
+                                    {new Date(studentSubmissions[selectedDetailContent.id].submitted_at).toLocaleString('id-ID', { 
+                                      weekday: 'long',
+                                      year: 'numeric', 
+                                      month: 'long', 
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </p>
                                 </div>
                               </div>
                             </div>
 
-                            {/* Late Submission Warning */}
+                            {/* Message if exists */}
+                            {studentSubmissions[selectedDetailContent.id]?.message && (
+                              <div className="p-4 rounded-lg" style={{backgroundColor: '#FFFFFC', border: '2px solid #22C55E'}}>
+                                <p className="text-xs font-bold mb-2" style={{color: '#1A1A1A'}}>PESAN KAMU:</p>
+                                <p className="text-sm whitespace-pre-wrap" style={{color: '#166534'}}>{studentSubmissions[selectedDetailContent.id].message}</p>
+                              </div>
+                            )}
+
+                            {/* Late Warning */}
                             {selectedDetailContent.deadline && new Date(studentSubmissions[selectedDetailContent.id].submitted_at) > new Date(selectedDetailContent.deadline) && (
-                              <div className="p-4 rounded-lg flex gap-3" style={{backgroundColor: '#FEF2F2', border: '1px solid #DC2626'}}>
+                              <div className="p-4 rounded-lg flex gap-3" style={{backgroundColor: '#FEF2F2', border: '2px solid #DC2626'}}>
                                 <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" style={{color: '#DC2626'}} />
                                 <div>
-                                  <p className="font-semibold" style={{color: '#7F1D1D'}}>Pengumpulan Terlambat</p>
-                                  <p className="text-sm mt-1" style={{color: '#DC2626'}}>Tugas dikumpulkan setelah batas waktu yang ditentukan</p>
+                                  <p className="font-bold" style={{color: '#7F1D1D'}}>Pengumpulan Terlambat</p>
+                                  <p className="text-sm mt-1" style={{color: '#DC2626'}}>Tugas dikumpulkan setelah deadline</p>
                                 </div>
                               </div>
                             )}
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-2">
+                              {studentSubmissions[selectedDetailContent.id]?.file_url && (
+                                <Button
+                                  size="sm"
+                                  className="flex-1 font-bold"
+                                  style={{backgroundColor: '#F97316', color: '#FFFFFC'}}
+                                  onClick={() => handleImagePreview(studentSubmissions[selectedDetailContent.id].file_url!)}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Lihat File
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                className="flex-1 font-bold"
+                                style={{backgroundColor: '#DC2626', color: '#FFFFFC'}}
+                                onClick={() => {
+                                  setSubmissionToDelete(selectedDetailContent.id);
+                                  setShowDeleteModal(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Hapus
+                              </Button>
+                            </div>
                           </>
                         )}
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
                   )}
 
                   {/* Back Button */}
@@ -1543,10 +1570,10 @@ export default function ClassroomsPage() {
                       setDetailViewMode(false);
                       setSelectedDetailContent(null);
                     }}
-                    className="w-full font-semibold hover:opacity-90 transition-opacity"
+                    className="w-full font-bold py-3 text-base rounded-lg hover:opacity-90 transition-opacity"
                     style={{backgroundColor: '#1A1A1A', color: '#FFFFFC'}}
                   >
-                    Kembali ke Daftar
+                    ← Kembali ke Daftar
                   </Button>
                 </div>
               ) : (
@@ -1564,7 +1591,7 @@ export default function ClassroomsPage() {
                   )}
 
                   {/* Content List */}
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                 {filteredContents.length > 0 ? (
                   filteredContents.map((content) => {
                     const status = getContentStatus(content);
@@ -1576,11 +1603,14 @@ export default function ClassroomsPage() {
                     return (
                       <Card
                         key={content.id}
-                        className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                        className={`bg-white/80 backdrop-blur-sm border-l-4 border-t border-r border-b border-gray-200 shadow-sm hover:shadow-xl transition-all cursor-pointer rounded-lg hover:-translate-y-1.5 group`}
+                        style={{borderLeftColor: 
+                          content.jenis_create.toLowerCase() === "materi" ? "#A86A32" :
+                          content.jenis_create.toLowerCase() === "tugas" ? "#E87835" :
+                          "#C84B31"
+                        }}
                         onClick={() => {
-                          if (content.jenis_create === "latihan soal") {
-                            handleKerjakanLatihan(content);
-                          } else {
+                          if (content.jenis_create.toLowerCase() !== "latihan soal") {
                             setSelectedDetailContent(content);
                             setDetailViewMode(true);
                           }
@@ -1588,66 +1618,98 @@ export default function ClassroomsPage() {
                       >
                         <CardContent className="p-4 sm:p-5">
                           <div className="flex items-start gap-3 sm:gap-4">
-                            <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#1A1A1A'}}>
-                              <Icon className="h-5 sm:h-6 w-5 sm:w-6" style={{color: '#FFFFFC'}} />
+                            <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0 transition-all" style={{
+                              backgroundColor: 
+                                content.jenis_create.toLowerCase() === "materi" ? "#E8DCC8" :
+                                content.jenis_create.toLowerCase() === "tugas" ? "#FAF3EB" :
+                                "#F0E5DC"
+                            }}>
+                              <Icon className="h-5 sm:h-6 w-5 sm:w-6" style={{color: 
+                                content.jenis_create.toLowerCase() === "materi" ? "#A86A32" :
+                                content.jenis_create.toLowerCase() === "tugas" ? "#E87835" :
+                                "#C84B31"
+                              }} />
                             </div>
                             
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-3 sm:gap-4 mb-2">
+                              <div className="flex items-start justify-between gap-2 sm:gap-3 mb-1.5">
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="text-sm sm:text-base font-semibold text-gray-900 mb-1 truncate">
+                                  <h4 className="text-sm sm:text-base font-semibold text-gray-900 mb-0.5 truncate group-hover:text-gray-700 transition-colors">
                                     {content.sub_judul || content.judul}
                                   </h4>
-                                  <p className="text-xs sm:text-sm text-gray-600 line-clamp-2">
-                                    {stripHtml(content.konten).substring(0, 120)}...
+                                  <p className="text-xs sm:text-sm text-gray-600 line-clamp-1">
+                                    {stripHtml(content.konten).substring(0, 100)}...
                                   </p>
                                 </div>
                                 
-                                <Badge 
-                                  className={`flex items-center gap-1 px-2 sm:px-3 py-1 flex-shrink-0 text-xs sm:text-sm ${
-                                    (content.jenis_create.toLowerCase() === "materi" || content.jenis_create.toLowerCase() === "latihan soal") 
-                                      ? "" 
-                                      : status.color
-                                  }`}
-                                  style={
-                                    (content.jenis_create.toLowerCase() === "materi" || content.jenis_create.toLowerCase() === "latihan soal") 
-                                      ? {backgroundColor: '#1A1A1A', color: '#FFFFFC'}
-                                      : {}
-                                  }
-                                >
-                                  <StatusIcon className="h-3 w-3" style={
-                                    (content.jenis_create.toLowerCase() === "materi" || content.jenis_create.toLowerCase() === "latihan soal")
-                                      ? {color: '#FFFFFC'}
-                                      : {}
-                                  } />
-                                  <span className="hidden sm:inline">{status.label}</span>
-                                  <span className="sm:hidden">{status.label.split(' ')[0]}</span>
-                                </Badge>
+                                <div className="flex-shrink-0">
+                                  {content.jenis_create.toLowerCase() === "materi" && (
+                                    <Badge className="text-xs px-2 py-1 font-medium" style={{backgroundColor: '#E8DCC8', color: '#6B4423', border: '1px solid #A86A32'}}>
+                                      📖
+                                    </Badge>
+                                  )}
+                                  {content.jenis_create.toLowerCase() === "tugas" && (
+                                    <Badge className={`text-xs px-2 py-1 font-medium`} style={submission ? {backgroundColor: '#DCFCE7', color: '#166534', border: '1px solid #22C55E'} : {backgroundColor: '#FFF7ED', color: '#92400E', border: '1px solid #F97316'}}>
+                                      {submission ? "✓ Kirim" : "⏳ Pending"}
+                                    </Badge>
+                                  )}
+                                  {content.jenis_create.toLowerCase() === "latihan soal" && (
+                                    <Badge className="text-xs px-2 py-1 font-medium" style={{backgroundColor: '#F0E5DC', color: '#8B4513', border: '1px solid #C84B31'}}>
+                                      {attempts && attempts.length > 0 ? `✓ ${attempts[0].percentage.toFixed(0)}%` : "○ Baru"}
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
 
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-gray-500 mt-2 sm:mt-3">
+                              {/* Deadline Warning */}
+                              {content.deadline && content.jenis_create.toLowerCase() === "tugas" && !submission && (() => {
+                                const deadlineDate = new Date(content.deadline);
+                                const today = new Date();
+                                const diffTime = Number(deadlineDate.getTime()) - Number(today.getTime());
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                
+                                if (diffDays <= 3 && diffDays > 0) {
+                                  return (
+                                    <div className={`px-2.5 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 mt-2 mb-1.5 ${
+                                      diffDays <= 1 
+                                        ? 'bg-red-50 border border-red-200 text-red-700' 
+                                        : 'bg-amber-50 border border-amber-200 text-amber-700'
+                                    }`}>
+                                      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                      <span>
+                                        {diffDays === 0 ? 'Deadline hari ini!' : diffDays === 1 ? '1 hari tersisa' : `${diffDays} hari lagi`}
+                                      </span>
+                                    </div>
+                                  );
+                                }
+                              })()}
+
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-gray-500 mt-1.5">
                                 <div className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3 flex-shrink-0" />
+                                  <Calendar className="h-3 w-3 flex-shrink-0" style={{color: 
+                                    content.jenis_create.toLowerCase() === "materi" ? "#A86A32" :
+                                    content.jenis_create.toLowerCase() === "tugas" ? "#F97316" :
+                                    "#A855F7"
+                                  }} />
                                   <span className="truncate">{new Date(content.created_at).toLocaleDateString('id-ID')}</span>
                                 </div>
                                 
-                                {content.deadline && (
+                                {content.deadline && content.jenis_create.toLowerCase() === "tugas" && (
                                   <div className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3 flex-shrink-0" />
-                                    <span className="truncate">Deadline: {new Date(content.deadline).toLocaleDateString('id-ID')}</span>
+                                    <Clock className="h-3 w-3 flex-shrink-0" style={{color: '#F97316'}} />
+                                    <span className="truncate text-xs font-medium">{new Date(content.deadline).toLocaleDateString('id-ID')}</span>
                                   </div>
                                 )}
                                 
                                 {attempts && attempts.length > 0 && (
                                   <div className="flex items-center gap-1">
-                                    <Target className="h-3 w-3 flex-shrink-0" />
-                                    <span>Skor: {attempts[0].percentage.toFixed(0)}%</span>
+                                    <span className="font-semibold" style={{color: '#C84B31'}}>Attempt: {attempts.length}</span>
                                   </div>
                                 )}
                               </div>
 
                               {/* Action Buttons */}
-                              <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-4">
+                              <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-3 opacity-100 group-hover:opacity-100 transition-opacity">
                                 {userRole === "teacher" ? (
                                   <>
                                     <Button
@@ -1661,18 +1723,18 @@ export default function ClassroomsPage() {
                                           router.push(`/home/classrooms/create?classId=${classId}&contentId=${content.id}`);
                                         }
                                       }}
-                                      className="text-xs sm:text-sm"
+                                      className="text-xs sm:text-sm font-medium transition-all hover:bg-gray-100"
                                     >
                                       <Edit className="h-3 sm:h-4 w-3 sm:w-4 mr-1" />
                                       <span className="hidden sm:inline">Edit</span>
-                                      <span className="sm:hidden">Edit</span>
                                     </Button>
                                     <Button
                                       size="sm"
-                                      className="bg-yellow-400 hover:bg-yellow-500 text-black text-xs sm:text-sm font-semibold"
+                                      className="text-xs sm:text-sm font-semibold transition-all hover:opacity-90"
+                                      style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
                                     >
                                       <Eye className="h-3 sm:h-4 w-3 sm:w-4 mr-1" />
-                                      Lihat Detail
+                                      Detail
                                     </Button>
                                   </>
                                 ) : (
@@ -1680,8 +1742,8 @@ export default function ClassroomsPage() {
                                     {content.jenis_create.toLowerCase() === "latihan soal" ? (
                                       <Button
                                         size="sm"
-                                        className="text-xs sm:text-sm"
-                                        style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
+                                        className="text-xs sm:text-sm font-semibold transition-all hover:opacity-90"
+                                        style={{backgroundColor: '#C84B31', color: '#FFFFFC'}}
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleKerjakanLatihan(content);
@@ -1690,46 +1752,41 @@ export default function ClassroomsPage() {
                                         {attempts && attempts.length > 0 ? (
                                           <>
                                             <Eye className="h-3 sm:h-4 w-3 sm:w-4 mr-1" />
-                                            <span className="hidden sm:inline">Lihat Riwayat</span>
-                                            <span className="sm:hidden">Riwayat</span>
+                                            <span className="hidden sm:inline">Riwayat</span>
                                           </>
                                         ) : (
                                           <>
                                             <PlayCircle className="h-3 sm:h-4 w-3 sm:w-4 mr-1" />
-                                            <span className="hidden sm:inline">Mulai Latihan</span>
-                                            <span className="sm:hidden">Mulai</span>
+                                            <span className="hidden sm:inline">Mulai</span>
                                           </>
                                         )}
                                       </Button>
                                     ) : content.jenis_create.toLowerCase() === "tugas" ? (
                                       <Button
                                         size="sm"
-                                        className={submission ? "bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm" : "text-xs sm:text-sm"}
-                                        style={submission ? {} : {backgroundColor: '#E8B824', color: '#1A1A1A'}}
+                                        className="text-xs sm:text-sm font-semibold transition-all hover:opacity-90"
+                                        style={submission ? {backgroundColor: '#22C55E', color: '#FFFFFC'} : {backgroundColor: '#F97316', color: '#FFFFFC'}}
                                       >
                                         {submission ? (
                                           <>
                                             <CheckCircle2 className="h-3 sm:h-4 w-3 sm:w-4 mr-1" />
-                                            <span className="hidden sm:inline">Lihat Pengumpulan</span>
-                                            <span className="sm:hidden">Lihat</span>
+                                            <span className="hidden sm:inline">Lihat</span>
                                           </>
                                         ) : (
                                           <>
                                             <FileText className="h-3 sm:h-4 w-3 sm:w-4 mr-1" />
-                                            <span className="hidden sm:inline">Kumpulkan Tugas</span>
-                                            <span className="sm:hidden">Kumpul</span>
+                                            <span className="hidden sm:inline">Kumpul</span>
                                           </>
                                         )}
                                       </Button>
                                     ) : (
                                       <Button
                                         size="sm"
-                                        className="text-xs sm:text-sm"
-                                        style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
+                                        className="text-xs sm:text-sm font-semibold transition-all hover:opacity-90"
+                                        style={{backgroundColor: '#A86A32', color: '#FFFFFC'}}
                                       >
                                         <BookOpen className="h-3 sm:h-4 w-3 sm:w-4 mr-1" />
                                         <span className="hidden sm:inline">Pelajari</span>
-                                        <span className="sm:hidden">Baca</span>
                                       </Button>
                                     )}
                                   </>
@@ -2028,86 +2085,113 @@ export default function ClassroomsPage() {
       {/* Latihan Modal */}
       <Dialog open={showLatihanModal} onOpenChange={setShowLatihanModal}>
         <DialogContent className="max-w-xl border-0 shadow-xl rounded-xl p-0 overflow-hidden">
-          {/* Header */}
-          <DialogHeader className="pb-0 px-6 pt-6 mb-0" style={{backgroundColor: '#1A1A1A', borderBottomColor: '#E8B824', borderBottomWidth: '2px'}}>
-            <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-white">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: '#E8B824'}}>
-                <Target className="h-6 w-6 text-black" />
+          {/* Header Section - Color-Coded Purple */}
+          <div style={{
+            background: "linear-gradient(135deg, #F0E5DC 0%, #E8D5C4 100%)"
+          }}>
+            <div className="p-6 sm:p-7 flex items-start gap-4 border-l-4" style={{borderLeftColor: "#C84B31"}}>
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: "#E8D5C4"}}>
+                <Target className="h-6 w-6" style={{color: "#A0572D"}} />
               </div>
-              Latihan: {currentLatihan?.title}
-            </DialogTitle>
-            <DialogDescription className="mt-2 pb-4 text-gray-300">
-              {currentLatihan?.attempts && currentLatihan.attempts.length > 0
-                ? `Anda telah menyelesaikan latihan ini ${currentLatihan.attempts.length} kali. Mulai percobaan baru untuk meningkatkan skor Anda.`
-                : 'Anda belum mengerjakan latihan ini. Mulai sekarang dan kuji kemampuan Anda!'
-              }
-            </DialogDescription>
-          </DialogHeader>
+              <div className="flex-1 min-w-0">
+                <Badge className="mb-2 text-xs font-semibold px-3 py-1" style={{
+                  backgroundColor: "#C84B31",
+                  color: "#FFFFFC"
+                }}>
+                  LATIHAN SOAL
+                </Badge>
+                <h1 className="text-2xl font-bold" style={{color: '#1A1A1A'}}>
+                  {currentLatihan?.title}
+                </h1>
+              </div>
+            </div>
+          </div>
 
           {/* Content */}
-          <div className="px-6 space-y-4 max-h-96 overflow-y-auto bg-white">
-            {currentLatihan?.attempts && currentLatihan.attempts.length > 0 ? (
-              <div className="space-y-3 pt-6 pb-6">
-                <h4 className="text-base font-bold flex items-center gap-2 text-gray-900">
-                  <CheckCircle2 className="h-5 w-5" style={{color: '#E8B824'}} />
-                  Riwayat Percobaan
-                </h4>
-                <div className="space-y-2">
-                  {currentLatihan.attempts.map((attempt) => (
-                    <Card key={attempt.id} className="border-2 bg-gray-50 hover:bg-gray-100 transition-colors" style={{borderColor: '#E8B824'}}>
-                      <CardContent className="p-4 flex justify-between items-center">
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-gray-900">
-                            Percobaan #{attempt.attempt_number}
-                          </p>
-                          <p className="text-xs text-gray-600 mt-1">
-                            <Clock className="h-3 w-3 inline mr-1" />
-                            {new Date(attempt.submitted_at).toLocaleString('id-ID', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                        </div>
-                        <Badge className="font-bold text-lg px-4 py-2 text-black border-0" style={{backgroundColor: '#E8B824'}}>
-                          {attempt.percentage.toFixed(0)}%
-                        </Badge>
-                      </CardContent>
-                    </Card>
+          <div className="px-6 sm:px-7 space-y-4 max-h-80 overflow-y-auto bg-white py-5">
+            {/* Best Score - Minimal Badge */}
+            {currentLatihan?.attempts && currentLatihan.attempts.length > 0 && (
+              <div className="flex items-center justify-between p-4 rounded-lg border-2 bg-gradient-to-r" style={{
+                borderColor: "#C84B31",
+                backgroundImage: "linear-gradient(to right, #F0E5DC, #FFFFFC)"
+              }}>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide" style={{color: '#4A4A4A'}}>Skor Terbaik</p>
+                  <p className="text-sm mt-1" style={{color: '#4A4A4A'}}>{currentLatihan.attempts.length} percobaan</p>
+                </div>
+                <div className="flex items-center justify-center min-w-16 px-4 py-2 rounded-lg font-bold text-3xl whitespace-nowrap" style={{
+                  backgroundColor: "#C84B31",
+                  color: "#FFFFFC"
+                }}>
+                  {Math.max(...currentLatihan.attempts.map(a => a.percentage || 0)).toFixed(0)}%
+                </div>
+              </div>
+            )}
+
+            {/* Attempt History - Compact List */}
+            {currentLatihan?.attempts && currentLatihan.attempts.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wide" style={{color: '#4A4A4A'}}>Riwayat Percobaan</h4>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {currentLatihan.attempts.slice(0, 8).map((attempt) => (
+                    <div key={attempt.id} className="flex items-center justify-between p-3 rounded-lg border transition-all hover:shadow-md" style={{
+                      borderColor: "#E8D5C4",
+                      backgroundColor: "#FFFBFF"
+                    }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold" style={{color: '#1A1A1A'}}>
+                          Percobaan #{attempt.attempt_number}
+                        </p>
+                        <p className="text-xs mt-0.5 flex items-center gap-1" style={{color: '#4A4A4A'}}>
+                          <Clock className="h-3 w-3 flex-shrink-0" />
+                          {new Date(attempt.submitted_at).toLocaleDateString('id-ID', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }).replace(',', '')}
+                        </p>
+                      </div>
+                      <Badge className="font-bold px-3 py-1 text-sm border-0 flex-shrink-0 ml-2" style={{
+                        backgroundColor: "#C84B31",
+                        color: "#FFFFFC"
+                      }}>
+                        {attempt.percentage.toFixed(0)}%
+                      </Badge>
+                    </div>
                   ))}
                 </div>
               </div>
-            ) : (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{backgroundColor: '#E8B824'}}>
-                  <Target className="h-8 w-8 text-black" />
+            )}
+
+            {/* No Attempt State */}
+            {(!currentLatihan?.attempts || currentLatihan.attempts.length === 0) && (
+              <div className="text-center py-6">
+                <div className="w-12 h-12 rounded-lg mx-auto mb-3 flex items-center justify-center" style={{backgroundColor: "#F0E5DC"}}>
+                  <Target className="h-6 w-6" style={{color: "#C84B31"}} />
                 </div>
-                <h4 className="text-lg font-semibold text-gray-900 mb-2">Belum Ada Percobaan</h4>
-                <p className="text-sm text-gray-600">
-                  Mulai mengerjakan latihan ini untuk merekam percobaan pertama Anda.
-                </p>
+                <p className="text-sm font-semibold" style={{color: '#1A1A1A'}}>Belum Ada Percobaan</p>
+                <p className="text-xs mt-1" style={{color: '#4A4A4A'}}>Mulai sekarang untuk merekam skor</p>
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="flex gap-3 px-6 py-4" style={{backgroundColor: '#1A1A1A', borderTopColor: '#E8B824', borderTopWidth: '2px'}}>
+          <div className="flex gap-2.5 px-6 sm:px-7 py-4 border-t" style={{borderTopColor: "#E8D5C4", backgroundColor: '#FFFBFF'}}>
             <Button 
               onClick={() => setShowLatihanModal(false)}
               variant="outline"
-              className="flex-1 font-semibold text-black hover:bg-gray-900"
-              style={{borderColor: '#E8B824', color: '#E8B824'}}
+              className="flex-1 font-semibold py-2 text-sm"
+              style={{borderColor: "#C84B31", color: "#C84B31"}}
             >
               Tutup
             </Button>
             <Button 
               onClick={handleStartNewAttempt}
-              className="flex-1 h-10 font-semibold text-black"
-              style={{backgroundColor: '#E8B824'}}
+              className="flex-1 font-semibold py-2 text-sm"
+              style={{backgroundColor: "#C84B31", color: "#FFFFFC"}}
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-1.5" />
               Mulai Percobaan {currentLatihan?.attempts?.length ? currentLatihan.attempts.length + 1 : 1}
             </Button>
           </div>
@@ -2940,9 +3024,9 @@ function MeetingSidebar({
                   <div className="border-t pt-3 mt-3" style={{borderColor: '#FFFFFC'}}>
                     <div className="flex flex-col gap-2">
                       {[
-                        { type: "materi", label: "Materi", color: "bg-slate-600", textColor: "text-slate-600" },
-                        { type: "tugas", label: "Tugas", color: "bg-orange-500", textColor: "text-orange-500" },
-                        { type: "latihan", label: "Latihan Soal", color: "bg-purple-400", textColor: "text-purple-400" },
+                        { type: "materi", label: "Materi", bgColor: "#A86A32", textColor: "#A86A32" },
+                        { type: "tugas", label: "Tugas", bgColor: "#E87835", textColor: "#E87835" },
+                        { type: "latihan", label: "Latihan Soal", bgColor: "#C84B31", textColor: "#C84B31" },
                       ].map((item) => {
                         const count = getContentCountByType?.(meeting.number, item.type as "materi" | "tugas" | "latihan") || 0;
                         const isSelected = selectedContentType === item.type;
@@ -2956,13 +3040,22 @@ function MeetingSidebar({
                             }}
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
                               isSelected
-                                ? `${item.color} text-white font-semibold shadow-md`
+                                ? `text-white font-semibold shadow-md`
                                 : `bg-gray-100 text-gray-700 hover:bg-gray-200`
                             }`}
+                            style={isSelected ? { backgroundColor: item.bgColor } : {}}
                           >
-                            <div className={`w-2 h-2 rounded-full ${isSelected ? "bg-white" : item.color}`}></div>
+                            <div 
+                              className={`w-2 h-2 rounded-full`}
+                              style={{backgroundColor: isSelected ? '#FFFFFC' : item.bgColor}}
+                            ></div>
                             <span className="text-xs lg:text-sm flex-1 text-left">{item.label}</span>
-                            <span className={`text-xs font-bold ${isSelected ? "bg-white/30" : "bg-gray-300"} px-2 py-0.5 rounded`}>
+                            <span 
+                              className={`text-xs font-bold px-2 py-0.5 rounded`}
+                              style={{
+                                backgroundColor: isSelected ? 'rgba(255,255,252,0.3)' : '#D1D5DB'
+                              }}
+                            >
                               {count}
                             </span>
                           </button>
