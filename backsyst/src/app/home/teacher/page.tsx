@@ -915,18 +915,30 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                     <TabsContent value="open-courses" className="space-y-6 mt-0">
                         {openCourses.length === 0 ? (
                             <Card 
-                                className="rounded-xl shadow-sm hover:shadow-md transition-all overflow-hidden"
-                                style={{backgroundColor: '#FFFFFC', borderColor: '#E5E5E5', borderWidth: '1px'}}
+                                className="rounded-2xl flex flex-col shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer backdrop-blur-sm"
+                                style={{
+                                  backgroundColor: 'rgba(255, 255, 252, 0.8)',
+                                  borderColor: 'rgba(232, 184, 36, 0.2)',
+                                  borderWidth: '1px'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(232, 184, 36, 0.12)';
+                                  e.currentTarget.style.borderColor = 'rgba(232, 184, 36, 0.4)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                  e.currentTarget.style.borderColor = 'rgba(232, 184, 36, 0.2)';
+                                }}
                             >
-                                {/* Dark top accent bar */}
+                                {/* Gradient Top Border */}
                                 <div 
-                                  className="h-2"
-                                  style={{ backgroundColor: '#1A1A1A' }}
+                                  className="h-1"
+                                  style={{ background: 'linear-gradient(90deg, #E8B824 0%, rgba(232, 184, 36, 0) 100%)' }}
                                 ></div>
                                 <CardHeader>
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1">
-                                            <CardTitle className="text-2xl font-bold flex items-center gap-2 mb-2" style={{ color: '#1A1A1A' }}>
+                                            <CardTitle className="text-2xl font-bold flex items-center gap-2 mb-2 group-hover:text-yellow-600 transition-colors" style={{ color: '#1A1A1A' }}>
                                                 <Globe className="h-6 w-6" style={{ color: '#E8B824' }} />
                                                 Kelas Terbuka
                                             </CardTitle>
@@ -965,30 +977,42 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                             </Card>
                         ) : (
                             <div className="space-y-4">
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {openCourses.map((course) => (
                                         <Card 
                                             key={course.id} 
-                                            className="rounded-xl flex flex-col shadow-sm hover:shadow-md transition-all overflow-hidden"
-                                            style={{backgroundColor: '#FFFFFC', borderColor: '#E5E5E5', borderWidth: '1px'}}
+                                            className="rounded-2xl flex flex-col shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer backdrop-blur-sm hover:scale-105 transform" 
+                                            style={{
+                                              backgroundColor: 'rgba(255, 255, 252, 0.8)',
+                                              borderColor: 'rgba(232, 184, 36, 0.2)',
+                                              borderWidth: '1px'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.boxShadow = '0 20px 40px rgba(232, 184, 36, 0.12)';
+                                              e.currentTarget.style.borderColor = 'rgba(232, 184, 36, 0.4)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                              e.currentTarget.style.borderColor = 'rgba(232, 184, 36, 0.2)';
+                                            }}
                                         >
-                                            {/* Dark top accent bar */}
+                                            {/* Gradient Top Border */}
                                             <div 
-                                              className="h-2"
-                                              style={{ backgroundColor: '#1A1A1A' }}
+                                              className="h-1"
+                                              style={{ background: 'linear-gradient(90deg, #E8B824 0%, rgba(232, 184, 36, 0) 100%)' }}
                                             ></div>
                                             
                                             <CardHeader className="pb-3 flex-shrink-0">
                                                 <div className="flex items-start justify-between mb-2 gap-2">
-                                                    <CardTitle className="text-lg font-bold text-ellipsis line-clamp-2" style={{ color: '#1A1A1A' }}>
+                                                    <CardTitle className="text-lg font-bold text-ellipsis line-clamp-2 group-hover:text-yellow-600 transition-colors" style={{ color: '#1A1A1A' }}>
                                                         {course.title}
                                                     </CardTitle>
                                                     <Badge 
                                                       className="flex-shrink-0 text-xs font-semibold px-2 py-1 whitespace-nowrap"
                                                       style={{
-                                                        backgroundColor: '#E3F2FD',
-                                                        color: '#1565C0',
-                                                        border: '1px solid #BBDEFB'
+                                                        backgroundColor: '#FFF7ED',
+                                                        color: '#B45309',
+                                                        border: '1px solid #E87835'
                                                       }}
                                                     >
                                                       <Globe className="h-3 w-3 mr-1" />
@@ -1007,7 +1031,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                             </CardContent>
 
                                             {/* Action Buttons */}
-                                            <div className="px-4 pb-4 pt-2 space-y-2 flex flex-col gap-2 flex-shrink-0 border-t" style={{ borderColor: '#E5E5E5' }}>
+                                            <div className="px-4 pb-4 pt-2 space-y-2 flex flex-col gap-2 flex-shrink-0 border-t" style={{ borderColor: 'rgba(232, 184, 36, 0.2)' }}>
                                                 <div className="flex gap-2">
                                                     <Button
                                                         size="sm"
@@ -1026,8 +1050,8 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                                         onClick={() => router.push(`/open-courses/${course.id}/preview`)}
                                                         className="flex-1 text-xs font-semibold rounded-lg transition-all hover:opacity-90"
                                                         style={{
-                                                            backgroundColor: '#F5F5F5',
-                                                            borderColor: '#E5E5E5',
+                                                            backgroundColor: '#FAF3EB',
+                                                            borderColor: 'rgba(232, 184, 36, 0.2)',
                                                             color: '#1A1A1A',
                                                             border: '1px solid'
                                                         }}
