@@ -821,12 +821,16 @@ export default function CourseDetailPage() {
 
                     <div
                       style={{ color: "#4A4A4A" }}
-                      className="leading-relaxed mb-8"
+                      className="leading-relaxed mb-8 prose prose-sm max-w-none"
                     >
                       {currentLesson.content ? (
                         <div
                           dangerouslySetInnerHTML={{
                             __html: currentLesson.content,
+                          }}
+                          style={{
+                            wordWrap: "break-word",
+                            overflowWrap: "break-word",
                           }}
                         />
                       ) : (

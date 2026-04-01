@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LessonContentEditor } from "@/components/LessonContentEditor";
 import {
   Plus,
   Trash2,
@@ -28,6 +29,8 @@ import {
   BookMarked,
   Headphones,
   Dumbbell,
+  Eye,
+  X,
 } from "lucide-react";
 import {
   DndContext,
@@ -320,6 +323,8 @@ export default function ModuleEditorPage() {
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showModuleModal, setShowModuleModal] = useState(false);
 
   // Module form state
   const [newModule, setNewModule] = useState({
@@ -445,6 +450,56 @@ export default function ModuleEditorPage() {
 
     fetchModuleContent();
   }, [selectedModuleId]);
+
+  // Auto-populate lesson form when a lesson is selected
+  useEffect(() => {
+    if (selectedLessonId && activeTab === "lessons") {
+      const selectedLesson = lessons.find((l) => l.id === selectedLessonId);
+      if (selectedLesson) {
+        setNewLesson({
+          title: selectedLesson.title,
+          description: selectedLesson.description,
+          content: selectedLesson.content,
+          lesson_type: selectedLesson.lesson_type,
+        });
+      }
+    } else if (!selectedLessonId) {
+      // Reset form when deselected
+      setNewLesson({
+        title: "",
+        description: "",
+        content: "",
+        lesson_type: "explanation",
+      });
+    }
+  }, [selectedLessonId, activeTab, lessons]);
+
+  // Auto-populate material form when a material is selected
+  useEffect(() => {
+    if (selectedMaterialId && activeTab === "materials") {
+      const selectedMaterial = materials.find((m) => m.id === selectedMaterialId);
+      if (selectedMaterial) {
+        setNewMaterial({
+          title: selectedMaterial.title,
+          description: selectedMaterial.description,
+          material_type: selectedMaterial.material_type,
+          source_type: selectedMaterial.source_type,
+          file_url: selectedMaterial.file_url || "",
+          external_url: selectedMaterial.external_url || "",
+        });
+      }
+    } else if (!selectedMaterialId) {
+      // Reset form when deselected
+      setNewMaterial({
+        title: "",
+        description: "",
+        material_type: "video",
+        source_type: "upload",
+        file_url: "",
+        external_url: "",
+      });
+    }
+  }, [selectedMaterialId, activeTab, materials]);
 
   // Handle module drag end
   const handleModuleDragEnd = async (event: DragEndEvent) => {
@@ -586,7 +641,7 @@ export default function ModuleEditorPage() {
     }
   };
 
-  // Handle add lesson
+  // Handle add/update lesson
   const handleAddLesson = async () => {
     if (!newLesson.title.trim() || !selectedModuleId) {
       setError(
@@ -599,40 +654,74 @@ export default function ModuleEditorPage() {
 
     try {
       setError("");
-      const orderIndex = lessons.length;
       const currentModuleId = selectedModuleId;
 
-      const { data, error: insertError } = await supabase
-        .from("module_lessons")
-        .insert({
-          module_id: currentModuleId,
-          title: newLesson.title,
-          description: newLesson.description,
-          content: newLesson.content,
-          lesson_type: newLesson.lesson_type,
-          order_index: orderIndex,
-          is_active: true,
-        })
-        .select()
-        .single();
+      // If editing an existing lesson
+      if (selectedLessonId) {
+        const { error: updateError } = await supabase
+          .from("module_lessons")
+          .update({
+            title: newLesson.title,
+            description: newLesson.description,
+            content: newLesson.content,
+            lesson_type: newLesson.lesson_type,
+          })
+          .eq("id", selectedLessonId);
 
-      if (insertError) throw insertError;
+        if (updateError) throw updateError;
 
-      setLessons([...lessons, data]);
-      setNewLesson({
-        title: "",
-        description: "",
-        content: "",
-        lesson_type: "explanation",
-      });
-      setSuccess("Lesson added successfully!");
-      setTimeout(() => setSuccess(""), 3000);
+        // Update local state
+        const updatedLessons = lessons.map((l) =>
+          l.id === selectedLessonId
+            ? {
+                ...l,
+                title: newLesson.title,
+                description: newLesson.description,
+                content: newLesson.content,
+                lesson_type: newLesson.lesson_type,
+              }
+            : l
+        );
+        setLessons(updatedLessons);
+        setSuccess("Lesson updated successfully!");
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        // Creating new lesson
+        const orderIndex = lessons.length;
+
+        const { data, error: insertError } = await supabase
+          .from("module_lessons")
+          .insert({
+            module_id: currentModuleId,
+            title: newLesson.title,
+            description: newLesson.description,
+            content: newLesson.content,
+            lesson_type: newLesson.lesson_type,
+            order_index: orderIndex,
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        setLessons([...lessons, data]);
+        setNewLesson({
+          title: "",
+          description: "",
+          content: "",
+          lesson_type: "explanation",
+        });
+        setSelectedLessonId(null);
+        setSuccess("Lesson added successfully!");
+        setTimeout(() => setSuccess(""), 3000);
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to add lesson");
+      setError(err.message || "Failed to save lesson");
     }
   };
 
-  // Handle add material
+  // Handle add/update material
   const handleAddMaterial = async () => {
     if (!newMaterial.title.trim() || !selectedModuleId) {
       setError(
@@ -645,48 +734,98 @@ export default function ModuleEditorPage() {
 
     try {
       setError("");
-      const orderIndex = materials.length;
       const currentModuleId = selectedModuleId;
 
-      const { data, error: insertError } = await supabase
-        .from("module_materials")
-        .insert({
-          module_id: currentModuleId,
-          title: newMaterial.title,
-          description: newMaterial.description,
-          material_type: newMaterial.material_type,
-          source_type: newMaterial.source_type,
-          file_url:
-            newMaterial.source_type === "upload"
-              ? newMaterial.file_url
-              : null,
-          external_url:
-            newMaterial.source_type !== "upload"
-              ? newMaterial.external_url
-              : null,
-          file_size_mb: null,
-          duration_seconds: null,
-          order_index: orderIndex,
-          is_active: true,
-        })
-        .select()
-        .single();
+      // If editing an existing material
+      if (selectedMaterialId) {
+        const { error: updateError } = await supabase
+          .from("module_materials")
+          .update({
+            title: newMaterial.title,
+            description: newMaterial.description,
+            material_type: newMaterial.material_type,
+            source_type: newMaterial.source_type,
+            file_url:
+              newMaterial.source_type === "upload"
+                ? newMaterial.file_url
+                : null,
+            external_url:
+              newMaterial.source_type !== "upload"
+                ? newMaterial.external_url
+                : null,
+          })
+          .eq("id", selectedMaterialId);
 
-      if (insertError) throw insertError;
+        if (updateError) throw updateError;
 
-      setMaterials([...materials, data]);
-      setNewMaterial({
-        title: "",
-        description: "",
-        material_type: "video",
-        source_type: "upload",
-        file_url: "",
-        external_url: "",
-      });
-      setSuccess("Material added successfully!");
-      setTimeout(() => setSuccess(""), 3000);
+        // Update local state
+        const updatedMaterials = materials.map((m) =>
+          m.id === selectedMaterialId
+            ? {
+                ...m,
+                title: newMaterial.title,
+                description: newMaterial.description,
+                material_type: newMaterial.material_type,
+                source_type: newMaterial.source_type,
+                file_url:
+                  newMaterial.source_type === "upload"
+                    ? newMaterial.file_url
+                    : null,
+                external_url:
+                  newMaterial.source_type !== "upload"
+                    ? newMaterial.external_url
+                    : null,
+              }
+            : m
+        );
+        setMaterials(updatedMaterials);
+        setSuccess("Material updated successfully!");
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        // Creating new material
+        const orderIndex = materials.length;
+
+        const { data, error: insertError } = await supabase
+          .from("module_materials")
+          .insert({
+            module_id: currentModuleId,
+            title: newMaterial.title,
+            description: newMaterial.description,
+            material_type: newMaterial.material_type,
+            source_type: newMaterial.source_type,
+            file_url:
+              newMaterial.source_type === "upload"
+                ? newMaterial.file_url
+                : null,
+            external_url:
+              newMaterial.source_type !== "upload"
+                ? newMaterial.external_url
+                : null,
+            file_size_mb: null,
+            duration_seconds: null,
+            order_index: orderIndex,
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        setMaterials([...materials, data]);
+        setNewMaterial({
+          title: "",
+          description: "",
+          material_type: "video",
+          source_type: "upload",
+          file_url: "",
+          external_url: "",
+        });
+        setSelectedMaterialId(null);
+        setSuccess("Material added successfully!");
+        setTimeout(() => setSuccess(""), 3000);
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to add material");
+      setError(err.message || "Failed to save material");
     }
   };
 
@@ -732,9 +871,9 @@ export default function ModuleEditorPage() {
     }
   };
 
-  // Check if lesson is locked (needs previous lessons completed)
+  // Check if lesson is locked (only locked in student view, not in teacher edit)
   const isLessonLocked = (index: number): boolean => {
-    return index > 0; // For now, all lessons except first are locked until completed
+    return false; // Teacher can edit all lessons - locking is only for students
   };
 
   if (loading) {
@@ -792,9 +931,24 @@ export default function ModuleEditorPage() {
           }}
         >
           <div className="space-y-4">
-            <h2 className="text-lg font-bold" style={{ color: "#1A1A1A" }}>
-              Modules
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold" style={{ color: "#1A1A1A" }}>
+                Modules
+              </h2>
+              {modules.length > 0 && (
+                <button
+                  onClick={() => setShowModuleModal(true)}
+                  className="py-2 px-4 rounded-lg font-semibold text-sm transition-all flex items-center gap-2"
+                  style={{
+                    backgroundColor: "#E8B824",
+                    color: "#1A1A1A",
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  New Module
+                </button>
+              )}
+            </div>
 
             {modules.length === 0 ? (
               <p className="text-sm" style={{ color: "#999999" }}>
@@ -864,49 +1018,20 @@ export default function ModuleEditorPage() {
               </p>
             </div>
 
-            {/* Create Module Form */}
-            <div
-              className="rounded-lg p-4 mt-6"
-              style={{
-                backgroundColor: "#FFFFFC",
-                border: "2px solid #E8B824",
-              }}
-            >
-              <h3 className="text-sm font-bold mb-3" style={{ color: "#1A1A1A" }}>
-                Create New Module
-              </h3>
-              <div className="space-y-2">
-                <Input
-                  placeholder="Module title"
-                  value={newModule.title}
-                  onChange={(e) =>
-                    setNewModule({ ...newModule, title: e.target.value })
-                  }
-                  className="h-9 rounded-lg border-2 border-gray-200 focus:border-yellow-400 text-sm"
-                  style={{ backgroundColor: "#FFFFFC" }}
-                />
-                <Input
-                  placeholder="Description (optional)"
-                  value={newModule.description}
-                  onChange={(e) =>
-                    setNewModule({ ...newModule, description: e.target.value })
-                  }
-                  className="h-9 rounded-lg border-2 border-gray-200 focus:border-yellow-400 text-sm"
-                  style={{ backgroundColor: "#FFFFFC" }}
-                />
-                <Button
-                  onClick={handleAddModule}
-                  className="w-full h-9 font-semibold flex items-center justify-center gap-2 text-sm"
-                  style={{
-                    backgroundColor: "#E8B824",
-                    color: "#1A1A1A",
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                  Create Module
-                </Button>
-              </div>
-            </div>
+            {/* Create First Module Button - Show only if no modules */}
+            {modules.length === 0 && (
+              <button
+                onClick={() => setShowModuleModal(true)}
+                className="w-full mt-6 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                style={{
+                  backgroundColor: "#E8B824",
+                  color: "#1A1A1A",
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Create First Module
+              </button>
+            )}
 
             {/* Tab Selector - Only show if module selected */}
             {selectedModuleId && (
@@ -960,18 +1085,54 @@ export default function ModuleEditorPage() {
                         >
                           <div className="space-y-2">
                             {lessons.map((lesson, index) => (
-                              <SortableLessonItem
-                                key={lesson.id}
-                                lesson={lesson}
-                                index={index}
-                                isSelected={selectedLessonId === lesson.id}
-                                isLocked={isLessonLocked(index)}
-                                onSelect={(id) => {
-                                  setSelectedLessonId(id);
-                                  setSelectedMaterialId(null);
-                                }}
-                                getLessonIcon={getLessonIcon}
-                              />
+                              <div key={lesson.id}>
+                                <SortableLessonItem
+                                  lesson={lesson}
+                                  index={index}
+                                  isSelected={selectedLessonId === lesson.id}
+                                  isLocked={isLessonLocked(index)}
+                                  onSelect={(id) => {
+                                    setSelectedLessonId(id);
+                                    setSelectedMaterialId(null);
+                                  }}
+                                  getLessonIcon={getLessonIcon}
+                                />
+                                {selectedLessonId === lesson.id && (
+                                  <>
+                                    <div className="flex gap-2 mt-2">
+                                      <button
+                                        onClick={() => handleDeleteLesson(lesson.id)}
+                                        className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                                        style={{
+                                          backgroundColor: "#DC2626",
+                                          color: "#FFFFFF",
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        Delete
+                                      </button>
+                                      <button
+                                        onClick={() => setShowPreviewModal(true)}
+                                        className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                                        style={{
+                                          backgroundColor: "#1A1A1A",
+                                          color: "#FFFFFF",
+                                        }}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                        Preview
+                                      </button>
+                                    </div>
+                                    <div
+                                      className="mt-3"
+                                      style={{
+                                        height: "1px",
+                                        backgroundColor: "#E5E5E5",
+                                      }}
+                                    ></div>
+                                  </>
+                                )}
+                              </div>
                             ))}
                           </div>
                         </SortableContext>
@@ -997,17 +1158,53 @@ export default function ModuleEditorPage() {
                         >
                           <div className="space-y-2">
                             {materials.map((material, index) => (
-                              <SortableMaterialItem
-                                key={material.id}
-                                material={material}
-                                index={index}
-                                isSelected={selectedMaterialId === material.id}
-                                onSelect={(id) => {
-                                  setSelectedMaterialId(id);
-                                  setSelectedLessonId(null);
-                                }}
-                                getMaterialIcon={getMaterialIcon}
-                              />
+                              <div key={material.id}>
+                                <SortableMaterialItem
+                                  material={material}
+                                  index={index}
+                                  isSelected={selectedMaterialId === material.id}
+                                  onSelect={(id) => {
+                                    setSelectedMaterialId(id);
+                                    setSelectedLessonId(null);
+                                  }}
+                                  getMaterialIcon={getMaterialIcon}
+                                />
+                                {selectedMaterialId === material.id && (
+                                  <>
+                                    <div className="flex gap-2 mt-2">
+                                      <button
+                                        onClick={() => handleDeleteMaterial(material.id)}
+                                        className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                                        style={{
+                                          backgroundColor: "#DC2626",
+                                          color: "#FFFFFF",
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        Delete
+                                      </button>
+                                      <button
+                                        onClick={() => setShowPreviewModal(true)}
+                                        className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                                        style={{
+                                          backgroundColor: "#1A1A1A",
+                                          color: "#FFFFFF",
+                                        }}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                        Preview
+                                      </button>
+                                    </div>
+                                    <div
+                                      className="mt-3"
+                                      style={{
+                                        height: "1px",
+                                        backgroundColor: "#E5E5E5",
+                                      }}
+                                    ></div>
+                                  </>
+                                )}
+                              </div>
                             ))}
                           </div>
                         </SortableContext>
@@ -1022,9 +1219,8 @@ export default function ModuleEditorPage() {
 
         {/* Center Content Area - Forms */}
         <div
-          className="flex-1 p-8 overflow-y-auto border-r"
+          className="flex-1 p-8 overflow-y-auto"
           style={{
-            borderRightColor: "#E5E5E5",
             backgroundColor: "#FFFFFC",
           }}
         >
@@ -1048,7 +1244,7 @@ export default function ModuleEditorPage() {
               </p>
             </div>
           ) : (
-            <div className="w-full max-w-2xl">
+            <>
             {/* Success Alert */}
             {success && (
               <div className="p-4 rounded-lg border border-green-200 bg-green-50 flex items-center gap-3 mb-6">
@@ -1080,7 +1276,7 @@ export default function ModuleEditorPage() {
                     style={{ color: "#E8B824" }}
                   />
                   <h2 className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>
-                    Add New Lesson
+                    {selectedLessonId ? "Edit Lesson" : "Add New Lesson"}
                   </h2>
                 </div>
 
@@ -1159,47 +1355,58 @@ export default function ModuleEditorPage() {
                     />
                   </div>
 
-                  {/* Content */}
+                  {/* Content - Rich Editor */}
                   <div>
                     <Label
                       htmlFor="lesson_content"
                       className="text-sm font-semibold"
                       style={{ color: "#1A1A1A" }}
                     >
-                      Content (HTML)
+                      Content with Media Support
                     </Label>
-                    <textarea
-                      id="lesson_content"
-                      placeholder="Add your lesson content here... (supports HTML)"
-                      value={newLesson.content}
-                      onChange={(e) =>
-                        setNewLesson({ ...newLesson, content: e.target.value })
+                    <LessonContentEditor
+                      content={newLesson.content}
+                      onChange={(content) =>
+                        setNewLesson({ ...newLesson, content })
                       }
-                      rows={6}
-                      className="w-full rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 p-3 text-base resize-none mt-1"
-                      style={{
-                        backgroundColor: "#FFFFFC",
-                        fontFamily: "monospace",
-                        fontSize: "12px",
-                      }}
                     />
-                    <p className="text-xs mt-1" style={{ color: "#999999" }}>
-                      You can use basic HTML tags or Markdown
-                    </p>
                   </div>
 
-                  {/* Add Button */}
-                  <Button
-                    onClick={handleAddLesson}
-                    className="w-full h-11 font-semibold flex items-center justify-center gap-2"
-                    style={{
-                      backgroundColor: "#E8B824",
-                      color: "#1A1A1A",
-                    }}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Lesson
-                  </Button>
+                  {/* Add/Update Button */}
+                  <div className="flex gap-3">
+                    {selectedLessonId && (
+                      <Button
+                        onClick={() => {
+                          setSelectedLessonId(null);
+                          setNewLesson({
+                            title: "",
+                            description: "",
+                            content: "",
+                            lesson_type: "explanation",
+                          });
+                        }}
+                        className="flex-1 h-11 font-semibold"
+                        style={{
+                          backgroundColor: "#F5F5F5",
+                          color: "#1A1A1A",
+                          border: "1px solid #E5E5E5",
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                    <Button
+                      onClick={handleAddLesson}
+                      className="flex-1 h-11 font-semibold flex items-center justify-center gap-2"
+                      style={{
+                        backgroundColor: "#E8B824",
+                        color: "#1A1A1A",
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                      {selectedLessonId ? "Update Lesson" : "Add Lesson"}
+                    </Button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1217,7 +1424,7 @@ export default function ModuleEditorPage() {
                     style={{ color: "#E87835" }}
                   />
                   <h2 className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>
-                    Add New Material
+                    {selectedMaterialId ? "Edit Material" : "Add New Material"}
                   </h2>
                 </div>
 
@@ -1380,202 +1587,441 @@ export default function ModuleEditorPage() {
                     </div>
                   )}
 
-                  {/* Add Button */}
-                  <Button
-                    onClick={handleAddMaterial}
-                    className="w-full h-11 font-semibold flex items-center justify-center gap-2"
-                    style={{
-                      backgroundColor: "#E87835",
-                      color: "#1A1A1A",
-                    }}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Material
-                  </Button>
+                  {/* Form Buttons */}
+                  <div className="flex gap-3">
+                    {selectedMaterialId && (
+                      <Button onClick={() => setSelectedMaterialId(null)} className="flex-1 h-11 font-semibold"
+                        style={{
+                          backgroundColor: "#F5F5F5",
+                          color: "#1A1A1A",
+                          border: "1px solid #E5E5E5",
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                    <Button
+                      onClick={handleAddMaterial}
+                      className="flex-1 h-11 font-semibold flex items-center justify-center gap-2"
+                      style={{
+                        backgroundColor: "#E87835",
+                        color: "#1A1A1A",
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                      {selectedMaterialId ? "Update Material" : "Add Material"}
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
-            </div>
-          )}
-        </div>
-
-        {/* Right Preview Panel */}
-        <div
-          className="w-80 p-6 overflow-y-auto"
-          style={{
-            backgroundColor: "#F9F7F4",
-            borderLeft: "1px solid #E5E5E5",
-          }}
-        >
-          {activeTab === "lessons" && selectedLessonId ? (
-            <>
-              {lessons
-                .filter((l) => l.id === selectedLessonId)
-                .map((lesson) => (
-                  <div key={lesson.id} className="space-y-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3
-                        className="text-lg font-bold"
-                        style={{ color: "#1A1A1A" }}
-                      >
-                        Preview
-                      </h3>
-                      <Button
-                        onClick={() => handleDeleteLesson(selectedLessonId)}
-                        size="sm"
-                        className="text-xs"
-                        style={{
-                          borderColor: "#DC2626",
-                          color: "#DC2626",
-                          backgroundColor: "transparent",
-                          border: "1px solid #DC2626",
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Delete
-                      </Button>
-                    </div>
-
-                    <div
-                      className="p-3 rounded-lg"
-                      style={{
-                        backgroundColor: "#FFFFFC",
-                        border: "1px solid #E5E5E5",
-                      }}
-                    >
-                      <p
-                        className="text-xs font-bold uppercase"
-                        style={{ color: "#999999" }}
-                      >
-                        {lesson.lesson_type}
-                      </p>
-                      <h4
-                        className="text-lg font-bold mt-2"
-                        style={{ color: "#1A1A1A" }}
-                      >
-                        {lesson.title}
-                      </h4>
-                      {lesson.description && (
-                        <p className="text-sm mt-2" style={{ color: "#4A4A4A" }}>
-                          {lesson.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {lesson.content && (
-                      <div>
-                        <p
-                          className="text-xs font-semibold mb-2"
-                          style={{ color: "#999999" }}
-                        >
-                          Content Preview:
-                        </p>
-                        <div
-                          className="p-3 rounded-lg text-xs line-clamp-4"
-                          style={{
-                            backgroundColor: "#FFFFFC",
-                            border: "1px solid #E5E5E5",
-                            color: "#4A4A4A",
-                          }}
-                        >
-                          {lesson.content.substring(0, 150)}...
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
             </>
-          ) : activeTab === "materials" && selectedMaterialId ? (
-            <>
-              {materials
-                .filter((m) => m.id === selectedMaterialId)
-                .map((material) => (
-                  <div key={material.id} className="space-y-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3
-                        className="text-lg font-bold"
-                        style={{ color: "#1A1A1A" }}
-                      >
-                        Preview
-                      </h3>
-                      <Button
-                        onClick={() => handleDeleteMaterial(selectedMaterialId)}
-                        size="sm"
-                        className="text-xs"
-                        style={{
-                          borderColor: "#DC2626",
-                          color: "#DC2626",
-                          backgroundColor: "transparent",
-                          border: "1px solid #DC2626",
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Delete
-                      </Button>
-                    </div>
-
-                    <div
-                      className="p-3 rounded-lg"
-                      style={{
-                        backgroundColor: "#FFFFFC",
-                        border: "1px solid #E5E5E5",
-                      }}
-                    >
-                      <p
-                        className="text-xs font-bold uppercase"
-                        style={{ color: "#999999" }}
-                      >
-                        {material.material_type}
-                      </p>
-                      <h4
-                        className="text-lg font-bold mt-2"
-                        style={{ color: "#1A1A1A" }}
-                      >
-                        {material.title}
-                      </h4>
-                      {material.description && (
-                        <p className="text-sm mt-2" style={{ color: "#4A4A4A" }}>
-                          {material.description}
-                        </p>
-                      )}
-
-                      {material.source_type === "youtube_link" ? (
-                        <p className="text-xs mt-2" style={{ color: "#E87835" }}>
-                          YouTube Link
-                        </p>
-                      ) : material.source_type === "upload" ? (
-                        <p className="text-xs mt-2" style={{ color: "#E8B824" }}>
-                          Uploaded File
-                        </p>
-                      ) : (
-                        <p className="text-xs mt-2" style={{ color: "#A86A32" }}>
-                          External Link
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-            </>
-          ) : (
-            <div
-              className="rounded-lg p-6 text-center"
-              style={{
-                backgroundColor: "#FFFFFC",
-                border: "2px dashed #E5E5E5",
-              }}
-            >
-              <Layers
-                className="h-12 w-12 mx-auto mb-3"
-                style={{ color: "#D4D4D4" }}
-              />
-              <p className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>
-                Select a {activeTab === "lessons" ? "lesson" : "material"} to
-                preview
-              </p>
-            </div>
           )}
         </div>
       </div>
+
+      {/* Create Module Modal */}
+      {showModuleModal && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div
+            className="rounded-lg max-w-md w-full p-6"
+            style={{ backgroundColor: "#FFFFFC" }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>
+                Create New Module
+              </h2>
+              <button
+                onClick={() => setShowModuleModal(false)}
+                className="p-1 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="h-5 w-5" style={{ color: "#1A1A1A" }} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <div className="space-y-4">
+              <div>
+                <Label
+                  htmlFor="modal_title"
+                  className="text-sm font-semibold"
+                  style={{ color: "#1A1A1A" }}
+                >
+                  Module Title *
+                </Label>
+                <Input
+                  id="modal_title"
+                  placeholder="e.g., German A1 Basics"
+                  value={newModule.title}
+                  onChange={(e) =>
+                    setNewModule({ ...newModule, title: e.target.value })
+                  }
+                  className="h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 mt-1"
+                  style={{ backgroundColor: "#FFFFFC" }}
+                />
+              </div>
+
+              <div>
+                <Label
+                  htmlFor="modal_description"
+                  className="text-sm font-semibold"
+                  style={{ color: "#1A1A1A" }}
+                >
+                  Description (Optional)
+                </Label>
+                <Input
+                  id="modal_description"
+                  placeholder="Brief description of this module"
+                  value={newModule.description}
+                  onChange={(e) =>
+                    setNewModule({ ...newModule, description: e.target.value })
+                  }
+                  className="h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 mt-1"
+                  style={{ backgroundColor: "#FFFFFC" }}
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-4">
+                <Button
+                  onClick={() => setShowModuleModal(false)}
+                  className="flex-1 h-10 font-semibold"
+                  style={{
+                    backgroundColor: "#F5F5F5",
+                    color: "#1A1A1A",
+                    border: "1px solid #E5E5E5",
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    handleAddModule();
+                    setShowModuleModal(false);
+                  }}
+                  className="flex-1 h-10 font-semibold flex items-center justify-center gap-2"
+                  style={{
+                    backgroundColor: "#E8B824",
+                    color: "#1A1A1A",
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Create
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Modal - Slides from Right */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex">
+          {/* Modal Content */}
+          <div
+            className="ml-auto w-full max-w-3xl h-full bg-white overflow-y-auto animate-in slide-in-from-right-96"
+            style={{ backgroundColor: "#FFFFFC" }}
+          >
+            <div className="p-8">
+              {/* Close Button */}
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                className="mb-6 text-sm font-semibold px-4 py-2 rounded-lg"
+                style={{
+                  backgroundColor: "#E87835",
+                  color: "#FFFFFF",
+                }}
+              >
+                ← Close Preview
+              </button>
+
+              {/* Lesson Preview */}
+              {activeTab === "lessons" && selectedLessonId && (
+                <>
+                  {lessons
+                    .filter((l) => l.id === selectedLessonId)
+                    .map((lesson) => (
+                      <div key={lesson.id} className="space-y-6">
+                        {/* Header */}
+                        <div>
+                          <p
+                            className="text-xs font-bold uppercase tracking-wide"
+                            style={{ color: "#999999" }}
+                          >
+                            {lesson.lesson_type}
+                          </p>
+                          <h2
+                            className="text-4xl font-bold mt-2"
+                            style={{ color: "#1A1A1A" }}
+                          >
+                            {lesson.title}
+                          </h2>
+                          {lesson.description && (
+                            <p
+                              className="text-lg mt-4"
+                              style={{ color: "#4A4A4A" }}
+                            >
+                              {lesson.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Content Rendered */}
+                        {lesson.content && (
+                          <div
+                            className="prose prose-sm max-w-none"
+                            style={{
+                              color: "#1A1A1A",
+                            }}
+                          >
+                            <div
+                              className="space-y-4"
+                              dangerouslySetInnerHTML={{
+                                __html: lesson.content,
+                              }}
+                              style={{
+                                lineHeight: "1.8",
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </>
+              )}
+
+              {/* Material Preview */}
+              {activeTab === "materials" && selectedMaterialId && (
+                <>
+                  {materials
+                    .filter((m) => m.id === selectedMaterialId)
+                    .map((material) => (
+                      <div key={material.id} className="space-y-6">
+                        {/* Header */}
+                        <div>
+                          <p
+                            className="text-xs font-bold uppercase tracking-wide"
+                            style={{ color: "#999999" }}
+                          >
+                            {material.material_type}
+                          </p>
+                          <h2
+                            className="text-4xl font-bold mt-2"
+                            style={{ color: "#1A1A1A" }}
+                          >
+                            {material.title}
+                          </h2>
+                          {material.description && (
+                            <p
+                              className="text-lg mt-4"
+                              style={{ color: "#4A4A4A" }}
+                            >
+                              {material.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Material Content */}
+                        <div
+                          className="rounded-lg p-6"
+                          style={{
+                            backgroundColor: "#F5F5F5",
+                            border: "1px solid #E5E5E5",
+                          }}
+                        >
+                          {material.material_type === "video" && (
+                            <div>
+                              <p
+                                className="text-sm font-semibold mb-3"
+                                style={{ color: "#1A1A1A" }}
+                              >
+                                Video:
+                              </p>
+                              {material.source_type === "youtube_link" &&
+                              material.external_url ? (
+                                <div
+                                  style={{
+                                    aspectRatio: "16/9",
+                                    borderRadius: "8px",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  <iframe
+                                    width="100%"
+                                    height="100%"
+                                    src={`https://www.youtube.com/embed/${extractYouTubeId(
+                                      material.external_url
+                                    )}`}
+                                    frameBorder="0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                  ></iframe>
+                                </div>
+                              ) : material.file_url ? (
+                                <video
+                                  controls
+                                  style={{
+                                    width: "100%",
+                                    borderRadius: "8px",
+                                    backgroundColor: "#000",
+                                  }}
+                                >
+                                  <source src={material.file_url} />
+                                </video>
+                              ) : (
+                                <p style={{ color: "#999999" }}>
+                                  {material.external_url || "No video source"}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {material.material_type === "audio" && (
+                            <div>
+                              <p
+                                className="text-sm font-semibold mb-3"
+                                style={{ color: "#1A1A1A" }}
+                              >
+                                Audio:
+                              </p>
+                              {material.file_url || material.external_url ? (
+                                <audio
+                                  controls
+                                  style={{
+                                    width: "100%",
+                                  }}
+                                >
+                                  <source
+                                    src={material.file_url || material.external_url || ""}
+                                  />
+                                </audio>
+                              ) : (
+                                <p style={{ color: "#999999" }}>
+                                  No audio source
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {material.material_type === "image" && (
+                            <div>
+                              <p
+                                className="text-sm font-semibold mb-3"
+                                style={{ color: "#1A1A1A" }}
+                              >
+                                Image:
+                              </p>
+                              {material.file_url || material.external_url ? (
+                                <img
+                                  src={material.file_url || material.external_url || ""}
+                                  alt={material.title}
+                                  style={{
+                                    maxWidth: "100%",
+                                    height: "auto",
+                                    borderRadius: "8px",
+                                    maxHeight: "500px",
+                                  }}
+                                />
+                              ) : (
+                                <p style={{ color: "#999999" }}>
+                                  No image source
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {material.material_type === "pdf" && (
+                            <div>
+                              <p
+                                className="text-sm font-semibold mb-3"
+                                style={{ color: "#1A1A1A" }}
+                              >
+                                PDF File:
+                              </p>
+                              {material.file_url || material.external_url ? (
+                                <a
+                                  href={material.file_url || material.external_url || ""}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 underline font-semibold"
+                                >
+                                  Open PDF →
+                                </a>
+                              ) : (
+                                <p style={{ color: "#999999" }}>
+                                  No PDF source
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {material.material_type === "resource" && (
+                            <div>
+                              <p
+                                className="text-sm font-semibold mb-3"
+                                style={{ color: "#1A1A1A" }}
+                              >
+                                Resource Link:
+                              </p>
+                              {material.external_url ? (
+                                <a
+                                  href={material.external_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-semibold"
+                                  style={{ color: "#E87835", textDecoration: "underline" }}
+                                >
+                                  {material.external_url}
+                                </a>
+                              ) : (
+                                <p style={{ color: "#999999" }}>
+                                  No resource link
+                                </p>
+                              )}
+                            </div>
+            )}
+          </div>
+                        {/* File Info */}
+                        <div
+                          className="rounded-lg p-4"
+                          style={{
+                            backgroundColor: "#F5F5F5",
+                            border: "1px solid #E5E5E5",
+                          }}
+                        >
+                          <p
+                            className="text-xs font-semibold"
+                            style={{ color: "#999999" }}
+                          >
+                            Source: {material.source_type.toUpperCase()}
+                          </p>
+                          {material.file_size_mb && (
+                            <p
+                              className="text-xs mt-1"
+                              style={{ color: "#999999" }}
+                            >
+                              Size: {material.file_size_mb} MB
+                            </p>
+                          )}
+                          {material.duration_seconds && (
+                            <p
+                              className="text-xs mt-1"
+                              style={{ color: "#999999" }}
+                            >
+                              Duration: {Math.floor(material.duration_seconds / 60)}m{" "}
+                              {material.duration_seconds % 60}s
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -1614,5 +2060,17 @@ export default function ModuleEditorPage() {
       default:
         return <Upload {...iconProps} />;
     }
+  }
+
+  // Extract YouTube ID from URL
+  function extractYouTubeId(url: string): string | null {
+    const regExp =
+      /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+
+    if (match && match[2].length === 11) {
+      return match[2];
+    }
+    return null;
   }
 }
