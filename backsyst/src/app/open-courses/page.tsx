@@ -474,44 +474,25 @@ export default function OpenCoursesPage() {
 
                     {/* CTA Button */}
                     <Button
-                      onClick={() =>
-                        user
-                          ? course.isEnrolled
-                            ? router.push(`/open-courses/${course.id}`)
-                            : handleEnroll(course.id)
-                          : handlePreview(course.id)
-                      }
+                      onClick={() => router.push(`/open-courses/${course.id}/syllabus`)}
                       className="w-full h-10 font-semibold rounded-lg transition-all flex items-center justify-center gap-2"
                       style={{
-                        backgroundColor: course.isEnrolled ? "#22C55E" : "#E8B824",
+                        backgroundColor: course.isEnrolled ? "#22C55E" : "#F5C518",
                         color: course.isEnrolled ? "#FFFFFF" : "#1A1A1A",
                       }}
                     >
-                      {user ? (
-                        course.isEnrolled ? (
-                          <>
-                            <CheckCircle2 className="h-4 w-4" />
-                            Lanjutkan Belajar
-                          </>
-                        ) : (
-                          <>
-                            Daftar Sekarang
-                            <ArrowRight className="h-4 w-4" />
-                          </>
-                        )
+                      {course.isEnrolled ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4" />
+                          Lanjutkan Belajar
+                        </>
                       ) : (
                         <>
-                          Preview
+                          Lihat Silabus
                           <ArrowRight className="h-4 w-4" />
                         </>
                       )}
                     </Button>
-
-                    {!user && (
-                      <p className="text-xs text-center mt-2" style={{ color: "#999999" }}>
-                        Register to enroll in course
-                      </p>
-                    )}
                   </div>
                 </div>
               ))}
