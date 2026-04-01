@@ -22,34 +22,12 @@ export default function AuthLayout({
   return (
     <>
       <style>{`
-        @keyframes pageSlideInRight {
-          from {
-            opacity: 0;
-            transform: translateX(50px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
-        @keyframes pageSlideInLeft {
-          from {
-            opacity: 0;
-            transform: translateX(-50px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
         .page-transition {
-          animation: pageSlideInRight 0.4s ease-out forwards;
+          /* Animations disabled */
         }
 
         .page-transition.transition-left {
-          animation: pageSlideInLeft 0.4s ease-out forwards;
+          /* Animations disabled */
         }
       `}</style>
       <div 
