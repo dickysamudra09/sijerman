@@ -9,7 +9,7 @@ export interface ModuleItem {
   title: string;
   description: string;
   orderIndex: number;
-  moduleType: string; // e.g., 'materi', 'latihan', 'kuis'
+  moduleType: string; 
   isCompleted: boolean;
   isAvailable: boolean;
   estimatedMinutes?: number;

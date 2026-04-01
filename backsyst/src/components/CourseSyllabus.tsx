@@ -27,7 +27,7 @@ export const CourseSyllabus: React.FC<CourseSyllabusProps> = ({
     .filter((outcome) => outcome.length > 0);
 
   return (
-    <div className="w-full bg-gradient-to-br from-blue-50 to-white rounded-lg border border-blue-100 p-6 md:p-8 shadow-sm">
+    <div className="w-full bg-gradient-to-br from-blue-50 to-white rounded-lg border border-blue-100 p-6 md:p-8 shadow-sm mb-4">
       {/* Header Section */}
       <div className="mb-8">
         <div className="flex items-start justify-between mb-4">
