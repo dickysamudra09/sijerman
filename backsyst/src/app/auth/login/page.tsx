@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
-import { AlertCircle, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, ArrowLeft, CheckCircle } from "lucide-react";
+import "@/styles/auth-animations.css";
 
 interface LoginForm {
   email: string;
@@ -15,11 +16,36 @@ interface LoginForm {
   remember?: boolean;
 }
 
+// Animation Hook
+const useFormAnimation = () => {
+  const [isVisible, setIsVisible] = useState(false);
+  
+  useEffect(() => {
+    setIsVisible(true);
+  }, []);
+  
+  return isVisible;
+};
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isRegistered = searchParams?.get("registered") === "true";
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successNotification, setSuccessNotification] = useState(isRegistered);
+  const isVisible = useFormAnimation();
+
+  // Auto-hide success notification after 5 seconds
+  useEffect(() => {
+    if (successNotification) {
+      const timer = setTimeout(() => {
+        setSuccessNotification(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successNotification]);
   const loginForm = useForm<LoginForm>({
     defaultValues: {
       email: "",
@@ -98,10 +124,36 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen bg-white">
       {/* Left Section: Login Form */}
-      <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-8 lg:p-12">
-        <div className="w-full max-w-md">
+      <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-8 lg:p-12 relative overflow-hidden" style={{background: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(255,253,248,1) 100%)'}}>
+        {/* Decorative Blobs */}
+        <div style={{
+          position: 'absolute',
+          top: '-10%',
+          right: '-5%',
+          width: '400px',
+          height: '400px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(232, 184, 36, 0.08) 0%, rgba(232, 184, 36, 0) 70%)',
+          filter: 'blur(80px)',
+          zIndex: 0,
+          pointerEvents: 'none'
+        }} />
+        <div style={{
+          position: 'absolute',
+          bottom: '-15%',
+          left: '-8%',
+          width: '350px',
+          height: '350px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(245, 158, 11, 0.06) 0%, rgba(245, 158, 11, 0) 70%)',
+          filter: 'blur(80px)',
+          zIndex: 0,
+          pointerEvents: 'none'
+        }} />
+
+        <div className="w-full max-w-md relative z-10">
           {/* Header */}
-          <div className="flex items-center justify-between mb-12">
+          <div className="flex items-center justify-between mb-12" style={{animation: isVisible ? 'fadeSlideDown 0.6s ease-out forwards' : 'none'}}>
             <div className="flex items-center gap-3">
               <img
                 src="/img/1.png" 
@@ -116,7 +168,7 @@ export default function LoginPage() {
             <Button 
               onClick={() => router.push("/")} 
               variant="ghost"
-              className="flex items-center gap-2 transition-colors hover:opacity-70"
+              className="flex items-center gap-2 transition-all duration-300 hover:opacity-70"
               style={{color: '#1A1A1A'}}
             >
               <ArrowLeft className="h-4 w-4" />
@@ -125,7 +177,7 @@ export default function LoginPage() {
           </div>
 
           {/* Heading */}
-          <div className="mb-12">
+          <div className="mb-12" style={{animation: isVisible ? 'fadeSlideDown 0.6s ease-out 0.1s forwards' : 'none', opacity: isVisible ? 1 : 0}}>
             <h1 className="text-3xl sm:text-4xl font-bold leading-tight mb-4" style={{color: '#1A1A1A', lineHeight: '1.3'}}>
               Masuk dan Nikmati Fitur Si Jerman
             </h1>
@@ -134,11 +186,47 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Form */}
-          <form
-            onSubmit={loginForm.handleSubmit(handleLogin)}
-            className="space-y-6"
-          >
+          {/* Success Notification - Registration */}
+          {successNotification && (
+            <div 
+              className="mb-6 p-4 rounded-lg border-2 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
+              style={{
+                borderColor: '#22C55E',
+                backgroundColor: 'rgba(34, 197, 94, 0.08)',
+                animation: 'fadeSlideDown 0.5s ease-out forwards'
+              }}
+            >
+              <CheckCircle className="h-5 w-5 flex-shrink-0" style={{color: '#22C55E'}} />
+              <p className="text-sm font-medium" style={{color: '#166534'}}>
+                Pendaftaran berhasil! Silakan login dengan akun Anda.
+              </p>
+              <button
+                onClick={() => setSuccessNotification(false)}
+                className="ml-auto text-sm opacity-70 hover:opacity-100 transition-opacity"
+                style={{color: '#166534'}}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Glassmorphic Form Card */}
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 252, 0.7)',
+            borderRadius: '20px',
+            border: '1px solid rgba(232, 184, 36, 0.15)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            padding: '32px 24px',
+            boxShadow: '0 8px 32px rgba(232, 184, 36, 0.08)',
+            animation: isVisible ? 'fadeScaleIn 0.7s ease-out 0.2s forwards' : 'none',
+            opacity: isVisible ? 1 : 0
+          }}>
+            {/* Form */}
+            <form
+              onSubmit={loginForm.handleSubmit(handleLogin)}
+              className="space-y-6"
+            >
             {/* Error Alert */}
             {error && (
               <div className="p-4 rounded-lg border border-red-200 bg-red-50 flex items-center gap-3">
@@ -161,9 +249,10 @@ export default function LoginPage() {
                   id="login-email"
                   type="email"
                   placeholder="nama@gmail.com"
-                  className="h-12 rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 focus:outline-none pl-4 pr-10 text-base transition-colors"
+                  className="h-12 rounded-lg border-2 focus:ring-0 focus:outline-none pl-4 pr-10 text-base transition-all duration-300"
                   style={{
                     backgroundColor: '#FFFFFC',
+                    borderColor: '#E8B824'
                   }}
                   {...loginForm.register("email", {
                     required: "Email wajib diisi",
@@ -206,9 +295,10 @@ export default function LoginPage() {
                   id="login-password"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••••"
-                  className="h-12 rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 focus:outline-none pl-4 pr-10 text-base transition-colors"
+                  className="h-12 rounded-lg border-2 focus:ring-0 focus:outline-none pl-4 pr-10 text-base transition-all duration-300"
                   style={{
                     backgroundColor: '#FFFFFC',
+                    borderColor: '#E8B824'
                   }}
                   {...loginForm.register("password", {
                     required: "Password wajib diisi",
@@ -218,7 +308,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:opacity-70"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-all duration-300 hover:opacity-70"
                   style={{color: '#4A4A4A'}}
                 >
                   {showPassword ? (
@@ -244,11 +334,11 @@ export default function LoginPage() {
                 <input
                   type="checkbox"
                   id="remember"
-                  className="rounded h-4 w-4 border-2 border-gray-200 cursor-pointer"
+                  className="rounded h-4 w-4 border-2 border-gray-200 cursor-pointer transition-all duration-300"
                   style={{accentColor: '#E8B824'}}
                   {...loginForm.register("remember")}
                 />
-                <label htmlFor="remember" className="text-base cursor-pointer" style={{color: '#4A4A4A'}}>
+                <label htmlFor="remember" className="text-base cursor-pointer transition-colors duration-300" style={{color: '#4A4A4A'}}>
                   Remember me
                 </label>
               </div>
@@ -256,7 +346,7 @@ export default function LoginPage() {
                 variant="link"
                 size="sm"
                 type="button"
-                className="px-0 h-auto font-semibold transition-colors hover:opacity-70"
+                className="px-0 h-auto font-semibold transition-all duration-300 hover:opacity-70"
                 style={{color: '#E8B824'}}
               >
                 Forgot Password?
@@ -266,10 +356,22 @@ export default function LoginPage() {
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full h-12 font-semibold text-base rounded-lg transition-all hover:opacity-90 shadow-md flex items-center justify-center gap-2"
+              className="w-full h-12 font-semibold text-base rounded-lg transition-all duration-300 shadow-md flex items-center justify-center gap-2"
               style={{
                 backgroundColor: '#1A1A1A',
                 color: '#FFFFFC'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 12px 24px rgba(232, 184, 36, 0.2)';
+                e.currentTarget.style.backgroundColor = '#E8B824';
+                e.currentTarget.style.color = '#1A1A1A';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.backgroundColor = '#1A1A1A';
+                e.currentTarget.style.color = '#FFFFFC';
               }}
               disabled={isLoading || !loginForm.formState.isValid}
             >
@@ -285,9 +387,10 @@ export default function LoginPage() {
 
             {/* Terms */}
             <p className="text-xs text-center leading-relaxed" style={{color: '#999999'}}>
-              Dengan login, Anda setuju dengan <a href="#" className="hover:underline" style={{color: '#E8B824'}}>Syarat & Ketentuan</a> dan <a href="#" className="hover:underline" style={{color: '#E8B824'}}>Kebijakan Privasi</a> kami.
+              Dengan login, Anda setuju dengan <a href="#" className="hover:underline transition-colors duration-300" style={{color: '#E8B824'}}>Syarat & Ketentuan</a> dan <a href="#" className="hover:underline transition-colors duration-300" style={{color: '#E8B824'}}>Kebijakan Privasi</a> kami.
             </p>
-          </form>
+            </form>
+          </div>
 
           {/* Divider */}
           <div className="relative my-6">
@@ -295,7 +398,7 @@ export default function LoginPage() {
               <div className="w-full border-t border-gray-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-white" style={{color: '#999999'}}>atau</span>
+              <span className="px-3 bg-gradient-to-b from-white to-[#FFFDF8]" style={{color: '#999999'}}>atau</span>
             </div>
           </div>
 
@@ -305,7 +408,7 @@ export default function LoginPage() {
             <Button
               type="button"
               variant="link"
-              className="ml-1 px-0 h-auto font-bold transition-colors hover:opacity-70"
+              className="ml-1 px-0 h-auto font-bold transition-all duration-300 hover:opacity-70"
               style={{color: '#E8B824'}}
               onClick={() => router.push("/auth/register")}
             >
@@ -316,7 +419,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right Section: Branding Visual */}
-      <div className="flex-1 bg-gradient-to-br from-[#1A1A1A] via-[#2A2A2A] to-[#1A1A1A] relative overflow-hidden hidden md:flex items-center justify-center p-8">
+      <div className="flex-1 bg-gradient-to-br from-[#1A1A1A] via-[#2A2A2A] to-[#1A1A1A] relative overflow-hidden hidden md:flex items-center justify-center p-8 sticky top-0 h-screen">
         <div className="absolute inset-0 z-0 opacity-20">
           <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
           <div className="absolute top-1/2 right-1/4 w-48 h-48 bg-yellow-300 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-2000"></div>
