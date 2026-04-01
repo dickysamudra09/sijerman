@@ -61,17 +61,17 @@ export default function CreateCoursePage() {
     setError("");
 
     if (!formData.title.trim()) {
-      setError("Course title is required");
+      setError("Judul kelas harus diisi");
       return;
     }
 
     if (!formData.description.trim()) {
-      setError("Course description is required");
+      setError("Deskripsi kelas harus diisi");
       return;
     }
 
     if (!user) {
-      setError("User not found");
+      setError("Pengguna tidak ditemukan");
       return;
     }
 
@@ -94,7 +94,7 @@ export default function CreateCoursePage() {
 
       router.push(`/teacher/courses/${data.id}/modules`);
     } catch (err: any) {
-      setError(err.message || "Failed to create course");
+      setError(err.message || "Gagal membuat kelas");
       setLoading(false);
     }
   };
@@ -105,8 +105,8 @@ export default function CreateCoursePage() {
       <header
         className="sticky top-0 z-50 border-b"
         style={{
-          backgroundColor: "rgba(26, 26, 26, 0.95)",
-          borderBottomColor: "#333333",
+          backgroundColor: "rgba(26, 26, 26, 0.98)",
+          borderBottomColor: "rgba(232, 184, 36, 0.1)",
           backdropFilter: "blur(10px)",
         }}
       >
@@ -118,7 +118,7 @@ export default function CreateCoursePage() {
             style={{ color: "#FFFFFC" }}
           >
             <ArrowLeft className="h-4 w-4" />
-            Back
+            Kembali
           </Button>
         </div>
       </header>
@@ -130,11 +130,10 @@ export default function CreateCoursePage() {
             className="text-4xl font-bold mb-2"
             style={{ color: "#1A1A1A", lineHeight: "1.3" }}
           >
-            Create New Course
+            Buat Kelas Baru
           </h1>
           <p style={{ color: "#4A4A4A" }}>
-            Start by entering basic information about your course. You'll add
-            modules and content in the next step.
+            Mulai dengan memasukkan informasi dasar tentang kelas Anda. Anda akan menambahkan modul dan konten di langkah berikutnya.
           </p>
         </div>
 
@@ -159,22 +158,23 @@ export default function CreateCoursePage() {
               className="text-sm font-semibold block"
               style={{ color: "#1A1A1A" }}
             >
-              Course Title *
+              Judul Kelas *
             </Label>
             <Input
               id="title"
               name="title"
               type="text"
-              placeholder="e.g., Learn German from Zero"
+              placeholder="Contoh: Belajar Bahasa Jerman dari Nol"
               value={formData.title}
               onChange={handleInputChange}
-              className="h-12 rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 focus:outline-none pl-4 pr-10 text-base transition-colors"
+              className="h-12 rounded-lg border-2 focus:border-yellow-400 focus:ring-0 focus:outline-none pl-4 pr-10 text-base transition-all hover:border-opacity-75"
               style={{
                 backgroundColor: "#FFFFFC",
+                borderColor: "rgba(232, 184, 36, 0.25)",
               }}
             />
             <p className="text-xs" style={{ color: "#999999" }}>
-              Make it clear and descriptive
+              Buat judul yang jelas dan deskriptif
             </p>
           </div>
 
@@ -185,68 +185,80 @@ export default function CreateCoursePage() {
               className="text-sm font-semibold block"
               style={{ color: "#1A1A1A" }}
             >
-              Course Description *
+              Deskripsi Kelas *
             </Label>
             <textarea
               id="description"
               name="description"
-              placeholder="Describe what students will learn in this course..."
+              placeholder="Jelaskan apa yang akan dipelajari siswa di kelas ini..."
               value={formData.description}
               onChange={handleInputChange}
               rows={5}
-              className="w-full rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 focus:outline-none p-4 text-base transition-colors resize-none"
+              className="w-full rounded-lg border-2 focus:border-yellow-400 focus:ring-0 focus:outline-none p-4 text-base transition-all resize-none hover:border-opacity-75"
               style={{
                 backgroundColor: "#FFFFFC",
                 fontFamily: "inherit",
+                borderColor: "rgba(232, 184, 36, 0.25)",
               }}
             />
             <p className="text-xs" style={{ color: "#999999" }}>
-              This will be displayed in the course discovery page
+              Ini akan ditampilkan di halaman pencarian kelas
             </p>
           </div>
 
           {/* Info Box */}
           <div
-            className="p-4 rounded-lg border-2"
+            className="p-5 rounded-xl border-2 backdrop-blur-sm"
             style={{
-              backgroundColor: "#FFFBF0",
-              borderColor: "#E8B824",
+              backgroundColor: "rgba(255, 255, 252, 0.8)",
+              borderColor: "rgba(232, 184, 36, 0.3)",
             }}
           >
-            <p className="text-sm font-semibold mb-2" style={{ color: "#E8B824" }}>
-              📝 Course Type: Open Class (Free)
-            </p>
-            <p className="text-sm" style={{ color: "#4A4A4A" }}>
-              You're creating an open, self-paced course. Students will be able
-              to preview the first 3 modules before enrolling. You can change
-              this to paid later.
-            </p>
+            <div className="flex items-start gap-3 mb-2">
+              <div 
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 font-bold text-sm"
+                style={{
+                  backgroundColor: "#E8B824",
+                  color: "#1A1A1A"
+                }}
+              >
+                ℹ
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold mb-1" style={{ color: "#1A1A1A" }}>
+                  Kelas Terbuka (Gratis)
+                </p>
+                <p className="text-sm" style={{ color: "#4A4A4A" }}>
+                  Anda membuat kelas terbuka yang dapat dipelajari sendiri. Siswa dapat melihat pratinjau 3 modul pertama sebelum mendaftar. Anda dapat mengubahnya menjadi berbayar nanti.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-3 pt-6 border-t" style={{ borderColor: "#E5E5E5" }}>
+          <div className="flex gap-3 pt-6 border-t" style={{ borderColor: "rgba(232, 184, 36, 0.1)" }}>
             <Button
               type="button"
               onClick={() => router.back()}
               variant="outline"
-              className="flex-1 h-12"
+              className="flex-1 h-12 font-semibold"
               style={{
                 color: "#1A1A1A",
-                borderColor: "#E5E5E5",
+                borderColor: "rgba(232, 184, 36, 0.2)",
               }}
             >
-              Cancel
+              Batalkan
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="flex-1 h-12 font-semibold"
+              className="flex-1 h-12 font-semibold transition-all hover:opacity-90 rounded-lg"
               style={{
                 backgroundColor: "#E8B824",
                 color: "#1A1A1A",
               }}
             >
-              {loading ? "Creating..." : "Create Course"}
+              {loading ? "Membuat..." : "Buat Kelas"}
             </Button>
           </div>
         </form>
