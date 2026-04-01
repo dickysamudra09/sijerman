@@ -211,7 +211,7 @@ export default function CourseDetailPage() {
     <div className="min-h-screen" style={{ backgroundColor: "#FFFFFC" }}>
       {/* Header */}
       <header
-        className="sticky top-0 z-30 border-b overflow-visible"
+        className="fixed top-0 left-0 right-0 z-30 border-b overflow-visible w-full"
         style={{
           backgroundColor: "rgba(13, 13, 13, 0.90)",
           backdropFilter: "blur(10px)",
@@ -414,38 +414,42 @@ export default function CourseDetailPage() {
 
         {/* Main Content - Full width, but with margin-left on desktop for fixed sidebar */}
         <main 
-          className="flex-1 w-full overflow-y-auto main-with-fixed-sidebar"
+          className="flex-1 w-full overflow-y-auto main-with-fixed-sidebar pb-20 pt-24"
         >
-          <div className="container mx-auto px-4 md:px-8 py-6 md:py-8 space-y-8 max-w-5xl">
-            {/* Course Syllabus */}
-            {course && (
-              <CourseSyllabus
-                courseTitle={course.title}
-                courseDescription={course.description}
-                learningOutcomes={
-                  // Aggregate unique learning outcomes from all modules
-                  modules
-                    .flatMap((m) => m.learning_outcomes?.split("|").map((o) => o.trim()) || [])
-                    .filter((o) => o.length > 0)
-                    .filter((o, i, arr) => arr.indexOf(o) === i) // Remove duplicates
-                    .join("|")
-                }
-                totalModules={modules.length}
-                estimatedHours={modules.length * 2} // Estimate 2 hours per module
-                progressPercentage={Math.round((unlockedModules.size / modules.length) * 100)}
-                teacherName={course.teacher?.name || "Instruktur"}
-              />
-            )}
+          <div className="w-full px-0 md:px-0 py-6 md:py-8 space-y-6">
+            <div className="max-w-full mx-auto px-2 md:px-4">
+              {/* Course Syllabus */}
+              {course && (
+                <div className="mx-4 md:mx-8">
+                  <CourseSyllabus
+                    courseTitle={course.title}
+                    courseDescription={course.description}
+                    learningOutcomes={
+                      // Aggregate unique learning outcomes from all modules
+                      modules
+                        .flatMap((m) => m.learning_outcomes?.split("|").map((o) => o.trim()) || [])
+                        .filter((o) => o.length > 0)
+                        .filter((o, i, arr) => arr.indexOf(o) === i) // Remove duplicates
+                        .join("|")
+                    }
+                    totalModules={modules.length}
+                    estimatedHours={modules.length * 2} // Estimate 2 hours per module
+                    progressPercentage={Math.round((unlockedModules.size / modules.length) * 100)}
+                    teacherName={course.teacher?.name || "Instruktur"}
+                  />
+                </div>
+              )}
 
-            {/* Module Content Card */}
-            {currentModule && (
-              <div
-                className="rounded-lg p-6 md:p-8 shadow-md"
-                style={{
-                  backgroundColor: "#FFFFFC",
-                  border: "1px solid #E5E5E5",
-                }}
-              >
+              {/* Module Content Card */}
+              {currentModule && (
+                <div className="mx-4 md:mx-8">
+                  <div
+                    className="rounded-lg p-6 md:p-8 shadow-md"
+                    style={{
+                      backgroundColor: "#FFFFFC",
+                      border: "1px solid #E5E5E5",
+                    }}
+                  >
                 <div className="mb-6">
                   <span
                     className="text-xs uppercase tracking-wider font-bold"
@@ -532,65 +536,69 @@ export default function CourseDetailPage() {
                     </p>
                   </div>
                 )}
-
-                {/* Navigation & Continue Button */}
-                <div
-                  className="mt-8 flex gap-4 pt-8 border-t"
-                  style={{ borderColor: "#E5E5E5" }}
-                >
-                  <Button
-                    onClick={() =>
-                      setSelectedModuleIndex(Math.max(0, selectedModuleIndex - 1))
-                    }
-                    disabled={selectedModuleIndex === 0}
-                    variant="outline"
-                    className="flex-1 h-10"
-                    style={{
-                      color:
-                        selectedModuleIndex === 0 ? "#999999" : "#1A1A1A",
-                    }}
-                  >
-                    Previous
-                  </Button>
-                  
-                  {/* Continue Button - Unlock Next Module */}
-                  {selectedModuleIndex < modules.length - 1 ? (
-                    <Button
-                      onClick={() => {
-                        // Unlock next module
-                        const newUnlockedModules = new Set(unlockedModules);
-                        newUnlockedModules.add(selectedModuleIndex + 1);
-                        setUnlockedModules(newUnlockedModules);
-                        
-                        // Move to next module
-                        setSelectedModuleIndex(selectedModuleIndex + 1);
-                      }}
-                      className="flex-1 h-10 font-semibold"
-                      style={{
-                        backgroundColor: "#F5C518",
-                        color: "#1A1A1A",
-                      }}
-                    >
-                      Lanjutkan ke Modul Berikutnya
-                    </Button>
-                  ) : (
-                    <Button
-                      disabled
-                      className="flex-1 h-10 font-semibold"
-                      style={{
-                        backgroundColor: "#22C55E",
-                        color: "#FFFFFF",
-                      }}
-                    >
-                      ✓ Kursus Selesai
-                    </Button>
-                  )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </main>
       </div>
+
+      {/* Fixed Navigation Footer */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-2xl z-20 footer-with-sidebar">
+        <div className="px-6 md:px-8 py-3 flex items-center justify-between">
+          <div className="flex-1"></div>
+          
+          <div className="flex items-center w-full justify-between gap-4">
+            <Button
+              onClick={() =>
+                setSelectedModuleIndex(Math.max(0, selectedModuleIndex - 1))
+              }
+              disabled={selectedModuleIndex === 0}
+              variant="outline"
+              className="h-9 px-4 font-semibold border-2 hover:bg-gray-50 transition-all flex-1 text-sm"
+              style={{
+                color:
+                  selectedModuleIndex === 0 ? "#999999" : "#1A1A1A",
+              }}
+            >
+              ← Sebelumnya
+            </Button>
+            
+            {selectedModuleIndex < modules.length - 1 ? (
+              <Button
+                onClick={() => {
+                  const newUnlockedModules = new Set(unlockedModules);
+                  newUnlockedModules.add(selectedModuleIndex + 1);
+                  setUnlockedModules(newUnlockedModules);
+                  setSelectedModuleIndex(selectedModuleIndex + 1);
+                }}
+                className="h-9 px-4 font-bold rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex-1 text-sm"
+                style={{
+                  background: 'linear-gradient(135deg, #F5C518 0%, #F59E0B 100%)',
+                  color: '#1A1A1A',
+                }}
+              >
+                Lanjutkan →
+              </Button>
+            ) : (
+              <Button
+                disabled
+                className="h-9 px-4 font-bold rounded-lg transition-all shadow-lg flex-1 text-sm"
+                style={{
+                  backgroundColor: "#10B981",
+                  color: "#FFFFFF",
+                }}
+              >
+                ✓ Selesai
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Spacing for fixed footer */}
+      <div className="h-24"></div>
 
       {/* Upgrade Modal */}
       {showAIUpgrade && (
