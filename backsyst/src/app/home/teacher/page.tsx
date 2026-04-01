@@ -183,14 +183,13 @@ const ProfileDropdown = ({ userName, onLogout }: { userName: string; onLogout: (
 
 function TeacherMode({ onBack }: TeacherModeProps) {
     const [userName, setUserName] = useState<string>("");
-    const [initialLoading, setInitialLoading] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
     const [classrooms, setClassrooms] = useState<ClassRoom[]>([]);
     const [openCourses, setOpenCourses] = useState<OpenCourse[]>([]);
     const [newClassName, setNewClassName] = useState("");
     const [newClassDescription, setNewClassDescription] = useState("");
     const [joinCode, setJoinCode] = useState("");
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [stats, setStats] = useState<TeacherStats | null>(null);
@@ -200,102 +199,187 @@ function TeacherMode({ onBack }: TeacherModeProps) {
     const [startTime, setStartTime] = useState("09:00");
     const [attendanceStart, setAttendanceStart] = useState("08:45");
     const [attendanceEnd, setAttendanceEnd] = useState("09:15");
+    const [loadingSession, setLoadingSession] = useState(true);
     const router = useRouter();
 
+    // Effect 1: Get session and user profile
     useEffect(() => {
-        const fetchUserData = async () => {
-            setIsLoading(true);
-            setInitialLoading(true);
-            setError(null);
+        const getSession = async () => {
+            try {
+                const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+                
+                if (sessionError || !sessionData?.session?.user?.id) {
+                    setError("Session error. Please login again.");
+                    router.push("/auth/login");
+                    return;
+                }
 
-            console.log("Mengambil data pengguna...");
+                const userIdValue = sessionData.session.user.id;
+                const authUser = sessionData.session.user;
+                setUserId(userIdValue);
 
-            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-            console.log("Respons sesi:", { sessionData, error: sessionError });
+                const { data: userData, error: userError } = await supabase
+                    .from("users")
+                    .select("name, role")
+                    .eq("id", userIdValue)
+                    .single();
 
-            if (sessionError || !sessionData.session?.user) {
-                setError("Tidak ada sesi ditemukan. Silakan masuk.");
-                setIsLoading(false);
-                router.push("/auth/login");
-                return;
-            }
+                if (userError) {
+                    setError("Failed to get user profile");
+                    return;
+                }
 
-            const userId = sessionData.session.user.id;
-            const authUser = sessionData.session.user;
-            setUserId(userId);
+                if (userData?.role !== "teacher") {
+                    router.push("/home/student");
+                    return;
+                }
 
-            const { data: userData, error: userError } = await supabase
-                .from("users")
-                .select("name, role")
-                .eq("id", userId)
-                .single();
-            console.log("Respons data pengguna:", { userData, error: userError });
-
-            if (userError) {
-                setError("Gagal mengambil data pengguna: " + userError.message);
-                setIsLoading(false);
-                return;
-            }
-
-            if (userData && userData.role === "teacher") {
-                // Set username dengan fallback: name dari db → full_name dari metadata → email
-                const displayName = userData.name || authUser.user_metadata?.full_name || authUser.email || "Guru";
+                const displayName = userData.name || authUser?.user_metadata?.full_name || authUser?.email || "Guru";
                 setUserName(displayName);
-            } else {
-                setError("Anda tidak memiliki peran sebagai guru.");
-                setIsLoading(false);
-                router.push("/home/student");
-                return;
+            } catch (err: any) {
+                console.error("Session error:", err);
+                setError("Error loading session");
+            } finally {
+                setLoadingSession(false);
             }
-
-            setIsLoading(false);
-            setInitialLoading(false);
         };
 
-        fetchUserData();
+        getSession();
     }, [router]);
 
-    const fetchTeacherStats = async (teacherId: string) => {
-        try {
-            const { count: totalClasses, error: classError } = await supabase
-                .from('classrooms')
-                .select('*', { count: 'exact', head: true })
-                .eq('teacher_id', teacherId);
-    
-            if (classError) throw classError;
+    // Effect 2: Fetch classrooms when userId is available
+    useEffect(() => {
+        if (!userId) return;
 
-            const { count: totalClassExercises, error: classExerciseError } = await supabase
-                .from('exercise_sets')
-                .select('*', { count: 'exact', head: true })
-                .eq('pembuat_id', teacherId)
-                .not('kelas_id', 'is', null);
-    
-            if (classExerciseError) throw classExerciseError;
+        const fetchClassrooms = async () => {
+            try {
+                const { data: classroomList, error: classError } = await supabase
+                    .from("classrooms")
+                    .select("id, name, code, description, created_at")
+                    .eq("teacher_id", userId);
 
-            const { count: totalPublicExercises, error: publicExerciseError } = await supabase
-                .from('exercise_sets')
-                .select('*', { count: 'exact', head: true })
-                .eq('pembuat_id', teacherId)
-                .is('kelas_id', null);
-    
-            if (publicExerciseError) throw publicExerciseError;
-    
-            setStats({
-                totalClasses: totalClasses ?? 0,
-                totalClassExercises: totalClassExercises ?? 0,
-                totalPublicExercises: totalPublicExercises ?? 0,
-            });
-        } catch (err) {
-            console.error("Gagal mengambil statistik guru:", err);
-            setError("Gagal mengambil data statistik.");
-        }
-    };
+                if (classError) throw classError;
+
+                if (classroomList && classroomList.length > 0) {
+                    const classroomsWithStudents = await Promise.all(
+                        classroomList.map(async (classroom) => {
+                            try {
+                                const { data: registrations } = await supabase
+                                    .from("classroom_registrations")
+                                    .select("student_id")
+                                    .eq("classroom_id", classroom.id);
+
+                                const studentIds = registrations?.map(r => r.student_id) || [];
+                                let students: any[] = [];
+                                
+                                if (studentIds.length > 0) {
+                                    const { data: studentData } = await supabase
+                                        .from("users")
+                                        .select("id, name, email")
+                                        .in("id", studentIds);
+
+                                    if (studentData) {
+                                        students = studentData.map(s => ({
+                                            id: s.id,
+                                            name: s.name,
+                                            email: s.email,
+                                        }));
+                                    }
+                                }
+
+                                return {
+                                    id: classroom.id,
+                                    name: classroom.name,
+                                    code: classroom.code,
+                                    description: classroom.description || "",
+                                    students,
+                                    createdAt: classroom.created_at,
+                                };
+                            } catch (err) {
+                                return {
+                                    id: classroom.id,
+                                    name: classroom.name,
+                                    code: classroom.code,
+                                    description: classroom.description || "",
+                                    students: [],
+                                    createdAt: classroom.created_at,
+                                };
+                            }
+                        })
+                    );
+
+                    setClassrooms(classroomsWithStudents);
+                }
+            } catch (err: any) {
+                console.error("Error fetching classrooms:", err);
+            }
+        };
+
+        fetchClassrooms();
+    }, [userId]);
+
+    // Effect 3: Fetch open courses when userId is available
+    useEffect(() => {
+        if (!userId) return;
+
+        const fetchOpenCourses = async () => {
+            try {
+                const { data: courses, error: courseError } = await supabase
+                    .from("courses")
+                    .select("*")
+                    .eq("teacher_id", userId)
+                    .eq("class_type", "open")
+                    .order("created_at", { ascending: false });
+
+                if (courseError) throw courseError;
+
+                setOpenCourses(courses || []);
+            } catch (err: any) {
+                console.error("Error fetching courses:", err);
+            }
+        };
+
+        fetchOpenCourses();
+    }, [userId]);
+
+    // Effect 4: Fetch stats when userId is available
+    useEffect(() => {
+        if (!userId) return;
+
+        const fetchStats = async () => {
+            try {
+                const { count: totalClasses } = await supabase
+                    .from('classrooms')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('teacher_id', userId);
+
+                const { count: totalClassExercises } = await supabase
+                    .from('exercise_sets')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('pembuat_id', userId)
+                    .not('kelas_id', 'is', null);
+
+                const { count: totalPublicExercises } = await supabase
+                    .from('exercise_sets')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('pembuat_id', userId)
+                    .is('kelas_id', null);
+
+                setStats({
+                    totalClasses: totalClasses ?? 0,
+                    totalClassExercises: totalClassExercises ?? 0,
+                    totalPublicExercises: totalPublicExercises ?? 0,
+                });
+            } catch (err: any) {
+                console.error("Error fetching stats:", err);
+            }
+        };
+
+        fetchStats();
+    }, [userId]);
 
     const handleLogout = async () => {
-        console.log("Mencoba keluar...");
         const { error } = await supabase.auth.signOut();
-        console.log("Respons keluar:", { error });
-
         if (error) {
             setError("Gagal keluar: " + error.message);
             return;
@@ -305,97 +389,32 @@ function TeacherMode({ onBack }: TeacherModeProps) {
         router.push("/");
     };
 
-    const fetchClassrooms = async () => {
-        if (!userId) return;
-        setIsLoading(true);
-        setError(null);
-        console.log("Mengambil kelas untuk pengguna:", userId, "Peran:", "teacher");
-
-        const { data, error } = await supabase
-            .from("classrooms")
-            .select("id, name, code, description, created_at")
-            .eq("teacher_id", userId);
-
-        console.log("Respons kelas guru:", { data, error });
-
-        if (error) {
-            setError("Gagal mengambil kelas: " + error.message);
-            setIsLoading(false);
-            return;
-        }
-
-        if (data) {
-            const classroomsWithStudents = await Promise.all(
-                data.map(async (classroom) => {
-                    const { data: registrations, error: regError } = await supabase
-                        .from("classroom_registrations")
-                        .select("student_id")
-                        .eq("classroom_id", classroom.id);
-
-                    if (regError) {
-                        console.error("Gagal mengambil registrasi:", regError.message);
-                        setError("Gagal mengambil registrasi: " + regError.message);
-                        return {
-                            id: classroom.id,
-                            name: classroom.name,
-                            code: classroom.code,
-                            description: classroom.description || "",
-                            students: [],
-                            createdAt: classroom.created_at,
-                        } as ClassRoom;
-                    }
-
-                    const studentIds = registrations.map(reg => reg.student_id);
-                    let students: any[] = [];
-                    if (studentIds.length > 0) {
-                        const { data: studentData, error: studentError } = await supabase
-                            .from("users")
-                            .select("id, name, email")
-                            .in("id", studentIds);
-
-                        if (studentError) {
-                            console.error("Gagal mengambil data siswa:", studentError.message);
-                            setError("Gagal mengambil data siswa: " + studentError.message);
-                        } else {
-                            students = studentData.map(student => ({
-                                id: student.id,
-                                name: student.name,
-                                email: student.email,
-                            }));
-                        }
-                    }
-
-                    return {
-                        id: classroom.id,
-                        name: classroom.name,
-                        code: classroom.code,
-                        description: classroom.description || "",
-                        students,
-                        createdAt: classroom.created_at,
-                    } as ClassRoom;
-                })
-            );
-            setClassrooms(classroomsWithStudents);
-            console.log("Kelas guru yang di-set:", classroomsWithStudents);
-        }
-        setIsLoading(false);
-    };
-
-    const fetchOpenCourses = async () => {
-        if (!userId) return;
-        
+    const fetchTeacherStats = async (teacherId: string) => {
         try {
-            const { data, error } = await supabase
-                .from("courses")
-                .select("*")
-                .eq("teacher_id", userId)
-                .eq("class_type", "open")
-                .order("created_at", { ascending: false });
+            const { count: totalClasses } = await supabase
+                .from('classrooms')
+                .select('*', { count: 'exact', head: true })
+                .eq('teacher_id', teacherId);
 
-            if (error) throw error;
-            setOpenCourses(data || []);
-        } catch (err: any) {
-            console.error("Gagal mengambil open courses:", err);
+            const { count: totalClassExercises } = await supabase
+                .from('exercise_sets')
+                .select('*', { count: 'exact', head: true })
+                .eq('pembuat_id', teacherId)
+                .not('kelas_id', 'is', null);
+
+            const { count: totalPublicExercises } = await supabase
+                .from('exercise_sets')
+                .select('*', { count: 'exact', head: true })
+                .eq('pembuat_id', teacherId)
+                .is('kelas_id', null);
+
+            setStats({
+                totalClasses: totalClasses ?? 0,
+                totalClassExercises: totalClassExercises ?? 0,
+                totalPublicExercises: totalPublicExercises ?? 0,
+            });
+        } catch (err) {
+            console.error("Error fetching stats:", err);
         }
     };
 
@@ -430,55 +449,102 @@ function TeacherMode({ onBack }: TeacherModeProps) {
         const code = generateClassCode();
         const classId = crypto.randomUUID();
         
-        // Insert classroom
-        const { error: classError } = await supabase.from("classrooms").insert({
-            id: classId,
-            name: newClassName,
-            code,
-            description: newClassDescription || "",
-            teacher_id: userId,
-            pertemuan: numPertemuan,
-            created_at: new Date().toISOString(),
-        });
+        try {
+            const { error: classError } = await supabase.from("classrooms").insert({
+                id: classId,
+                name: newClassName,
+                code,
+                description: newClassDescription || "",
+                teacher_id: userId,
+                pertemuan: numPertemuan,
+                created_at: new Date().toISOString(),
+            });
 
-        if (classError) {
-            setError("Gagal membuat kelas: " + classError.message);
+            if (classError) throw classError;
+            
+            const { error: scheduleError } = await supabase.from("classroom_schedule").insert({
+                id: crypto.randomUUID(),
+                classroom_id: classId,
+                day_of_week: scheduleDay,
+                start_time: startTime,
+                attendance_range_start: attendanceStart,
+                attendance_range_end: attendanceEnd,
+                created_at: new Date().toISOString(),
+            });
+
+            if (scheduleError) throw scheduleError;
+
+            setNewClassName("");
+            setNewClassDescription("");
+            setNumPertemuan(16);
+            setScheduleDay(1);
+            setStartTime("09:00");
+            setAttendanceStart("08:45");
+            setAttendanceEnd("09:15");
+            setIsModalOpen(false);
+            toast.success("Kelas berhasil dibuat dengan jadwal!");
+            
+            // Refetch classrooms
+            const { data: classroomList } = await supabase
+                .from("classrooms")
+                .select("id, name, code, description, created_at")
+                .eq("teacher_id", userId);
+
+            if (classroomList && classroomList.length > 0) {
+                const classroomsWithStudents = await Promise.all(
+                    classroomList.map(async (classroom) => {
+                        try {
+                            const { data: registrations } = await supabase
+                                .from("classroom_registrations")
+                                .select("student_id")
+                                .eq("classroom_id", classroom.id);
+
+                            const studentIds = registrations?.map(r => r.student_id) || [];
+                            let students: any[] = [];
+                            
+                            if (studentIds.length > 0) {
+                                const { data: studentData } = await supabase
+                                    .from("users")
+                                    .select("id, name, email")
+                                    .in("id", studentIds);
+
+                                if (studentData) {
+                                    students = studentData.map(s => ({
+                                        id: s.id,
+                                        name: s.name,
+                                        email: s.email,
+                                    }));
+                                }
+                            }
+
+                            return {
+                                id: classroom.id,
+                                name: classroom.name,
+                                code: classroom.code,
+                                description: classroom.description || "",
+                                students,
+                                createdAt: classroom.created_at,
+                            };
+                        } catch (err) {
+                            return {
+                                id: classroom.id,
+                                name: classroom.name,
+                                code: classroom.code,
+                                description: classroom.description || "",
+                                students: [],
+                                createdAt: classroom.created_at,
+                            };
+                        }
+                    })
+                );
+
+                setClassrooms(classroomsWithStudents);
+            }
+        } catch (err: any) {
+            setError("Gagal membuat kelas: " + err.message);
+        } finally {
             setIsLoading(false);
-            return;
         }
-        
-        // Insert classroom schedule
-        const { error: scheduleError } = await supabase.from("classroom_schedule").insert({
-            id: crypto.randomUUID(),
-            classroom_id: classId,
-            day_of_week: scheduleDay,
-            start_time: startTime,
-            attendance_range_start: attendanceStart,
-            attendance_range_end: attendanceEnd,
-            created_at: new Date().toISOString(),
-        });
-
-        if (scheduleError) {
-            setError("Gagal membuat jadwal kelas: " + scheduleError.message);
-            setIsLoading(false);
-            return;
-        }
-
-        // Reset form
-        setNewClassName("");
-        setNewClassDescription("");
-        setNumPertemuan(16);
-        setScheduleDay(1);
-        setStartTime("09:00");
-        setAttendanceStart("08:45");
-        setAttendanceEnd("09:15");
-        setIsModalOpen(false);
-        toast.success("Kelas berhasil dibuat dengan jadwal!");
-        await fetchClassrooms();
-        if (userId) {
-            await fetchTeacherStats(userId);
-        }
-        setIsLoading(false);
     };
 
     const copyClassCode = async (code: string) => {
@@ -490,23 +556,15 @@ function TeacherMode({ onBack }: TeacherModeProps) {
         }
     };
 
-    useEffect(() => {
-        if (userId) {
-            fetchClassrooms();
-            fetchOpenCourses();
-            fetchTeacherStats(userId);
-        }
-    }, [userId]);
-
-    if (initialLoading) {
+    if (loadingSession) {
         return (
             <div className="min-h-screen bg-gray-50 p-6">
                 <div className="max-w-7xl mx-auto">
                     <Card className="bg-white shadow-lg border-0 rounded-xl">
                         <CardContent className="flex items-center justify-center p-16">
                             <div className="text-center">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                                <p className="text-gray-600 text-lg">Memuat...</p>
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: "#E8B824" }}></div>
+                                <p className="text-gray-600 text-lg mt-4">Memuat...</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -515,7 +573,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
         );
     }
 
-    if (error) {
+    if (error && !classrooms.length && !openCourses.length) {
         return (
             <div className="min-h-screen bg-gray-50 p-6">
                 <div className="max-w-7xl mx-auto">
@@ -536,11 +594,15 @@ function TeacherMode({ onBack }: TeacherModeProps) {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen" style={{background: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(255,253,248,1) 100%)'}}>
             {/* Header dengan dark theme dan yellow accent */}
-            <div className="px-6 py-8 shadow-lg" style={{ backgroundColor: '#1A1A1A', borderBottom: '4px solid #E8B824' }}>
-                <div className="max-w-7xl mx-auto">
-                    <div className="flex items-center justify-between mb-6">
+            <div className="px-6 py-8 shadow-lg relative overflow-hidden" style={{ backgroundColor: '#1A1A1A', borderBottom: '4px solid #E8B824' }}>
+                {/* Decorative Blobs */}
+                <div className="absolute top-10 right-20 w-64 h-64 bg-gradient-to-br from-yellow-400 to-amber-300 rounded-full filter blur-3xl opacity-8 pointer-events-none" style={{opacity: 0.08}}></div>
+                <div className="absolute bottom-0 left-10 w-56 h-56 bg-gradient-to-br from-amber-300 to-yellow-300 rounded-full filter blur-3xl opacity-6 pointer-events-none" style={{opacity: 0.06}}></div>
+
+                <div className="max-w-7xl mx-auto relative z-10">
+                    <div className="flex items-center justify-between mb-8">
                         <div>
                             <h1 className="text-2xl font-bold mb-1" style={{ color: '#FFFFFC' }}>Selamat Datang, {userName || "Guru"}!</h1>
                             <p className="text-sm" style={{ color: '#E8B824' }}>Kelola kelas dan materi pembelajaran Anda dengan mudah</p>
@@ -559,45 +621,75 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                         </div>
                     </div>
 
-                    {/* Stats Cards di dalam header dark dengan white accent */}
+                    {/* Stats Cards - Glasmorphic */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Card 1 - Kelas yang dibuat */}
-                        <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+                        <div className="rounded-xl p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
+                            backgroundColor: 'rgba(255, 255, 252, 0.1)',
+                            borderColor: 'rgba(232, 184, 36, 0.2)',
+                            borderWidth: '1px'
+                        }} onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 12px 28px rgba(232, 184, 36, 0.15)';
+                        }} onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                        }}>
                             <div className="flex items-start justify-between">
                                 <div className="flex-1">
-                                    <p className="text-gray-400 text-sm mb-2">Kelas yang Dibuat</p>
+                                    <p className="text-gray-300 text-sm mb-3">Kelas yang Dibuat</p>
                                     <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{stats?.totalClasses ?? 0}</p>
-                                    <p className="text-gray-500 text-xs">+2 kelas baru bulan ini</p>
+                                    <p className="text-gray-400 text-xs">Kelas institusi</p>
                                 </div>
-                                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
+                                <div className="p-3 rounded-lg transform transition-transform hover:scale-110" style={{backgroundColor: '#E8B824'}}>
                                     <BookOpen className="h-6 w-6" style={{color: '#1E1E1E'}} />
                                 </div>
                             </div>
                         </div>
 
                         {/* Card 2 - Latihan yang Dibuat */}
-                        <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+                        <div className="rounded-xl p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
+                            backgroundColor: 'rgba(255, 255, 252, 0.1)',
+                            borderColor: 'rgba(232, 184, 36, 0.2)',
+                            borderWidth: '1px'
+                        }} onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 12px 28px rgba(232, 184, 36, 0.15)';
+                        }} onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                        }}>
                             <div className="flex items-start justify-between">
                                 <div className="flex-1">
-                                    <p className="text-gray-400 text-sm mb-2">Latihan yang Dibuat</p>
+                                    <p className="text-gray-300 text-sm mb-3">Latihan yang Dibuat</p>
                                     <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{stats?.totalClassExercises ?? 0}</p>
-                                    <p className="text-gray-500 text-xs">+5 latihan minggu ini</p>
+                                    <p className="text-gray-400 text-xs">Untuk kelas</p>
                                 </div>
-                                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
-                                    <BookOpen className="h-6 w-6" style={{color: '#1E1E1E'}} />
+                                <div className="p-3 rounded-lg transform transition-transform hover:scale-110" style={{backgroundColor: '#E8B824'}}>
+                                    <ClipboardList className="h-6 w-6" style={{color: '#1E1E1E'}} />
                                 </div>
                             </div>
                         </div>
 
                         {/* Card 3 - Latihan Soal Umum */}
-                        <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+                        <div className="rounded-xl p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
+                            backgroundColor: 'rgba(255, 255, 252, 0.1)',
+                            borderColor: 'rgba(232, 184, 36, 0.2)',
+                            borderWidth: '1px'
+                        }} onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 12px 28px rgba(232, 184, 36, 0.15)';
+                        }} onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                        }}>
                             <div className="flex items-start justify-between">
                                 <div className="flex-1">
-                                    <p className="text-gray-400 text-sm mb-2">Latihan Soal Umum</p>
+                                    <p className="text-gray-300 text-sm mb-3">Latihan Soal Umum</p>
                                     <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{stats?.totalPublicExercises ?? 0}</p>
-                                    <p className="text-gray-500 text-xs">Untuk publik</p>
+                                    <p className="text-gray-400 text-xs">Untuk publik</p>
                                 </div>
-                                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
+                                <div className="p-3 rounded-lg transform transition-transform hover:scale-110" style={{backgroundColor: '#E8B824'}}>
                                     <Users className="h-6 w-6" style={{color: '#1E1E1E'}} />
                                 </div>
                             </div>
@@ -606,7 +698,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-0 pt-0 pb-12">
+            <div className="max-w-7xl mx-auto px-6 pt-8 pb-12">
                 {/* Section Title */}
                 <div className="flex items-center justify-between mb-8 mt-8">
                     <div>
@@ -661,33 +753,41 @@ function TeacherMode({ onBack }: TeacherModeProps) {
 
                     <TabsContent value="classes" className="space-y-6 mt-0">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {classrooms.map((classroom) => (
+                            {classrooms.map((classroom, index) => (
                                 <Card 
                                     key={classroom.id} 
-                                    className="rounded-xl flex flex-col shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group cursor-pointer" 
+                                    className="rounded-2xl flex flex-col shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer backdrop-blur-sm hover:scale-105 transform" 
                                     style={{
-                                      backgroundColor: '#FFFFFC', 
-                                      borderColor: '#E5E5E5', 
+                                      backgroundColor: 'rgba(255, 255, 252, 0.8)',
+                                      borderColor: 'rgba(232, 184, 36, 0.2)',
                                       borderWidth: '1px'
                                     }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.boxShadow = '0 20px 40px rgba(232, 184, 36, 0.12)';
+                                      e.currentTarget.style.borderColor = 'rgba(232, 184, 36, 0.4)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                      e.currentTarget.style.borderColor = 'rgba(232, 184, 36, 0.2)';
+                                    }}
                                 >
-                                    {/* Header dengan warna accent */}
+                                    {/* Gradient Top Border */}
                                     <div 
-                                      className="h-2"
-                                      style={{ backgroundColor: '#1A1A1A' }}
+                                      className="h-1"
+                                      style={{ background: 'linear-gradient(90deg, #E8B824 0%, rgba(232, 184, 36, 0) 100%)' }}
                                     ></div>
                                     
                                     <CardHeader className="pb-3 flex-shrink-0">
                                       <div className="flex items-start justify-between mb-2 gap-2">
-                                        <CardTitle className="text-lg font-bold text-ellipsis line-clamp-2" style={{ color: "#1A1A1A" }}>
+                                        <CardTitle className="text-lg font-bold text-ellipsis line-clamp-2 group-hover:text-yellow-600 transition-colors" style={{ color: "#1A1A1A" }}>
                                           {classroom.name}
                                         </CardTitle>
                                         <Badge 
                                           className="flex-shrink-0 text-xs font-semibold px-2 py-1 whitespace-nowrap"
                                           style={{
-                                            backgroundColor: '#E8F5E9',
-                                            color: '#2E7D32',
-                                            border: '1px solid #C8E6C9'
+                                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                            color: '#22C55E',
+                                            border: '1px solid rgba(34, 197, 94, 0.3)'
                                           }}
                                         >
                                           ✓ Aktif ({classroom.students.length})
@@ -702,11 +802,11 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                     </CardContent>
 
                                     {/* Action Buttons */}
-                                    <div className="px-4 pb-4 pt-2 space-y-2 flex flex-col gap-2 flex-shrink-0 border-t" style={{ borderColor: '#E5E5E5' }}>
+                                    <div className="px-4 pb-4 pt-2 space-y-2 flex flex-col gap-2 flex-shrink-0 border-t" style={{ borderColor: 'rgba(232, 184, 36, 0.1)' }}>
                                       {/* Class Code Section */}
                                       <div 
-                                        className="rounded-lg p-3 flex items-center justify-between mb-2"
-                                        style={{ backgroundColor: '#FFF8E1', borderColor: '#E8B824', borderWidth: '1px' }}
+                                        className="rounded-lg p-3 flex items-center justify-between mb-2 backdrop-blur-sm transition-all hover:shadow-md"
+                                        style={{ backgroundColor: 'rgba(232, 184, 36, 0.08)', borderColor: 'rgba(232, 184, 36, 0.3)', borderWidth: '1px' }}
                                       >
                                         <div>
                                           <p className="text-xs" style={{ color: "#4A4A4A" }}>Kode Kelas</p>
@@ -721,7 +821,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                           size="sm"
                                           variant="ghost"
                                           onClick={() => copyClassCode(classroom.code)}
-                                          className="text-sm p-2 h-8 w-8 rounded-md transition-colors hover:opacity-70"
+                                          className="text-sm p-2 h-8 w-8 rounded-md transition-all hover:scale-110 hover:bg-yellow-50"
                                           style={{ color: "#E8B824" }}
                                         >
                                           <Copy className="h-4 w-4" />
@@ -729,7 +829,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                       </div>
 
                                       <Button
-                                        className="w-full font-semibold text-sm h-9 rounded-lg transition-all hover:opacity-90"
+                                        className="w-full font-semibold text-sm h-10 rounded-lg transition-all hover:shadow-lg duration-200 group-hover:shadow-lg"
                                         style={{
                                           backgroundColor: '#E8B824', 
                                           color: '#1A1A1A'
@@ -737,6 +837,12 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                                         onClick={() => {
                                           console.log("Navigating to classroom with id:", classroom.id);
                                           router.push(`/home/classrooms/${classroom.id}`);
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.transform = 'translateY(-2px)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.transform = 'translateY(0)';
                                         }}
                                       >
                                         <Eye className="h-4 w-4 mr-2" />

@@ -183,7 +183,7 @@ function StudentMode({ onBack }: StudentModeProps) {
   const [userId, setUserId] = useState<string | null>(null);
   const [classrooms, setClassrooms] = useState<ClassRoom[]>([]);
   const [joinCode, setJoinCode] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isJoinConfirmOpen, setIsJoinConfirmOpen] = useState(false);
   const [selectedClassToJoin, setSelectedClassToJoin] = useState<any>(null);
@@ -192,60 +192,180 @@ function StudentMode({ onBack }: StudentModeProps) {
     completedExercises: 0,
     averageScore: 0,
   });
+  const [loadingSession, setLoadingSession] = useState(true);
   const router = useRouter();
 
+  // Effect 1: Get session and user profile
   useEffect(() => {
-    const fetchUserData = async () => {
-      setIsLoading(true);
-      setError(null);
-      console.log("Mengambil data pengguna...");
+    const getSession = async () => {
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !sessionData?.session?.user?.id) {
+          setError("Session error. Please login again.");
+          router.push("/auth/login");
+          return;
+        }
 
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      console.log("Respons sesi:", { sessionData, error: sessionError });
+        const userIdValue = sessionData.session.user.id;
+        setUserId(userIdValue);
 
-      if (sessionError || !sessionData.session?.user) {
-        setError("Tidak ada sesi ditemukan. Silakan masuk.");
-        setIsLoading(false);
-        router.push("/auth/login");
-        return;
-      }
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("name, role")
+          .eq("id", userIdValue)
+          .single();
 
-      const userId = sessionData.session.user.id;
-      setUserId(userId);
+        if (userError) {
+          setError("Failed to get user profile");
+          return;
+        }
 
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("name, role")
-        .eq("id", userId)
-        .single();
-      console.log("Respons data pengguna:", { userData, error: userError });
+        if (userData?.role !== "student") {
+          router.push("/home/teacher");
+          return;
+        }
 
-      if (userError) {
-        setError("Gagal mengambil data pengguna: " + userError.message);
-        setIsLoading(false);
-        return;
-      }
-
-      if (userData && userData.role === "student") {
         setUserName(userData.name);
-      } else {
-        setError("Anda tidak memiliki peran sebagai siswa.");
-        setIsLoading(false);
-        router.push("/home/teacher");
-        return;
+      } catch (err: any) {
+        console.error("Session error:", err);
+        setError("Error loading session");
+      } finally {
+        setLoadingSession(false);
       }
-
-      setIsLoading(false);
     };
 
-    fetchUserData();
+    getSession();
   }, [router]);
 
-  const handleLogout = async () => {
-    console.log("Mencoba keluar...");
-    const { error } = await supabase.auth.signOut();
-    console.log("Respons keluar:", { error });
+  // Effect 2: Fetch classrooms when userId is available
+  useEffect(() => {
+    if (!userId) return;
 
+    const fetchClassrooms = async () => {
+      try {
+        const { data: registrations, error: regError } = await supabase
+          .from("classroom_registrations")
+          .select("classroom_id")
+          .eq("student_id", userId);
+
+        if (regError) throw regError;
+
+        if (!registrations || registrations.length === 0) {
+          setClassrooms([]);
+          return;
+        }
+
+        const classroomIds = registrations.map(r => r.classroom_id);
+
+        const { data: classroomData, error: classError } = await supabase
+          .from("classrooms")
+          .select("id, name, code, description, created_at, teacher_id")
+          .in("id", classroomIds);
+
+        if (classError) throw classError;
+
+        if (!classroomData || classroomData.length === 0) {
+          setClassrooms([]);
+          return;
+        }
+
+        const classroomsWithTeacher = await Promise.all(
+          classroomData.map(async (classroom) => {
+            try {
+              const { data: teacherData } = await supabase
+                .from("users")
+                .select("name")
+                .eq("id", classroom.teacher_id)
+                .single();
+
+              return {
+                id: classroom.id,
+                name: classroom.name,
+                code: classroom.code,
+                description: classroom.description || "",
+                students: [],
+                createdAt: classroom.created_at,
+                teacherName: teacherData?.name || "Unknown",
+              };
+            } catch (err) {
+              return {
+                id: classroom.id,
+                name: classroom.name,
+                code: classroom.code,
+                description: classroom.description || "",
+                students: [],
+                createdAt: classroom.created_at,
+                teacherName: "Unknown",
+              };
+            }
+          })
+        );
+
+        setClassrooms(classroomsWithTeacher);
+      } catch (err: any) {
+        console.error("Error fetching classrooms:", err);
+      }
+    };
+
+    fetchClassrooms();
+  }, [userId]);
+
+  // Effect 3: Fetch student stats when userId is available
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchStats = async () => {
+      try {
+        const { data: registrations } = await supabase
+          .from("classroom_registrations")
+          .select("classroom_id")
+          .eq("student_id", userId);
+
+        const totalClassrooms = registrations?.length || 0;
+
+        let completedExercises = 0;
+        let totalScore = 0;
+        let scoreCount = 0;
+
+        if (registrations && registrations.length > 0) {
+          // Try to get exercises, but handle if table doesn't exist
+          try {
+            const { data: exercises } = await supabase
+              .from("student_exercises")
+              .select("score")
+              .eq("student_id", userId)
+              .not("score", "is", null);
+
+            if (exercises) {
+              completedExercises = exercises.length;
+              exercises.forEach((ex) => {
+                totalScore += ex.score || 0;
+                scoreCount++;
+              });
+            }
+          } catch (err) {
+            console.warn("Could not fetch exercises:", err);
+          }
+        }
+
+        const averageScore = scoreCount > 0 ? Math.round(totalScore / scoreCount) : 0;
+
+        setStudentStats({
+          totalClassrooms,
+          completedExercises,
+          averageScore,
+        });
+      } catch (err: any) {
+        console.error("Error fetching stats:", err);
+      }
+    };
+
+    fetchStats();
+  }, [userId]);
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
     if (error) {
       setError("Gagal keluar: " + error.message);
       return;
@@ -309,88 +429,75 @@ function StudentMode({ onBack }: StudentModeProps) {
     if (!userId) return;
     setIsLoading(true);
     setError(null);
-    console.log("Mengambil kelas untuk pengguna:", userId, "Peran:", "student");
 
-    const { data: registrations, error: regError } = await supabase
-      .from("classroom_registrations")
-      .select("classroom_id, joined_at")
-      .eq("student_id", userId);
+    try {
+      const { data: registrations, error: regError } = await supabase
+        .from("classroom_registrations")
+        .select("classroom_id, joined_at")
+        .eq("student_id", userId);
 
-    console.log("Respons registrasi siswa:", { registrations, error: regError });
+      if (regError) throw regError;
 
-    if (regError) {
-      console.error("Gagal mengambil registrasi siswa:", regError.message);
-      setError("Gagal mengambil kelas yang diikuti: " + regError.message);
-      setClassrooms([]);
-      setIsLoading(false);
-      return;
-    }
+      if (!registrations || registrations.length === 0) {
+        setClassrooms([]);
+        setIsLoading(false);
+        return;
+      }
 
-    if (!registrations || registrations.length === 0) {
-      console.log("Tidak ada kelas yang diikuti oleh siswa.");
-      setClassrooms([]);
-      setIsLoading(false);
-      return;
-    }
+      const classroomIds = registrations.map((reg) => reg.classroom_id);
 
-    const classroomIds = registrations.map((reg) => reg.classroom_id);
-    console.log("ID kelas yang diikuti:", classroomIds);
+      const { data: classroomData, error: classError } = await supabase
+        .from("classrooms")
+        .select("id, name, code, description, created_at, teacher_id")
+        .in("id", classroomIds);
 
-    const { data: classroomData, error: classError } = await supabase
-      .from("classrooms")
-      .select("id, name, code, description, created_at, teacher_id")
-      .in("id", classroomIds);
+      if (classError) throw classError;
 
-    console.log("Respons data kelas siswa:", { classroomData, error: classError });
+      if (!classroomData || classroomData.length === 0) {
+        setClassrooms([]);
+        setIsLoading(false);
+        return;
+      }
 
-    if (classError) {
-      console.error("Gagal mengambil detail kelas:", classError.message);
-      setError("Gagal mengambil detail kelas: " + classError.message);
-      setClassrooms([]);
-      setIsLoading(false);
-      return;
-    }
+      const classroomsWithTeacher = await Promise.all(
+        classroomData.map(async (classroom) => {
+          let teacherName = "Guru Tidak Dikenal";
+          try {
+            const { data: teacherData, error: teacherError } = await supabase
+              .from("users")
+              .select("name")
+              .eq("id", classroom.teacher_id)
+              .single();
 
-    if (!classroomData || classroomData.length === 0) {
-      console.log("Tidak ada data kelas yang ditemukan untuk ID:", classroomIds);
-      setClassrooms([]);
-      setIsLoading(false);
-      return;
-    }
-
-    const classroomsWithTeacher = await Promise.all(
-      classroomData.map(async (classroom) => {
-        let teacherName = "Guru Tidak Dikenal";
-        try {
-          const { data: teacherData, error: teacherError } = await supabase
-            .from("users")
-            .select("name")
-            .eq("id", classroom.teacher_id)
-            .single();
-
-          console.log("Respons data guru untuk kelas", classroom.id, ":", { teacherData, error: teacherError });
-
-          if (!teacherError && teacherData) {
-            teacherName = teacherData.name || "Guru Tidak Dikenal";
+            if (!teacherError && teacherData) {
+              teacherName = teacherData.name || "Guru Tidak Dikenal";
+            }
+          } catch (err) {
+            console.warn("Error fetching teacher for classroom:", err);
           }
-        } catch (err) {
-          console.warn("Kesalahan saat mengambil data guru untuk kelas", classroom.id, ":", err);
-        }
 
-        return {
-          id: classroom.id,
-          name: classroom.name,
-          code: classroom.code,
-          description: classroom.description || "Tidak ada deskripsi",
-          students: [],
-          createdAt: classroom.created_at,
-          teacherName,
-        } as ClassRoom;
-      })
-    );
-    setClassrooms(classroomsWithTeacher);
-    console.log("Kelas siswa yang di-set:", classroomsWithTeacher);
-    setIsLoading(false);
+          return {
+            id: classroom.id,
+            name: classroom.name,
+            code: classroom.code,
+            description: classroom.description || "Tidak ada deskripsi",
+            students: [],
+            createdAt: classroom.created_at,
+            teacherName,
+          } as ClassRoom;
+        })
+      );
+
+      setClassrooms(classroomsWithTeacher);
+      // Cache classrooms to localStorage
+      localStorage.setItem(`classrooms_${userId}`, JSON.stringify(classroomsWithTeacher));
+      setIsLoading(false);
+    } catch (err: any) {
+      console.error("Gagal mengambil kelas:", err);
+      setError("Gagal mengambil kelas: " + err.message);
+      setClassrooms([]);
+      setIsLoading(false);
+    }
   };
 
   const joinClass = async () => {
@@ -560,11 +667,15 @@ function StudentMode({ onBack }: StudentModeProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{background: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(255,253,248,1) 100%)'}}>
       {/* Header dengan dark theme dan gold accent */}
-      <div className="text-[#FFFFFC] px-6 py-8 shadow-lg" style={{ backgroundColor: '#1A1A1A', borderBottom: '4px solid #E8B824' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
+      <div className="text-[#FFFFFC] px-6 py-8 shadow-lg relative overflow-hidden" style={{ backgroundColor: '#1A1A1A', borderBottom: '4px solid #E8B824' }}>
+        {/* Decorative Blobs */}
+        <div className="absolute top-10 right-20 w-64 h-64 bg-gradient-to-br from-yellow-400 to-amber-300 rounded-full filter blur-3xl opacity-8 pointer-events-none" style={{opacity: 0.08}}></div>
+        <div className="absolute bottom-0 left-10 w-56 h-56 bg-gradient-to-br from-amber-300 to-yellow-300 rounded-full filter blur-3xl opacity-6 pointer-events-none" style={{opacity: 0.06}}></div>
+
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-2xl font-bold mb-1">Selamat Datang, {userName}!</h1>
               <p className="text-sm" style={{ color: '#E8B824' }}>Kelola kelas dan materi pembelajaran Anda dengan mudah</p>
@@ -583,45 +694,75 @@ function StudentMode({ onBack }: StudentModeProps) {
             </div>
           </div>
 
-          {/* Stats Cards di dalam header dark */}
+          {/* Stats Cards - Glasmorphic */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Card 1 - Kelas yang diikuti */}
-            <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+            <div className="rounded-xl p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
+              backgroundColor: 'rgba(255, 255, 252, 0.1)',
+              borderColor: 'rgba(232, 184, 36, 0.2)',
+              borderWidth: '1px'
+            }} onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 12px 28px rgba(232, 184, 36, 0.15)';
+            }} onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+            }}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <p className="text-gray-400 text-sm mb-2">Kelas yang diikuti</p>
+                  <p className="text-gray-300 text-sm mb-3">Kelas yang Diikuti</p>
                   <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.totalClassrooms}</p>
-                  <p className="text-gray-500 text-xs">Kelas</p>
+                  <p className="text-gray-400 text-xs">Kelas aktif</p>
                 </div>
-                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
+                <div className="p-3 rounded-lg transform transition-transform hover:scale-110" style={{backgroundColor: '#E8B824'}}>
                   <BookOpen className="h-6 w-6" style={{color: '#1E1E1E'}} />
                 </div>
               </div>
             </div>
 
             {/* Card 2 - Latihan Soal selesai */}
-            <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+            <div className="rounded-xl p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
+              backgroundColor: 'rgba(255, 255, 252, 0.1)',
+              borderColor: 'rgba(232, 184, 36, 0.2)',
+              borderWidth: '1px'
+            }} onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 12px 28px rgba(232, 184, 36, 0.15)';
+            }} onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+            }}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <p className="text-gray-400 text-sm mb-2">Latihan Soal selesai</p>
+                  <p className="text-gray-300 text-sm mb-3">Latihan Selesai</p>
                   <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.completedExercises}</p>
-                  <p className="text-gray-500 text-xs">Latihan</p>
+                  <p className="text-gray-400 text-xs">Total latihan</p>
                 </div>
-                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
-                  <BookOpen className="h-6 w-6" style={{color: '#1E1E1E'}} />
+                <div className="p-3 rounded-lg transform transition-transform hover:scale-110" style={{backgroundColor: '#E8B824'}}>
+                  <CheckCircle2 className="h-6 w-6" style={{color: '#1E1E1E'}} />
                 </div>
               </div>
             </div>
 
             {/* Card 3 - Rata-rata Nilai */}
-            <div className="rounded-xl p-5 hover:bg-opacity-80 transition-colors duration-200 hover:shadow-lg cursor-pointer" style={{backgroundColor: '#1E1E1E', borderColor: '#FFFFFC', borderWidth: '1px'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0A0A0A'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1E1E1E'}>
+            <div className="rounded-xl p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
+              backgroundColor: 'rgba(255, 255, 252, 0.1)',
+              borderColor: 'rgba(232, 184, 36, 0.2)',
+              borderWidth: '1px'
+            }} onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 12px 28px rgba(232, 184, 36, 0.15)';
+            }} onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+            }}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <p className="text-gray-400 text-sm mb-2">Rata-rata Nilai</p>
+                  <p className="text-gray-300 text-sm mb-3">Rata-rata Nilai</p>
                   <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.averageScore}%</p>
-                  <p className="text-gray-500 text-xs">Dari semua latihan</p>
+                  <p className="text-gray-400 text-xs">Performa Anda</p>
                 </div>
-                <div className="p-3 rounded-lg" style={{backgroundColor: '#E8B824'}}>
+                <div className="p-3 rounded-lg transform transition-transform hover:scale-110" style={{backgroundColor: '#E8B824'}}>
                   <TrendingUp className="h-6 w-6" style={{color: '#1E1E1E'}} />
                 </div>
               </div>
@@ -630,9 +771,9 @@ function StudentMode({ onBack }: StudentModeProps) {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px- pt-0 pb-12">
+      <div className="max-w-7xl mx-auto px-6 pt-8 pb-12">
         {/* Section Title */}
-        <div className="mb-6">
+        <div className="mb-8">
         </div>
 
         {/* Tabs */}
@@ -665,33 +806,41 @@ function StudentMode({ onBack }: StudentModeProps) {
           <TabsContent value="classrooms" className="space-y-6 mt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {classrooms.length > 0 ? (
-                classrooms.map((classroom) => (
+                classrooms.map((classroom, index) => (
                   <Card 
                     key={classroom.id} 
-                    className="rounded-xl flex flex-col shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group cursor-pointer" 
+                    className="rounded-2xl flex flex-col shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer backdrop-blur-sm hover:scale-105 transform" 
                     style={{
-                      backgroundColor: '#FFFFFC', 
-                      borderColor: '#E5E5E5', 
+                      backgroundColor: 'rgba(255, 255, 252, 0.8)',
+                      borderColor: 'rgba(232, 184, 36, 0.2)',
                       borderWidth: '1px'
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.boxShadow = '0 20px 40px rgba(232, 184, 36, 0.12)';
+                      e.currentTarget.style.borderColor = 'rgba(232, 184, 36, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(232, 184, 36, 0.2)';
+                    }}
                   >
-                    {/* Header dengan warna accent */}
+                    {/* Gradient Top Border */}
                     <div 
-                      className="h-2"
-                      style={{ backgroundColor: '#1A1A1A' }}
+                      className="h-1"
+                      style={{ background: 'linear-gradient(90deg, #E8B824 0%, rgba(232, 184, 36, 0) 100%)' }}
                     ></div>
                     
                     <CardHeader className="pb-3 flex-shrink-0">
                       <div className="flex items-start justify-between mb-2 gap-2">
-                        <CardTitle className="text-lg font-bold text-ellipsis line-clamp-2" style={{ color: "#1A1A1A" }}>
+                        <CardTitle className="text-lg font-bold text-ellipsis line-clamp-2 group-hover:text-yellow-600 transition-colors" style={{ color: "#1A1A1A" }}>
                           {classroom.name}
                         </CardTitle>
                         <Badge 
                           className="flex-shrink-0 text-xs font-semibold px-2 py-1 whitespace-nowrap"
                           style={{
-                            backgroundColor: '#E8F5E9',
-                            color: '#2E7D32',
-                            border: '1px solid #C8E6C9'
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            color: '#22C55E',
+                            border: '1px solid rgba(34, 197, 94, 0.3)'
                           }}
                         >
                           ✓ Aktif
@@ -706,7 +855,7 @@ function StudentMode({ onBack }: StudentModeProps) {
                       {/* Teacher Info */}
                       <div 
                         className="flex items-center gap-2 text-sm p-3 rounded-lg"
-                        style={{ backgroundColor: '#F5F5F5' }}
+                        style={{ backgroundColor: 'rgba(232, 184, 36, 0.05)' }}
                       >
                         <BookOpen className="h-4 w-4 flex-shrink-0" style={{ color: '#E8B824' }} />
                         <div className="min-w-0">
@@ -722,8 +871,8 @@ function StudentMode({ onBack }: StudentModeProps) {
                     <div className="px-4 pb-4 pt-2 space-y-2 flex flex-col gap-2 flex-shrink-0 border-t" style={{ borderColor: '#E5E5E5' }}>
                       {/* Class Code Section */}
                       <div 
-                        className="rounded-lg p-3 flex items-center justify-between mb-2"
-                        style={{ backgroundColor: '#FFF8E1', borderColor: '#E8B824', borderWidth: '1px' }}
+                        className="rounded-lg p-3 flex items-center justify-between mb-2 backdrop-blur-sm transition-all hover:shadow-md"
+                        style={{ backgroundColor: 'rgba(232, 184, 36, 0.08)', borderColor: 'rgba(232, 184, 36, 0.3)', borderWidth: '1px' }}
                       >
                         <div>
                           <p className="text-xs" style={{ color: "#4A4A4A" }}>Kode Kelas</p>
@@ -738,7 +887,7 @@ function StudentMode({ onBack }: StudentModeProps) {
                           size="sm"
                           variant="ghost"
                           onClick={() => copyClassCode(classroom.code)}
-                          className="text-sm p-2 h-8 w-8 rounded-md transition-colors hover:opacity-70"
+                          className="text-sm p-2 h-8 w-8 rounded-md transition-all hover:scale-110 hover:bg-yellow-50"
                           style={{ color: "#E8B824" }}
                         >
                           <Copy className="h-4 w-4" />
@@ -746,12 +895,18 @@ function StudentMode({ onBack }: StudentModeProps) {
                       </div>
 
                       <Button
-                        className="w-full font-semibold text-sm h-9 rounded-lg transition-all hover:opacity-90"
+                        className="w-full font-semibold text-sm h-10 rounded-lg transition-all hover:shadow-lg duration-200 group-hover:shadow-lg"
                         style={{
                           backgroundColor: '#E8B824', 
                           color: '#1A1A1A'
                         }}
                         onClick={() => handleViewClassroom(classroom.id)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
                       >
                         <Eye className="h-4 w-4 mr-2" />
                         Buka Kelas
@@ -775,11 +930,11 @@ function StudentMode({ onBack }: StudentModeProps) {
 
           <TabsContent value="join" className="space-y-6 mt-0">
             <Card 
-              className="rounded-xl shadow-sm border-l-4"
+              className="rounded-2xl shadow-sm border backdrop-blur-sm hover:shadow-md transition-all"
               style={{
-                backgroundColor: '#FFFFFC',
-                borderLeftColor: '#E8B824',
-                borderColor: '#E5E5E5'
+                backgroundColor: 'rgba(255, 255, 252, 0.8)',
+                borderColor: 'rgba(232, 184, 36, 0.2)',
+                borderWidth: '1px'
               }}
             >
               <CardHeader className="pb-4">
@@ -789,7 +944,7 @@ function StudentMode({ onBack }: StudentModeProps) {
                 >
                   <div 
                     className="p-2 rounded-lg"
-                    style={{ backgroundColor: '#FFF8E1' }}
+                    style={{ backgroundColor: 'rgba(232, 184, 36, 0.1)' }}
                   >
                     <UserPlus className="h-5 w-5" style={{ color: '#E8B824' }} />
                   </div>
@@ -805,17 +960,17 @@ function StudentMode({ onBack }: StudentModeProps) {
                     placeholder="Masukkan kode kelas..."
                     value={joinCode}
                     onChange={(e) => setJoinCode(e.target.value)}
-                    className="flex-1 h-11 rounded-lg border text-sm"
+                    className="flex-1 h-11 rounded-lg border text-sm transition-all focus:border-yellow-400"
                     style={{
-                      borderColor: '#E5E5E5',
-                      backgroundColor: '#F5F5F5',
+                      borderColor: 'rgba(232, 184, 36, 0.3)',
+                      backgroundColor: 'rgba(245, 245, 245, 0.6)',
                       color: '#1A1A1A'
                     }}
                   />
                   <Button 
                     onClick={joinClass} 
                     disabled={!joinCode.trim() || isLoading}
-                    className="px-6 h-11 font-semibold text-sm rounded-lg transition-all hover:opacity-90 disabled:opacity-50"
+                    className="px-6 h-11 font-semibold text-sm rounded-lg transition-all hover:-translate-y-1 disabled:opacity-50"
                     style={{
                       backgroundColor: '#E8B824',
                       color: '#1A1A1A'
@@ -831,7 +986,7 @@ function StudentMode({ onBack }: StudentModeProps) {
         </Tabs>
 
         <Dialog open={isJoinConfirmOpen} onOpenChange={setIsJoinConfirmOpen}>
-          <DialogContent className="rounded-xl max-w-md" style={{ backgroundColor: '#FFFFFC', borderColor: '#E8B824', borderWidth: '2px' }}>
+          <DialogContent className="rounded-2xl max-w-md" style={{ backgroundColor: '#FFFFFC', borderColor: 'rgba(232, 184, 36, 0.3)', borderWidth: '2px' }}>
             <DialogHeader>
               <DialogTitle className="text-xl" style={{ color: '#1A1A1A' }}>Bergabung ke Kelas</DialogTitle>
               <DialogDescription style={{ color: '#4A4A4A' }}>
@@ -841,23 +996,25 @@ function StudentMode({ onBack }: StudentModeProps) {
             <div className="space-y-4">
               {selectedClassToJoin && (
                 <>
-                  <div className="space-y-2">
-                    <h3 className="font-semibold" style={{ color: '#1A1A1A' }}>Nama Kelas: {selectedClassToJoin.name}</h3>
-                    <p className="text-sm" style={{ color: '#4A4A4A' }}>Deskripsi: {selectedClassToJoin.description}</p>
+                  <div className="space-y-2 p-4 rounded-lg" style={{ backgroundColor: 'rgba(232, 184, 36, 0.05)' }}>
+                    <h3 className="font-semibold" style={{ color: '#1A1A1A' }}>📚 {selectedClassToJoin.name}</h3>
+                    <p className="text-sm" style={{ color: '#4A4A4A' }}>📝 {selectedClassToJoin.description}</p>
                     <p className="text-sm" style={{ color: '#4A4A4A' }}>
-                      Dibuat pada: {new Date(selectedClassToJoin.createdAt).toLocaleDateString('id-ID')}
+                      📅 {new Date(selectedClassToJoin.createdAt).toLocaleDateString('id-ID')}
                     </p>
-                    <p className="text-sm" style={{ color: '#4A4A4A' }}>Guru: {selectedClassToJoin.teacherName}</p>
+                    <p className="text-sm" style={{ color: '#4A4A4A' }}>👨‍🏫 {selectedClassToJoin.teacherName}</p>
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button 
                       onClick={confirmJoinClass} 
                       disabled={isLoading} 
-                      className="font-semibold transition-all hover:opacity-90 disabled:opacity-50"
+                      className="flex-1 font-semibold transition-all hover:shadow-lg disabled:opacity-50"
                       style={{
                         backgroundColor: '#E8B824',
                         color: '#1A1A1A'
                       }}
+                      onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                      onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                     >
                       <CheckCircle2 className="h-4 w-4 mr-2" />
                       Masuk
@@ -865,9 +1022,9 @@ function StudentMode({ onBack }: StudentModeProps) {
                     <Button 
                       variant="outline" 
                       onClick={() => setIsJoinConfirmOpen(false)} 
-                      className="font-semibold transition-all hover:opacity-90"
+                      className="flex-1 font-semibold transition-all hover:shadow-md"
                       style={{
-                        borderColor: '#E8B824',
+                        borderColor: 'rgba(232, 184, 36, 0.5)',
                         color: '#E8B824'
                       }}
                     >
