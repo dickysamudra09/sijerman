@@ -651,14 +651,14 @@ export default function CourseDetailPage() {
       >
         <div className="text-center">
           <p style={{ color: "#4A4A4A" }} className="text-lg">
-            Access denied or course not found
+            Akses ditolak atau kursus tidak ditemukan
           </p>
           <Button
             onClick={() => router.push("/open-courses")}
             className="mt-4"
             style={{ backgroundColor: "#1A1A1A", color: "#FFFFFC" }}
           >
-            Back to Courses
+            Kembali ke Kursus
           </Button>
         </div>
       </div>
@@ -745,8 +745,8 @@ export default function CourseDetailPage() {
               className="md:hidden w-full justify-start gap-2"
               style={{ color: "#6B7280" }}
             >
-              <Menu className="h-4 w-4" />
-              Hide Menu
+              <X className="h-4 w-4" />
+              Sembunyikan Menu
             </Button>
             {/* Progress Summary */}
             <div
@@ -758,9 +758,9 @@ export default function CourseDetailPage() {
               }}
             >
               <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="h-5 w-5" style={{ color: "#E8B824" }} />
+                <TrendingUp className="h-5 w-5" strokeWidth={1.5} style={{ color: "#6B7280" }} />
                 <h4 className="font-bold text-sm" style={{ color: "#1A1A1A" }}>
-                  Progress
+                  Kemajuan
                 </h4>
               </div>
               <WarmProgressBar
@@ -807,22 +807,22 @@ export default function CourseDetailPage() {
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           {isModuleCompleted ? (
-                            <CheckCircle className="h-5 w-5 flex-shrink-0" style={{ color: "#2E7D32" }} />
+                            <CheckCircle className="h-5 w-5 flex-shrink-0" strokeWidth={1.5} style={{ color: "#6B7280" }} />
                           ) : isModuleUnlocked ? (
                             <div 
                               className="h-5 w-5 rounded-full flex-shrink-0 border-2" 
                               style={{ borderColor: isModuleSelected ? "#1A1A1A" : "#E8B824" }} 
                             />
                           ) : (
-                            <Lock className="h-5 w-5 flex-shrink-0" style={{ color: "#CCCCCC" }} />
+                            <Lock className="h-5 w-5 flex-shrink-0" strokeWidth={1.5} style={{ color: "#D1D5DB" }} />
                           )}
                           <span className="font-semibold truncate text-md">{module.title}</span>
                         </div>
                         {isModuleUnlocked && (
                           isModuleExpanded ? (
-                            <ChevronUp className="h-5 w-5 flex-shrink-0 ml-2" style={{ color: isModuleSelected ? "#1A1A1A" : "#666666" }} />
+                            <ChevronUp className="h-5 w-5 flex-shrink-0 ml-2" strokeWidth={1.5} style={{ color: "#9CA3AF" }} />
                           ) : (
-                            <ChevronDown className="h-5 w-5 flex-shrink-0 ml-2" style={{ color: isModuleSelected ? "#1A1A1A" : "#666666" }} />
+                            <ChevronDown className="h-5 w-5 flex-shrink-0 ml-2" strokeWidth={1.5} style={{ color: "#9CA3AF" }} />
                           )
                         )}
                       </button>
@@ -856,11 +856,11 @@ export default function CourseDetailPage() {
                               >
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                   {isCompleted ? (
-                                    <CheckCircle className="h-4 w-4 flex-shrink-0" style={{ color: "#2E7D32" }} />
+                                    <CheckCircle className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} style={{ color: "#6B7280" }} />
                                   ) : isLessonSelected ? (
                                     <div className="h-4 w-4 rounded-full flex-shrink-0" style={{ backgroundColor: "#E8B824" }} />
                                   ) : (
-                                    <Play className="h-4 w-4 flex-shrink-0" style={{ color: "#6B7280" }} />
+                                    <Play className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} style={{ color: "#9CA3AF" }} />
                                   )}
                                   <div className="flex-1 min-w-0">
                                     <div className="text-sm font-medium text-gray-800 truncate">{lesson.title}</div>
@@ -869,7 +869,7 @@ export default function CourseDetailPage() {
                                 <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                                   {isCompleted && (
                                     <span className="text-xs font-medium" style={{ color: "#2E7D32", whiteSpace: "nowrap" }}>
-                                      Completed
+                                      Selesai
                                     </span>
                                   )}
                                 </div>
@@ -903,23 +903,23 @@ export default function CourseDetailPage() {
                               >
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                   {isCompleted ? (
-                                    <CheckCircle className="h-4 w-4 flex-shrink-0" style={{ color: "#2E7D32" }} />
+                                    <CheckCircle className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} style={{ color: "#6B7280" }} />
                                   ) : isMaterialSelected ? (
                                     <div className="h-4 w-4 rounded-full flex-shrink-0" style={{ backgroundColor: "#E87835" }} />
                                   ) : (
-                                    <span style={{ color: "#E87835" }}>
-                                      {material.material_type === "video" && <Video className="h-4 w-4 flex-shrink-0" />}
-                                      {material.material_type === "audio" && <Headphones className="h-4 w-4 flex-shrink-0" />}
-                                      {material.material_type === "pdf" && <FileText className="h-4 w-4 flex-shrink-0" />}
-                                      {material.material_type === "image" && <Image className="h-4 w-4 flex-shrink-0" />}
-                                      {material.material_type === "resource" && <Link2 className="h-4 w-4 flex-shrink-0" />}
+                                    <span style={{ color: "#9CA3AF" }}>
+                                      {material.material_type === "video" && <Video className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
+                                      {material.material_type === "audio" && <Headphones className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
+                                      {material.material_type === "pdf" && <FileText className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
+                                      {material.material_type === "image" && <Image className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
+                                      {material.material_type === "resource" && <Link2 className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
                                     </span>
                                   )}
                                   <div className="flex-1 min-w-0">
                                     <div className="text-sm font-medium text-gray-800 truncate">{material.title}</div>
                                     {durationMinutes && (
                                       <div className="text-xs" style={{ color: "#999999" }}>
-                                        {durationMinutes} Minutes
+                                        {durationMinutes} Menit
                                       </div>
                                     )}
                                   </div>
@@ -927,7 +927,7 @@ export default function CourseDetailPage() {
                                 <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                                   {isCompleted && (
                                     <span className="text-xs font-medium" style={{ color: "#2E7D32", whiteSpace: "nowrap" }}>
-                                      Completed
+                                      Selesai
                                     </span>
                                   )}
                                 </div>
@@ -1059,7 +1059,7 @@ export default function CourseDetailPage() {
                         />
                       ) : (
                         <p className="text-gray-400">
-                          No content available for this lesson yet.
+                          Konten tidak tersedia untuk pelajaran ini.
                         </p>
                       )}
                     </div>
@@ -1077,7 +1077,7 @@ export default function CourseDetailPage() {
                     }}
                   >
                     <p style={{ color: "#4A4A4A" }}>
-                      Select a lesson to get started.
+                      Pilih pelajaran untuk memulai.
                     </p>
                   </div>
                 </div>
@@ -1130,7 +1130,7 @@ export default function CourseDetailPage() {
                                 {currentMaterial.title}
                               </h2>
                               <p style={{ color: "#4A4A4A" }}>
-                                {currentMaterial.description || "No description provided"}
+                                {currentMaterial.description || "Tidak ada deskripsi yang diberikan"}
                               </p>
                             </div>
 
@@ -1172,7 +1172,7 @@ export default function CourseDetailPage() {
                                       }}
                                     >
                                       <ExternalLink className="h-4 w-4" />
-                                      Watch Video
+                                      Tonton Video
                                     </a>
                                   )}
                                 </>
@@ -1199,7 +1199,7 @@ export default function CourseDetailPage() {
                                       }}
                                     >
                                       <ExternalLink className="h-4 w-4" />
-                                      Open Audio
+                                      Buka Audio
                                     </a>
                                   )}
                                 </>
@@ -1226,7 +1226,7 @@ export default function CourseDetailPage() {
                                       }}
                                     >
                                       <ExternalLink className="h-4 w-4" />
-                                      View Image
+                                      Lihat Gambar
                                     </a>
                                   )}
                                 </>
@@ -1246,7 +1246,7 @@ export default function CourseDetailPage() {
                                       }}
                                     >
                                       <Download className="h-4 w-4" />
-                                      Download PDF
+                                      Unduh PDF
                                     </a>
                                   )}
                                   {currentMaterial.external_url && !currentMaterial.file_url && (
@@ -1261,7 +1261,7 @@ export default function CourseDetailPage() {
                                       }}
                                     >
                                       <ExternalLink className="h-4 w-4" />
-                                      Open PDF
+                                      Buka PDF
                                     </a>
                                   )}
                                 </>
@@ -1281,7 +1281,7 @@ export default function CourseDetailPage() {
                                       }}
                                     >
                                       <Download className="h-4 w-4" />
-                                      Download Resource
+                                      Unduh Sumber Daya
                                     </a>
                                   )}
                                   {currentMaterial.external_url && (
@@ -1296,7 +1296,7 @@ export default function CourseDetailPage() {
                                       }}
                                     >
                                       <ExternalLink className="h-4 w-4" />
-                                      Open Resource
+                                      Buka Sumber Daya
                                     </a>
                                   )}
                                 </>
@@ -1314,7 +1314,7 @@ export default function CourseDetailPage() {
                             }}
                           >
                             <p style={{ color: "#4A4A4A" }}>
-                              Select a material from the sidebar to get started.
+                              Pilih materi dari sidebar untuk memulai.
                             </p>
                           </div>
                         </div>
@@ -1329,12 +1329,12 @@ export default function CourseDetailPage() {
                           border: "2px solid #F5C518",
                         }}
                       >
-                        <Lock className="h-8 w-8 mx-auto mb-2" style={{ color: "#F5C518" }} />
+                        <Lock className="h-8 w-8 mx-auto mb-2" strokeWidth={1.5} style={{ color: "#9CA3AF" }} />
                         <p
                           className="font-bold mb-1"
                           style={{ color: "#F5C518" }}
                         >
-                          Materials Locked
+                          Materi Terkunci
                         </p>
                         <p style={{ color: "#4A4A4A" }}>
                           Selesaikan semua pelajaran untuk mengakses materi.
@@ -1364,11 +1364,11 @@ export default function CourseDetailPage() {
                           className="font-bold text-sm mb-1"
                           style={{ color: "#F5C518" }}
                         >
-                          Free AI Feedback (1-2 attempts)
+                          Umpan Balik AI Gratis (1-2 Upaya)
                         </p>
                         <p className="text-xs mb-3" style={{ color: "#4A4A4A" }}>
-                          You have limited AI feedback attempts. Upgrade to paid
-                          for unlimited access.
+                          Anda memiliki upaya umpan balik AI terbatas. Tingkatkan ke berbayar
+                          untuk akses tanpa batas.
                         </p>
                         <Button
                           onClick={handleAIFeedback}
@@ -1379,7 +1379,7 @@ export default function CourseDetailPage() {
                             color: "#1A1A1A",
                           }}
                         >
-                          Use AI Feedback ({2 - aiAttempts} remaining)
+                          Gunakan Umpan Balik AI ({2 - aiAttempts} Tersisa)
                         </Button>
                       </div>
                     </div>
@@ -1389,17 +1389,18 @@ export default function CourseDetailPage() {
                 {/* Analytics (only if full access) */}
                 {access.canViewAnalytics && (
                   <div
-                    className="p-4 rounded-lg mb-6"
+                    className="p-4 rounded-lg mb-6 flex items-center gap-2"
                     style={{
                       backgroundColor: "#E8F5E9",
                       border: "1px solid #C8E6C9",
                     }}
                   >
+                    <CheckCircle className="h-4 w-4" strokeWidth={1.5} style={{ color: "#6B7280" }} />
                     <p
                       className="text-sm font-semibold"
                       style={{ color: "#2E7D32" }}
                     >
-                      ✓ Full analytics access available
+                      Akses analitik penuh tersedia
                     </p>
                   </div>
                 )}
@@ -1469,7 +1470,7 @@ export default function CourseDetailPage() {
                   selectedLessonIndex === 0 && selectedModuleIndex === 0 ? "#999999" : "#1A1A1A",
               }}
             >
-              ← Sebelumnya
+              ⬅ Sebelumnya
             </Button>
             
             {selectedModuleIndex < modules.length - 1 || activeTab === "lessons" || activeTab === "materials" ? (
@@ -1539,18 +1540,19 @@ export default function CourseDetailPage() {
                   color: '#1A1A1A',
                 }}
               >
-                Lanjutkan →
+                Lanjutkan ➡
               </Button>
             ) : (
               <Button
                 disabled
-                className="h-9 px-4 font-bold rounded-lg transition-all shadow-lg flex-1 text-sm"
+                className="h-9 px-4 font-bold rounded-lg transition-all shadow-lg flex-1 text-sm flex items-center justify-center gap-2"
                 style={{
                   backgroundColor: "#10B981",
                   color: "#FFFFFF",
                 }}
               >
-                ✓ Selesai
+                <CheckCircle className="h-4 w-4" strokeWidth={1.5} style={{ color: "#FFFFFF" }} />
+                Selesai
               </Button>
             )}
           </div>
@@ -1568,11 +1570,10 @@ export default function CourseDetailPage() {
             style={{ backgroundColor: "#FFFFFC" }}
           >
             <h3 className="text-2xl font-bold mb-2" style={{ color: "#1A1A1A" }}>
-              Upgrade to Premium
+              Tingkatkan ke Premium
             </h3>
             <p style={{ color: "#4A4A4A" }} className="mb-4">
-              You've used your free AI feedback attempts. Upgrade to premium for
-              unlimited access to AI feedback and analytics.
+              Anda telah menggunakan upaya umpan balik AI gratis Anda. Tingkatkan ke premium untuk akses tanpa batas ke umpan balik AI dan analitik.
             </p>
             <div className="space-y-3">
               <Button
@@ -1582,7 +1583,7 @@ export default function CourseDetailPage() {
                   color: "#1A1A1A",
                 }}
               >
-                Upgrade Now
+                Tingkatkan Sekarang
               </Button>
               <Button
                 onClick={() => setShowAIUpgrade(false)}
@@ -1590,7 +1591,7 @@ export default function CourseDetailPage() {
                 className="w-full h-12"
                 style={{ color: "#1A1A1A" }}
               >
-                Cancel
+                Batal
               </Button>
             </div>
           </div>

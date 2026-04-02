@@ -1,0 +1,686 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { supabase } from "@/lib/supabase";
+import { useRouter, useParams } from "next/navigation";
+import { toast } from "sonner";
+import { Trash2, Edit, BookOpen, Clock, FileText, UserCircle, MoreVertical, Download as DownloadIcon, GraduationCap, Bell, User, Home, LogOut, UploadCloud, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
+
+interface ContentItem {
+  id: string;
+  judul: string;
+  sub_judul: string;
+  jenis_create: string;
+  konten: string;
+  documents: { name: string; url: string }[];
+  deadline: string | null;
+  created_at: string;
+  updated_at: string;
+  pembuat: string;
+}
+
+interface StudentSubmission {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  file_url: string;
+  submitted_at: string;
+  status: string;
+}
+
+interface SubmissionWithStudentName extends StudentSubmission {
+  users: {
+    name: string;
+  } | null;
+}
+
+export default function ContentDetailPage() {
+  const [content, setContent] = useState<ContentItem | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("");
+  const [creatorName, setCreatorName] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submissions, setSubmissions] = useState<SubmissionWithStudentName[] | null>(null);
+  const [selectedSubmissionIds, setSelectedSubmissionIds] = useState<string[]>([]);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  
+  // State untuk upload tugas
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<StudentSubmission | null>(null);
+  
+  const router = useRouter();
+  const params = useParams();
+  const classId = params.classId as string;
+  const contentId = params.content as string;
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      if (!classId || !contentId) {
+        setError("Parameter kelas atau konten tidak valid.");
+        setIsLoading(false);
+        return;
+      }
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session?.user) {
+        setError("Tidak ada sesi ditemukan. Silakan masuk.");
+        router.push("/auth/login");
+        setIsLoading(false);
+        return;
+      }
+
+      const currentUserId = sessionData.session.user.id;
+      setUserId(currentUserId);
+
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("name, role")
+        .eq("id", currentUserId)
+        .single();
+
+      if (userError || !userData) {
+        setError("Gagal mengambil data pengguna: " + (userError?.message || ""));
+        setIsLoading(false);
+        return;
+      }
+
+      setUserRole(userData.role);
+      setUserName(userData.name || "");
+
+      let contentData: ContentItem | null = null;
+      let creator: string | null = null;
+      let fetchError: any = null;
+
+      if (userData.role === "teacher") {
+        const { data, error: fetchErr } = await supabase
+          .from("teacher_create")
+          .select("*, users!teacher_create_pembuat_fkey(name)")
+          .eq("id", contentId)
+          .eq("kelas", classId)
+          .single();
+        
+        if (data) {
+          contentData = data;
+          creator = data.users?.name || data.pembuat;
+        }
+        fetchError = fetchErr;
+
+        if (contentData && contentData.jenis_create.toLowerCase() === "tugas") {
+          const { data: submissionData, error: submissionError } = await supabase
+            .from("student_submissions")
+            .select(`
+              *,
+              users!student_submissions_student_id_fkey(name)
+            `)
+            .eq("assignment_id", contentId)
+            .order("submitted_at", { ascending: true });
+
+          if (submissionError) {
+            console.error("Error fetching student submissions:", submissionError);
+          } else {
+            setSubmissions(submissionData as SubmissionWithStudentName[]);
+          }
+        }
+      } else if (userData.role === "student") {
+        const { data: registration, error: regError } = await supabase
+          .from("classroom_registrations")
+          .select("classroom_id")
+          .eq("classroom_id", classId)
+          .eq("student_id", currentUserId)
+          .single();
+
+        if (regError || !registration) {
+          setError("Anda tidak terdaftar di kelas ini.");
+          setIsLoading(false);
+          return;
+        }
+
+        const { data, error: fetchErr } = await supabase
+          .from("teacher_create")
+          .select("*, users!teacher_create_pembuat_fkey(name)")
+          .eq("id", contentId)
+          .eq("kelas", classId)
+          .single();
+        
+        if (data) {
+          contentData = data;
+          creator = data.users?.name || data.pembuat;
+        }
+        fetchError = fetchErr;
+
+        // Fetch submission status untuk student
+        if (contentData && contentData.jenis_create.toLowerCase() === "tugas") {
+          const { data: submissionData, error: submissionError } = await supabase
+            .from("student_submissions")
+            .select("*")
+            .eq("assignment_id", contentId)
+            .eq("student_id", currentUserId)
+            .single();
+
+          if (submissionError && submissionError.code !== 'PGRST116') {
+            console.error("Error fetching submission status:", submissionError);
+          } else {
+            setSubmissionStatus(submissionData || null);
+          }
+        }
+      } else {
+        setError("Role pengguna tidak valid.");
+      }
+
+      if (fetchError) {
+        setError("Gagal mengambil konten: " + fetchError.message);
+      } else if (!contentData) {
+        setError("Konten tidak ditemukan atau Anda tidak memiliki akses.");
+      } else {
+        setContent(contentData);
+        setCreatorName(creator);
+      }
+
+      setIsLoading(false);
+    };
+
+    fetchContent();
+  }, [classId, contentId, router, userId]);
+
+  const handleDownload = async (fileUrl: string, fileName: string) => {
+    try {
+      const response = await fetch(fileUrl);
+      const blob = await response.blob();
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      toast.error("Gagal mengunduh file: " + (err.message || err));
+    }
+  };
+
+  const handleCheckboxChange = (id: string, isChecked: boolean) => {
+    if (isChecked) {
+      setSelectedSubmissionIds((prev) => [...prev, id]);
+    } else {
+      setSelectedSubmissionIds((prev) => prev.filter((submissionId) => submissionId !== id));
+    }
+  };
+
+  const handleDownloadSelected = async () => {
+    setIsDownloadingAll(true);
+    try {
+      if (!submissions) {
+        toast.error("Tidak ada data pengumpulan untuk diunduh.");
+        return;
+      }
+      
+      const filesToDownload = submissions.filter((sub) => selectedSubmissionIds.includes(sub.id));
+
+      if (filesToDownload.length === 0) {
+        toast.error("Tidak ada file yang dipilih.");
+        return;
+      }
+
+      for (const file of filesToDownload) {
+        const fileUrl = file.file_url;
+        const fileName = `${file.users?.name || "siswa"}_${fileUrl.substring(fileUrl.lastIndexOf('/') + 1)}`;
+        
+        await handleDownload(fileUrl, fileName);
+      }
+
+      toast.success(`${filesToDownload.length} dokumen berhasil diunduh!`);
+      setSelectedSubmissionIds([]);
+      
+    } catch (err: any) {
+      toast.error("Gagal mengunduh file: " + (err.message || err));
+    } finally {
+      setIsDownloadingAll(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!content || userRole !== "teacher" || content.pembuat !== userId) return;
+
+    const confirmDelete = window.confirm("Apakah Anda yakin ingin menghapus konten ini?");
+    if (!confirmDelete) return;
+
+    setIsLoading(true);
+
+    const { error } = await supabase
+      .from("teacher_create")
+      .delete()
+      .eq("id", contentId);
+
+    if (error) {
+      toast.error("Gagal menghapus konten: " + error.message);
+    } else {
+      toast.success("Konten berhasil dihapus!");
+      router.push(`/home/classrooms/${classId}`);
+    }
+
+    setIsLoading(false);
+  };
+
+  const handleUpdate = () => {
+    if (!content || userRole !== "teacher" || content.pembuat !== userId) return;
+    router.push(`/home/classrooms/create?classId=${classId}&contentId=${content.id}`);
+  };
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Logout Error:", error.message);
+      toast.error("Gagal keluar. Silakan coba lagi.");
+    } else {
+      router.push("/auth/login");
+    }
+  };
+
+  // Fungsi untuk upload tugas
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile || isUploading || !userId) {
+      toast.error("Pilih file terlebih dahulu.");
+      return;
+    }
+
+    if (selectedFile.size > 12 * 1024 * 1024) {
+      toast.error("Ukuran file maksimal 12MB.");
+      return;
+    }
+
+    setIsUploading(true);
+    const uniqueFileName = `${Date.now()}_${selectedFile.name}`;
+    const filePath = `${userId}/${contentId}/${uniqueFileName}`;
+
+    try {
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        throw new Error("Gagal mengunggah file: " + uploadError.message);
+      }
+
+      const { data: fileUrlData } = supabase.storage
+        .from('documents')
+        .getPublicUrl(filePath);
+
+      if (!fileUrlData || !fileUrlData.publicUrl) {
+        throw new Error("Gagal mendapatkan URL publik.");
+      }
+
+      const { error: dbError } = await supabase
+        .from('student_submissions')
+        .upsert({
+          assignment_id: contentId,
+          student_id: userId,
+          file_url: fileUrlData.publicUrl,
+          submitted_at: new Date().toISOString(),
+          status: 'submitted',
+        }, { onConflict: 'assignment_id,student_id', ignoreDuplicates: false });
+
+      if (dbError) {
+        console.error("Database upsert error:", dbError);
+        throw new Error("Gagal menyimpan data ke database: " + dbError.message);
+      }
+
+      toast.success("Tugas berhasil dikumpulkan!");
+      setSubmissionStatus({
+        id: crypto.randomUUID(),
+        assignment_id: contentId,
+        student_id: userId,
+        file_url: fileUrlData.publicUrl,
+        submitted_at: new Date().toISOString(),
+        status: 'submitted'
+      });
+      setSelectedFile(null);
+
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat mengunggah tugas.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+            <CardContent className="flex items-center justify-center p-16">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600 text-lg">Memuat konten...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !content) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+            <CardHeader>
+              <CardTitle className="text-red-600 text-xl">Error</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-red-600 mb-6">{error || "Konten tidak ditemukan"}</p>
+              <Button 
+                onClick={() => router.push(`/home/classrooms/${classId}`)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Kembali ke Kelas
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const isContentCreator = userRole === "teacher" && content.pembuat === userId;
+  const isAssignment = content.jenis_create.toLowerCase() === "tugas";
+  const isLate = content.deadline && new Date() > new Date(content.deadline);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        {/* Header with Back Button */}
+        <div className="mb-8 flex items-center gap-4">
+          <Button 
+            variant="ghost"
+            onClick={() => router.push(`/home/classrooms/${classId}`)}
+            className="h-10 w-10 p-0"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-gray-900">{content.judul}</h1>
+            <p className="text-gray-600 mt-1">{content.sub_judul}</p>
+          </div>
+          {isContentCreator && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleUpdate}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDelete} className="text-red-600">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Hapus
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+
+        {/* Info Bar */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-8 shadow-sm">
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-blue-600" />
+              <span className="text-sm text-gray-600">{content.jenis_create}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <UserCircle className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-gray-600">Oleh: {creatorName || content.pembuat}</span>
+            </div>
+            {content.deadline && (
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-purple-600" />
+                <span className="text-sm text-gray-600">
+                  Batas: {new Date(content.deadline).toLocaleDateString('id-ID')}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2">
+            <Card className="mb-8">
+              <CardContent className="p-8">
+                <div 
+                  dangerouslySetInnerHTML={{ __html: content.konten || '' }}
+                  className="prose prose-sm max-w-none text-gray-700"
+                />
+              </CardContent>
+            </Card>
+
+            {/* Student Submission Section */}
+            {isAssignment && userRole === "student" && (
+              <Card className="mb-8">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-xl">Kumpulkan Tugas</CardTitle>
+                    {submissionStatus ? (
+                      <Badge className="bg-green-100 text-green-700">
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        Sudah Dikumpulkan
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-yellow-100 text-yellow-700">
+                        <Clock className="h-4 w-4 mr-1" />
+                        Belum Dikumpulkan
+                      </Badge>
+                    )}
+                  </div>
+                  <CardDescription>
+                    {content.deadline && `Batas waktu: ${new Date(content.deadline).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!submissionStatus ? (
+                    <>
+                      <div
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                        className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500"
+                      >
+                        <UploadCloud className="h-12 w-12 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-600 mb-2">Drag and drop atau klik untuk memilih file</p>
+                        <label htmlFor="file-input" className="text-blue-600 text-sm font-medium cursor-pointer hover:underline">
+                          Pilih File
+                        </label>
+                        <input
+                          id="file-input"
+                          type="file"
+                          className="hidden"
+                          onChange={handleFileChange}
+                        />
+                      </div>
+                      {selectedFile && (
+                        <div className="p-3 bg-gray-50 rounded border border-gray-200 flex items-center justify-between">
+                          <span className="text-sm text-gray-700">{selectedFile.name}</span>
+                          <Button size="sm" variant="ghost" onClick={() => setSelectedFile(null)}>
+                            ✕
+                          </Button>
+                        </div>
+                      )}
+                      <Button
+                        onClick={handleFileUpload}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        disabled={!selectedFile || isUploading}
+                      >
+                        {isUploading ? 'Mengunggah...' : 'Kumpulkan Tugas'}
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded">
+                      <div className="flex gap-3">
+                        <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
+                        <div>
+                          <p className="font-semibold text-green-800">Tugas Dikumpulkan</p>
+                          <p className="text-sm text-green-700">
+                            {new Date(submissionStatus.submitted_at).toLocaleString('id-ID')}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 text-blue-600"
+                            onClick={() => handleDownload(submissionStatus.file_url, 'Tugas_Saya')}
+                          >
+                            <DownloadIcon className="h-4 w-4 mr-1" />
+                            Unduh File
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Teacher Submissions List */}
+            {isAssignment && isContentCreator && submissions && submissions.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Daftar Pengumpulan ({submissions.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">
+                            <Checkbox
+                              checked={selectedSubmissionIds.length === submissions.length}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedSubmissionIds(submissions.map(s => s.id));
+                                } else {
+                                  setSelectedSubmissionIds([]);
+                                }
+                              }}
+                            />
+                          </TableHead>
+                          <TableHead>Nama Siswa</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Waktu</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {submissions.map((sub) => {
+                          const isLateSubmission = content.deadline && new Date(sub.submitted_at) > new Date(content.deadline);
+                          return (
+                            <TableRow key={sub.id}>
+                              <TableCell>
+                                <Checkbox
+                                  checked={selectedSubmissionIds.includes(sub.id)}
+                                  onCheckedChange={(checked) => handleCheckboxChange(sub.id, checked as boolean)}
+                                />
+                              </TableCell>
+                              <TableCell>{sub.users?.name || 'Nama Tidak Ditemukan'}</TableCell>
+                              <TableCell>
+                                <Badge className={isLateSubmission ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}>
+                                  {isLateSubmission ? 'Terlambat' : 'Tepat Waktu'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm text-gray-600">
+                                {new Date(sub.submitted_at).toLocaleDateString('id-ID')}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDownload(sub.file_url, `${sub.users?.name || 'siswa'}.pdf`)}
+                                >
+                                  <DownloadIcon className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <Card className="sticky top-4">
+              <CardHeader>
+                <CardTitle className="text-lg">Informasi</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm text-gray-600">
+                <div>
+                  <p className="font-semibold text-gray-900">Jenis</p>
+                  <p>{content.jenis_create}</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">Pembuat</p>
+                  <p>{creatorName || content.pembuat}</p>
+                </div>
+                {content.deadline && (
+                  <div>
+                    <p className="font-semibold text-gray-900">Batas Waktu</p>
+                    <p>{new Date(content.deadline).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                  </div>
+                )}
+                {isAssignment && submissions && (
+                  <div>
+                    <p className="font-semibold text-gray-900">Pengumpulan</p>
+                    <p>{submissions.length} dari total siswa</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1340,7 +1340,7 @@ const UserDropdownMenu = ({ user, language, onLogout }: UserDropdownProps) => {
             style={{ color: "#1A1A1A" }}
           >
             <BookOpen className="h-4 w-4" />
-            {getText("My Courses", "Meine Kurse")}
+            {getText("Kursus Saya", "Meine Kurse")}
           </button>
 
           <button
@@ -1352,7 +1352,7 @@ const UserDropdownMenu = ({ user, language, onLogout }: UserDropdownProps) => {
             style={{ color: "#1A1A1A" }}
           >
             <Globe className="h-4 w-4" />
-            {getText("Open Courses", "Offene Kurse")}
+            {getText("Kursus Terbuka", "Offene Kurse")}
           </button>
 
           <div style={{ borderColor: "#E5E5E5" }} className="border-t my-1"></div>
@@ -1464,7 +1464,7 @@ export default function App() {
       case "interactive-quiz":
         return (
           <div className="container mx-auto py-12 text-center">
-            <h2 className="text-2xl font-bold">Interactive Quiz</h2>
+            <h2 className="text-2xl font-bold">Kuis Interaktif</h2>
             <p className="text-gray-500 mt-4">
               {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht implementiert.")}
             </p>
@@ -1476,7 +1476,7 @@ export default function App() {
       case "ai-analysis":
         return (
           <div className="container mx-auto py-12 text-center">
-            <h2 className="text-2xl font-bold">AI Analysis</h2>
+            <h2 className="text-2xl font-bold">Analisis AI</h2>
             <p className="text-gray-500 mt-4">
               {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht implementiert.")}
             </p>
@@ -1488,7 +1488,7 @@ export default function App() {
       case "teacher-student":
         return (
           <div className="container mx-auto py-12 text-center">
-            <h2 className="text-2xl font-bold">Teacher & Student Mode</h2>
+            <h2 className="text-2xl font-bold">Mode Guru & Siswa</h2>
             <p className="text-gray-500 mt-4">
               {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht implementiert.")}
             </p>
@@ -1500,7 +1500,7 @@ export default function App() {
       case "mini-quiz":
         return (
           <div className="container mx-auto py-12 text-center">
-            <h2 className="text-2xl font-bold">Mini Quiz Game</h2>
+            <h2 className="text-2xl font-bold">Permainan Kuis Mini</h2>
             <p className="text-gray-500 mt-4">
               {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht diimplementasikan.")}
             </p>
@@ -1512,7 +1512,7 @@ export default function App() {
       case "stats-tracking":
         return (
           <div className="container mx-auto py-12 text-center">
-            <h2 className="text-2xl font-bold">Statistics & Tracking</h2>
+            <h2 className="text-2xl font-bold">Statistik & Pelacakan</h2>
             <p className="text-gray-500 mt-4">
               {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht implementiert.")}
             </p>
@@ -1524,7 +1524,7 @@ export default function App() {
       case "forum":
         return (
           <div className="container mx-auto py-12 text-center">
-            <h2 className="text-2xl font-bold">Forum Discussion</h2>
+            <h2 className="text-2xl font-bold">Diskusi Forum</h2>
             <p className="text-gray-500 mt-4">
               {getText("Halaman ini belum diimplementasikan.", "Diese Seite ist noch nicht diimplementasikan.")}
             </p>
@@ -1562,7 +1562,7 @@ export default function App() {
               />
               <div>
                 <h1 className="text-xl font-bold" style={{color: '#F59E0B'}}>Si Jerman</h1>
-                <p className="text-xs uppercase tracking-wider" style={{color: '#FFFFFC', letterSpacing: '0.05em'}}>Learning Platform</p>
+                <p className="text-xs uppercase tracking-wider" style={{color: '#FFFFFC', letterSpacing: '0.05em'}}>Platform Pembelajaran</p>
               </div>
             </div>
 
@@ -1581,7 +1581,7 @@ export default function App() {
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                {getText("Home", "Startseite")}
+                {getText("Beranda", "Startseite")}
               </Button>
               <Button 
                 variant="ghost" 
@@ -1626,7 +1626,7 @@ export default function App() {
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                {getText("Contact Us", "Kontakt")}
+                {getText("Hubungi Kami", "Kontakt")}
               </Button>
             </nav>
 
@@ -1704,7 +1704,7 @@ export default function App() {
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
-                    {getText("Login", "Anmelden")}
+                    {getText("Masuk", "Anmelden")}
                   </Button>
                   <Button
                     size="sm"
@@ -1725,7 +1725,7 @@ export default function App() {
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
-                    {getText("Register", "Registrieren")}
+                    {getText("Daftar", "Registrieren")}
                   </Button>
                 </>
               )}
@@ -1741,7 +1741,7 @@ export default function App() {
                 </SheetTrigger>
                 <SheetContent>
                   <SheetHeader>
-                    <SheetTitle>Menu</SheetTitle>
+                            <SheetTitle>Menu</SheetTitle>
                     <SheetDescription>
                       {getText(
                         "Akses fitur dan navigasi",
@@ -1764,7 +1764,7 @@ export default function App() {
                       onClick={() => navigateToFeature("home")}
                       className="w-full justify-start"
                     >
-                      {getText("Home", "Startseite")}
+                      {getText("Beranda", "Startseite")}
                     </Button>
                     <Button
                       variant="ghost"
@@ -1778,7 +1778,7 @@ export default function App() {
                       onClick={() => navigateToFeature("home")}
                       className="w-full justify-start"
                     >
-                      {getText("Contact Us", "Kontakt")}
+                      {getText("Hubungi Kami", "Kontakt")}
                     </Button>
                     <div className="pt-4 border-t space-y-2">
                       <div className="flex items-center justify-between">
@@ -1803,7 +1803,7 @@ export default function App() {
                             }}
                           >
                             <User className="h-4 w-4 mr-2" />
-                            {getText("Dashboard", "Dashboard")}
+                            {getText("Dasbor", "Dashboard")}
                           </Button>
                           <Button
                             variant="ghost"
@@ -1825,7 +1825,7 @@ export default function App() {
                             }}
                           >
                             <User className="h-4 w-4 mr-2" />
-                            {getText("Login", "Anmelden")}
+                            {getText("Masuk", "Anmelden")}
                           </Button>
                           <Button
                             className="w-full"
@@ -1835,7 +1835,7 @@ export default function App() {
                             }}
                             style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
                           >
-                            {getText("Register", "Registrieren")}
+                            {getText("Daftar", "Registrieren")}
                           </Button>
                         </>
                       )}
@@ -1890,7 +1890,7 @@ export default function App() {
             {/* Course Section */}
             <div>
               <h4 className="font-bold text-base mb-6 uppercase tracking-wider" style={{color: '#E8B824', letterSpacing: '0.05em'}}>
-                {getText("Course", "Kurse")}
+                {getText("Kursus", "Kurse")}
               </h4>
               <ul className="space-y-3">
                 <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Kelas A-1", "Klasse A-1")}</a></li>
@@ -1930,7 +1930,7 @@ export default function App() {
                 <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Tentang Kami", "Über uns")}</a></li>
                 <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Karir", "Karriere")}</a></li>
                 <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>Blog</a></li>
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>Privacy Policy</a></li>
+                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Kebijakan Privasi", "Datenschutz")}</a></li>
               </ul>
             </div>
           </div>

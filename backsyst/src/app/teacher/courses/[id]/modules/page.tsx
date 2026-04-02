@@ -183,7 +183,7 @@ function SortableLessonItem({
               color: isSelected ? "#1A1A1A" : "#999999",
             }}
           >
-            Lesson {index + 1}
+            Pelajaran {index + 1}
           </div>
           <p
             className="text-sm font-semibold line-clamp-2"
@@ -195,7 +195,7 @@ function SortableLessonItem({
           </p>
           {isLocked && (
             <p className="text-xs mt-1" style={{ color: "#E87835" }}>
-              Locked - Complete previous lesson first
+              Terkunci - Selesaikan pelajaran sebelumnya terlebih dahulu
             </p>
           )}
         </div>
@@ -405,7 +405,7 @@ export default function ModuleEditorPage() {
           setSelectedModuleId(modulesData[0].id);
         }
       } catch (err: any) {
-        setError(err.message || "Failed to fetch data");
+        setError(err.message || "Gagal mengambil data");
       } finally {
         setLoading(false);
       }
@@ -444,7 +444,7 @@ export default function ModuleEditorPage() {
         if (materialsError) throw materialsError;
         setMaterials(materialsData || []);
       } catch (err: any) {
-        setError(err.message || "Failed to fetch module content");
+        setError(err.message || "Gagal mengambil konten modul");
       }
     };
 
@@ -518,6 +518,20 @@ export default function ModuleEditorPage() {
           order_index: idx,
         }));
 
+        // Use temporary offset to avoid constraint violation
+        const TEMP_OFFSET = 10000;
+
+        // Step 1: Update all to temporary values
+        for (const update of updates) {
+          const { error } = await supabase
+            .from("course_modules")
+            .update({ order_index: TEMP_OFFSET + update.order_index })
+            .eq("id", update.id);
+
+          if (error) throw error;
+        }
+
+        // Step 2: Update all to final values
         for (const update of updates) {
           const { error } = await supabase
             .from("course_modules")
@@ -527,10 +541,10 @@ export default function ModuleEditorPage() {
           if (error) throw error;
         }
 
-        setSuccess("Module order updated!");
+        setSuccess("Urutan modul diperbarui!");
         setTimeout(() => setSuccess(""), 3000);
       } catch (err: any) {
-        setError(err.message || "Failed to update module order");
+        setError(err.message || "Gagal memperbarui urutan modul");
         setModules(modules);
       }
     }
@@ -553,6 +567,20 @@ export default function ModuleEditorPage() {
           order_index: idx,
         }));
 
+        // Use temporary offset to avoid constraint violation
+        const TEMP_OFFSET = 10000;
+
+        // Step 1: Update all to temporary values
+        for (const update of updates) {
+          const { error } = await supabase
+            .from("module_lessons")
+            .update({ order_index: TEMP_OFFSET + update.order_index })
+            .eq("id", update.id);
+
+          if (error) throw error;
+        }
+
+        // Step 2: Update all to final values
         for (const update of updates) {
           const { error } = await supabase
             .from("module_lessons")
@@ -562,10 +590,10 @@ export default function ModuleEditorPage() {
           if (error) throw error;
         }
 
-        setSuccess("Lesson order updated!");
+        setSuccess("Urutan pelajaran diperbarui!");
         setTimeout(() => setSuccess(""), 3000);
       } catch (err: any) {
-        setError(err.message || "Failed to update lesson order");
+        setError(err.message || "Gagal memperbarui urutan pelajaran");
         setLessons(lessons);
       }
     }
@@ -588,6 +616,20 @@ export default function ModuleEditorPage() {
           order_index: idx,
         }));
 
+        // Use temporary offset to avoid constraint violation
+        const TEMP_OFFSET = 10000;
+
+        // Step 1: Update all to temporary values
+        for (const update of updates) {
+          const { error } = await supabase
+            .from("module_materials")
+            .update({ order_index: TEMP_OFFSET + update.order_index })
+            .eq("id", update.id);
+
+          if (error) throw error;
+        }
+
+        // Step 2: Update all to final values
         for (const update of updates) {
           const { error } = await supabase
             .from("module_materials")
@@ -597,10 +639,10 @@ export default function ModuleEditorPage() {
           if (error) throw error;
         }
 
-        setSuccess("Material order updated!");
+        setSuccess("Urutan bahan diperbarui!");
         setTimeout(() => setSuccess(""), 3000);
       } catch (err: any) {
-        setError(err.message || "Failed to update material order");
+        setError(err.message || "Gagal memperbarui urutan bahan");
         setMaterials(materials);
       }
     }
@@ -609,7 +651,7 @@ export default function ModuleEditorPage() {
   // Handle add module
   const handleAddModule = async () => {
     if (!newModule.title.trim()) {
-      setError("Module title is required");
+      setError("Judul modul diperlukan");
       return;
     }
 
@@ -634,10 +676,10 @@ export default function ModuleEditorPage() {
       setModules([...modules, data]);
       setSelectedModuleId(data.id);
       setNewModule({ title: "", description: "" });
-      setSuccess("Module created successfully!");
+      setSuccess("Modul berhasil dibuat!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
-      setError(err.message || "Failed to create module");
+      setError(err.message || "Gagal membuat modul");
     }
   };
 
@@ -646,8 +688,8 @@ export default function ModuleEditorPage() {
     if (!newLesson.title.trim() || !selectedModuleId) {
       setError(
         !newLesson.title.trim()
-          ? "Lesson title is required"
-          : "Please select a module first"
+          ? "Judul pelajaran diperlukan"
+          : "Pilih modul terlebih dahulu"
       );
       return;
     }
@@ -683,7 +725,7 @@ export default function ModuleEditorPage() {
             : l
         );
         setLessons(updatedLessons);
-        setSuccess("Lesson updated successfully!");
+        setSuccess("Pelajaran berhasil diperbarui!");
         setTimeout(() => setSuccess(""), 3000);
       } else {
         // Creating new lesson
@@ -713,11 +755,11 @@ export default function ModuleEditorPage() {
           lesson_type: "explanation",
         });
         setSelectedLessonId(null);
-        setSuccess("Lesson added successfully!");
+        setSuccess("Pelajaran berhasil ditambahkan!");
         setTimeout(() => setSuccess(""), 3000);
       }
     } catch (err: any) {
-      setError(err.message || "Failed to save lesson");
+      setError(err.message || "Gagal menyimpan pelajaran");
     }
   };
 
@@ -726,8 +768,8 @@ export default function ModuleEditorPage() {
     if (!newMaterial.title.trim() || !selectedModuleId) {
       setError(
         !newMaterial.title.trim()
-          ? "Material title is required"
-          : "Please select a module first"
+          ? "Judul bahan diperlukan"
+          : "Pilih modul terlebih dahulu"
       );
       return;
     }
@@ -779,7 +821,7 @@ export default function ModuleEditorPage() {
             : m
         );
         setMaterials(updatedMaterials);
-        setSuccess("Material updated successfully!");
+        setSuccess("Bahan berhasil diperbarui!");
         setTimeout(() => setSuccess(""), 3000);
       } else {
         // Creating new material
@@ -821,17 +863,17 @@ export default function ModuleEditorPage() {
           external_url: "",
         });
         setSelectedMaterialId(null);
-        setSuccess("Material added successfully!");
+        setSuccess("Bahan berhasil ditambahkan!");
         setTimeout(() => setSuccess(""), 3000);
       }
     } catch (err: any) {
-      setError(err.message || "Failed to save material");
+      setError(err.message || "Gagal menyimpan bahan");
     }
   };
 
   // Handle delete lesson
   const handleDeleteLesson = async (lessonId: string) => {
-    if (!confirm("Are you sure you want to delete this lesson?")) return;
+    if (!confirm("Apakah Anda yakin ingin menghapus pelajaran ini?")) return;
 
     try {
       const { error } = await supabase
@@ -843,16 +885,16 @@ export default function ModuleEditorPage() {
 
       setLessons(lessons.filter((l) => l.id !== lessonId));
       setSelectedLessonId(null);
-      setSuccess("Lesson deleted successfully!");
+      setSuccess("Pelajaran berhasil dihapus!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
-      setError(err.message || "Failed to delete lesson");
+      setError(err.message || "Gagal menghapus pelajaran");
     }
   };
 
   // Handle delete material
   const handleDeleteMaterial = async (materialId: string) => {
-    if (!confirm("Are you sure you want to delete this material?")) return;
+    if (!confirm("Apakah Anda yakin ingin menghapus bahan ini?")) return;
 
     try {
       const { error } = await supabase
@@ -864,10 +906,10 @@ export default function ModuleEditorPage() {
 
       setMaterials(materials.filter((m) => m.id !== materialId));
       setSelectedMaterialId(null);
-      setSuccess("Material deleted successfully!");
+      setSuccess("Bahan berhasil dihapus!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
-      setError(err.message || "Failed to delete material");
+      setError(err.message || "Gagal menghapus bahan");
     }
   };
 
@@ -933,7 +975,7 @@ export default function ModuleEditorPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold" style={{ color: "#1A1A1A" }}>
-                Modules
+                Modul
               </h2>
               {modules.length > 0 && (
                 <button
@@ -945,14 +987,14 @@ export default function ModuleEditorPage() {
                   }}
                 >
                   <Plus className="h-4 w-4" />
-                  New Module
+                  Modul Baru
                 </button>
               )}
             </div>
 
             {modules.length === 0 ? (
               <p className="text-sm" style={{ color: "#999999" }}>
-                No modules yet. Create one below.
+                Belum ada modul. Buat satu di bawah.
               </p>
             ) : (
               <DndContext
@@ -1014,7 +1056,7 @@ export default function ModuleEditorPage() {
               }}
             >
               <p className="text-xs font-semibold" style={{ color: "#999999" }}>
-                Total Modules: {modules.length}
+                Total Modul: {modules.length}
               </p>
             </div>
 
@@ -1029,7 +1071,7 @@ export default function ModuleEditorPage() {
                 }}
               >
                 <Plus className="h-4 w-4" />
-                Create First Module
+                Buat Modul Pertama
               </button>
             )}
 
@@ -1044,7 +1086,7 @@ export default function ModuleEditorPage() {
                     color: activeTab === "lessons" ? "#1A1A1A" : "#999999",
                   }}
                 >
-                  Lessons
+                  Pelajaran
                 </button>
                 <button
                   onClick={() => setActiveTab("materials")}
@@ -1054,7 +1096,7 @@ export default function ModuleEditorPage() {
                     color: activeTab === "materials" ? "#1A1A1A" : "#999999",
                   }}
                 >
-                  Materials
+                  Bahan
                 </button>
               </div>
             )}
@@ -1062,15 +1104,37 @@ export default function ModuleEditorPage() {
             {/* Content List - Only show if module selected */}
             {selectedModuleId && (
               <div className="space-y-4 mt-6">
-                <h3 className="text-sm font-bold" style={{ color: "#1A1A1A" }}>
-                  {activeTab === "lessons" ? "Lessons" : "Materials"}
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold" style={{ color: "#1A1A1A" }}>
+                    {activeTab === "lessons" ? "Pelajaran" : "Bahan"}
+                  </h3>
+                  <button
+                    onClick={() => {
+                      if (activeTab === "lessons") {
+                        setSelectedLessonId(null);
+                      } else {
+                        setSelectedMaterialId(null);
+                      }
+                    }}
+                    className="p-2 rounded-lg transition-all flex items-center gap-1"
+                    style={{
+                      backgroundColor: activeTab === "lessons" ? "#E8B824" : "#E87835",
+                      color: "#1A1A1A",
+                    }}
+                    title={activeTab === "lessons" ? "Tambah Pelajaran Baru" : "Tambah Bahan Baru"}
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="text-xs font-semibold">
+                      {activeTab === "lessons" ? "Pelajaran" : "Bahan"}
+                    </span>
+                  </button>
+                </div>
 
                 {activeTab === "lessons" ? (
                   <>
                     {lessons.length === 0 ? (
                       <p className="text-xs" style={{ color: "#999999" }}>
-                        No lessons yet.
+                        Belum ada pelajaran
                       </p>
                     ) : (
                       <DndContext
@@ -1143,7 +1207,7 @@ export default function ModuleEditorPage() {
                   <>
                     {materials.length === 0 ? (
                       <p className="text-xs" style={{ color: "#999999" }}>
-                        No materials yet.
+                        Belum ada bahan
                       </p>
                     ) : (
                       <DndContext
@@ -1181,7 +1245,7 @@ export default function ModuleEditorPage() {
                                         }}
                                       >
                                         <Trash2 className="h-4 w-4" />
-                                        Delete
+                                        Hapus
                                       </button>
                                       <button
                                         onClick={() => setShowPreviewModal(true)}
@@ -1192,7 +1256,7 @@ export default function ModuleEditorPage() {
                                         }}
                                       >
                                         <Eye className="h-4 w-4" />
-                                        Preview
+                                        Pratinjau
                                       </button>
                                     </div>
                                     <div
@@ -1237,10 +1301,10 @@ export default function ModuleEditorPage() {
                 style={{ color: "#D4D4D4" }}
               />
               <p className="text-lg font-semibold" style={{ color: "#1A1A1A" }}>
-                Select or Create a Module
+                Pilih atau Buat Modul
               </p>
               <p className="text-sm mt-2" style={{ color: "#999999" }}>
-                Choose an existing module from the list or create a new one to start adding lessons and materials.
+                Pilih modul yang ada dari daftar atau buat yang baru untuk mulai menambahkan pelajaran dan bahan.
               </p>
             </div>
           ) : (
@@ -1276,7 +1340,7 @@ export default function ModuleEditorPage() {
                     style={{ color: "#E8B824" }}
                   />
                   <h2 className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>
-                    {selectedLessonId ? "Edit Lesson" : "Add New Lesson"}
+                    {selectedLessonId ? "Edit Pelajaran" : "Tambah Pelajaran Baru"}
                   </h2>
                 </div>
 
@@ -1288,7 +1352,7 @@ export default function ModuleEditorPage() {
                       className="text-sm font-semibold"
                       style={{ color: "#1A1A1A" }}
                     >
-                      Lesson Type
+                      Jenis Pelajaran
                     </Label>
                     <select
                       id="lesson_type"
@@ -1302,11 +1366,11 @@ export default function ModuleEditorPage() {
                       className="w-full h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 px-3 mt-1"
                       style={{ backgroundColor: "#FFFFFC", color: "#1A1A1A" }}
                     >
-                      <option value="explanation">Explanation</option>
-                      <option value="vocabulary">Vocabulary</option>
-                      <option value="dialogue">Dialogue</option>
-                      <option value="reading">Reading</option>
-                      <option value="listening">Listening</option>
+                      <option value="explanation">Penjelasan</option>
+                      <option value="vocabulary">Kosakata</option>
+                      <option value="dialogue">Dialog</option>
+                      <option value="reading">Membaca</option>
+                      <option value="listening">Mendengarkan</option>
                     </select>
                   </div>
 
@@ -1317,11 +1381,11 @@ export default function ModuleEditorPage() {
                       className="text-sm font-semibold"
                       style={{ color: "#1A1A1A" }}
                     >
-                      Title *
+                      Judul *
                     </Label>
                     <Input
                       id="lesson_title"
-                      placeholder="e.g., German Alphabet Basics"
+                      placeholder="cth: Dasar-Dasar Alfabet Jerman"
                       value={newLesson.title}
                       onChange={(e) =>
                         setNewLesson({ ...newLesson, title: e.target.value })
@@ -1338,11 +1402,11 @@ export default function ModuleEditorPage() {
                       className="text-sm font-semibold"
                       style={{ color: "#1A1A1A" }}
                     >
-                      Description
+                      Deskripsi
                     </Label>
                     <Input
                       id="lesson_description"
-                      placeholder="Brief description of this lesson"
+                      placeholder="Deskripsi singkat pelajaran ini"
                       value={newLesson.description}
                       onChange={(e) =>
                         setNewLesson({
@@ -1362,7 +1426,7 @@ export default function ModuleEditorPage() {
                       className="text-sm font-semibold"
                       style={{ color: "#1A1A1A" }}
                     >
-                      Content with Media Support
+                      Konten dengan Dukungan Media
                     </Label>
                     <LessonContentEditor
                       content={newLesson.content}
@@ -1392,7 +1456,7 @@ export default function ModuleEditorPage() {
                           border: "1px solid #E5E5E5",
                         }}
                       >
-                        Cancel
+                        Batal
                       </Button>
                     )}
                     <Button
@@ -1404,7 +1468,7 @@ export default function ModuleEditorPage() {
                       }}
                     >
                       <Plus className="h-4 w-4" />
-                      {selectedLessonId ? "Update Lesson" : "Add Lesson"}
+                      {selectedLessonId ? "Perbarui Pelajaran" : "Tambah Pelajaran"}
                     </Button>
                   </div>
                 </div>
@@ -1424,7 +1488,7 @@ export default function ModuleEditorPage() {
                     style={{ color: "#E87835" }}
                   />
                   <h2 className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>
-                    {selectedMaterialId ? "Edit Material" : "Add New Material"}
+                    {selectedMaterialId ? "Edit Bahan" : "Tambah Bahan Baru"}
                   </h2>
                 </div>
 
@@ -1436,7 +1500,7 @@ export default function ModuleEditorPage() {
                       className="text-sm font-semibold"
                       style={{ color: "#1A1A1A" }}
                     >
-                      Material Type
+                      Jenis Bahan
                     </Label>
                     <select
                       id="material_type"
@@ -1453,8 +1517,8 @@ export default function ModuleEditorPage() {
                       <option value="video">Video</option>
                       <option value="audio">Audio</option>
                       <option value="pdf">PDF</option>
-                      <option value="image">Image</option>
-                      <option value="resource">Resource</option>
+                      <option value="image">Gambar</option>
+                      <option value="resource">Sumber Daya</option>
                     </select>
                   </div>
 
@@ -1465,7 +1529,7 @@ export default function ModuleEditorPage() {
                       className="text-sm font-semibold"
                       style={{ color: "#1A1A1A" }}
                     >
-                      Source Type
+                      Jenis Sumber
                     </Label>
                     <select
                       id="source_type"
@@ -1479,9 +1543,9 @@ export default function ModuleEditorPage() {
                       className="w-full h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 px-3 mt-1"
                       style={{ backgroundColor: "#FFFFFC", color: "#1A1A1A" }}
                     >
-                      <option value="upload">Upload File</option>
-                      <option value="youtube_link">YouTube Link</option>
-                      <option value="external_link">External Link</option>
+                      <option value="upload">Unggah File</option>
+                      <option value="youtube_link">Tautan YouTube</option>
+                      <option value="external_link">Tautan Eksternal</option>
                     </select>
                   </div>
 
@@ -1492,11 +1556,11 @@ export default function ModuleEditorPage() {
                       className="text-sm font-semibold"
                       style={{ color: "#1A1A1A" }}
                     >
-                      Title *
+                      Judul *
                     </Label>
                     <Input
                       id="material_title"
-                      placeholder="e.g., German Alphabet Video"
+                      placeholder="cth: Video Alfabet Jerman"
                       value={newMaterial.title}
                       onChange={(e) =>
                         setNewMaterial({ ...newMaterial, title: e.target.value })
@@ -1513,11 +1577,11 @@ export default function ModuleEditorPage() {
                       className="text-sm font-semibold"
                       style={{ color: "#1A1A1A" }}
                     >
-                      Description
+                      Deskripsi
                     </Label>
                     <Input
                       id="material_description"
-                      placeholder="Brief description of this material"
+                      placeholder="Deskripsi singkat bahan ini"
                       value={newMaterial.description}
                       onChange={(e) =>
                         setNewMaterial({
@@ -1538,7 +1602,7 @@ export default function ModuleEditorPage() {
                         className="text-sm font-semibold"
                         style={{ color: "#1A1A1A" }}
                       >
-                        Upload File (Max 50MB)
+                        Unggah File (Maks 50MB)
                       </Label>
                       <Input
                         id="file_input"
@@ -1557,7 +1621,7 @@ export default function ModuleEditorPage() {
                         style={{ backgroundColor: "#FFFFFC" }}
                       />
                       <p className="text-xs mt-1" style={{ color: "#999999" }}>
-                        Supported: MP4, WebM, MP3, WAV, PDF, JPG, PNG
+                        Didukung: MP4, WebM, MP3, WAV, PDF, JPG, PNG
                       </p>
                     </div>
                   ) : (
@@ -1568,12 +1632,12 @@ export default function ModuleEditorPage() {
                         style={{ color: "#1A1A1A" }}
                       >
                         {newMaterial.source_type === "youtube_link"
-                          ? "YouTube URL"
-                          : "External URL"}
+                          ? "URL YouTube"
+                          : "URL Eksternal"}
                       </Label>
                       <Input
                         id="external_url"
-                        placeholder="Paste the URL here"
+                        placeholder="Tempel URL di sini"
                         value={newMaterial.external_url}
                         onChange={(e) =>
                           setNewMaterial({
@@ -1597,7 +1661,7 @@ export default function ModuleEditorPage() {
                           border: "1px solid #E5E5E5",
                         }}
                       >
-                        Cancel
+                        Batal
                       </Button>
                     )}
                     <Button
@@ -1609,7 +1673,7 @@ export default function ModuleEditorPage() {
                       }}
                     >
                       <Plus className="h-4 w-4" />
-                      {selectedMaterialId ? "Update Material" : "Add Material"}
+                      {selectedMaterialId ? "Perbarui Bahan" : "Tambah Bahan"}
                     </Button>
                   </div>
                 </div>
@@ -1733,7 +1797,7 @@ export default function ModuleEditorPage() {
                   color: "#FFFFFF",
                 }}
               >
-                ← Close Preview
+                ← Tutup Pratinjau
               </button>
 
               {/* Lesson Preview */}
@@ -1871,7 +1935,7 @@ export default function ModuleEditorPage() {
                                 </video>
                               ) : (
                                 <p style={{ color: "#999999" }}>
-                                  {material.external_url || "No video source"}
+                                  Tidak ada sumber video
                                 </p>
                               )}
                             </div>
@@ -1898,7 +1962,7 @@ export default function ModuleEditorPage() {
                                 </audio>
                               ) : (
                                 <p style={{ color: "#999999" }}>
-                                  No audio source
+                                  Tidak ada sumber audio
                                 </p>
                               )}
                             </div>
@@ -1910,7 +1974,7 @@ export default function ModuleEditorPage() {
                                 className="text-sm font-semibold mb-3"
                                 style={{ color: "#1A1A1A" }}
                               >
-                                Image:
+                                Gambar:
                               </p>
                               {material.file_url || material.external_url ? (
                                 <img
@@ -1925,7 +1989,7 @@ export default function ModuleEditorPage() {
                                 />
                               ) : (
                                 <p style={{ color: "#999999" }}>
-                                  No image source
+                                  Tidak ada sumber gambar
                                 </p>
                               )}
                             </div>
@@ -1937,7 +2001,7 @@ export default function ModuleEditorPage() {
                                 className="text-sm font-semibold mb-3"
                                 style={{ color: "#1A1A1A" }}
                               >
-                                PDF File:
+                                File PDF:
                               </p>
                               {material.file_url || material.external_url ? (
                                 <a
@@ -1946,11 +2010,11 @@ export default function ModuleEditorPage() {
                                   rel="noopener noreferrer"
                                   className="text-blue-600 underline font-semibold"
                                 >
-                                  Open PDF →
+                                  Buka PDF →
                                 </a>
                               ) : (
                                 <p style={{ color: "#999999" }}>
-                                  No PDF source
+                                  Tidak ada sumber PDF
                                 </p>
                               )}
                             </div>
@@ -1962,7 +2026,7 @@ export default function ModuleEditorPage() {
                                 className="text-sm font-semibold mb-3"
                                 style={{ color: "#1A1A1A" }}
                               >
-                                Resource Link:
+                                Tautan Sumber Daya:
                               </p>
                               {material.external_url ? (
                                 <a
@@ -1976,7 +2040,7 @@ export default function ModuleEditorPage() {
                                 </a>
                               ) : (
                                 <p style={{ color: "#999999" }}>
-                                  No resource link
+                                  Tidak ada tautan sumber daya
                                 </p>
                               )}
                             </div>

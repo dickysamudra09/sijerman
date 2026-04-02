@@ -29,6 +29,12 @@ interface Module {
   order_index: number;
   duration_minutes?: number;
   learning_outcomes?: string;
+  lessons?: Array<{
+    id: string;
+    title: string;
+    lesson_type: string;
+    order_index: number;
+  }>;
 }
 
 interface Enrollment {
@@ -113,7 +119,24 @@ export default function CourseSyllabusPage() {
           .order('order_index', { ascending: true });
 
         if (modulesError) throw modulesError;
-        setModules(modulesData || []);
+        
+        // Fetch lessons for each module
+        const modulesWithLessons = await Promise.all(
+          (modulesData || []).map(async (module) => {
+            const { data: lessonsData } = await supabase
+              .from('module_lessons')
+              .select('id, title, lesson_type, order_index')
+              .eq('module_id', module.id)
+              .order('order_index', { ascending: true });
+            
+            return {
+              ...module,
+              lessons: lessonsData || []
+            };
+          })
+        );
+        
+        setModules(modulesWithLessons);
       } catch (error) {
         console.error('Error fetching course data:', error);
       } finally {
@@ -220,7 +243,7 @@ export default function CourseSyllabusPage() {
             <img src="/img/1.png" alt="Logo" className="h-12 w-auto" />
             <div>
               <h1 className="text-xl font-bold" style={{ color: "#E8B824" }}>Si Jerman</h1>
-              <p className="text-xs uppercase tracking-wider" style={{ color: "#FFFFFC" }}>Learning Platform</p>
+              <p className="text-xs uppercase tracking-wider" style={{ color: "#FFFFFC" }}>Platform Pembelajaran</p>
             </div>
           </Link>
 
@@ -277,6 +300,7 @@ export default function CourseSyllabusPage() {
                   moduleType={module.module_type}
                   durationMinutes={module.duration_minutes}
                   learningOutcomes={module.learning_outcomes || ''}
+                  lessons={module.lessons || []}
                 />
               </div>
             ))}
@@ -308,7 +332,7 @@ export default function CourseSyllabusPage() {
                   className="h-10 px-6 font-semibold transition-all"
                   style={{ borderColor: "#E2E8F0", color: "#64748B" }}
                 >
-                  👁️ Preview Gratis
+                  Preview Gratis
                 </Button>
               )}
 
@@ -322,12 +346,12 @@ export default function CourseSyllabusPage() {
                 }}
               >
                 {isEnrolling
-                  ? '⏳ Mendaftar...'
+                  ? 'Mendaftar...'
                   : enrollment
                     ? '✓ Lanjutkan Belajar →'
                     : user
-                      ? '🚀 Daftar Sekarang'
-                      : '🔐 Login dulu'}
+                      ? 'Daftar Sekarang'
+                      : 'Login dulu'}
               </Button>
             </div>
           </div>

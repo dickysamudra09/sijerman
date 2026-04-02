@@ -9,6 +9,12 @@ interface ModuleSyllabusItemProps {
   moduleType: string;
   durationMinutes?: number;
   learningOutcomes: string;
+  lessons?: Array<{
+    id: string;
+    title: string;
+    lesson_type: string;
+    order_index: number;
+  }>;
 }
 
 const getModuleIcon = (moduleType: string) => {
@@ -62,9 +68,9 @@ const getModuleTypeConfig = (moduleType: string) => {
 };
 
 const getDifficultyLevel = (index: number): { level: string; color: string } => {
-  if (index < 2) return { level: 'Beginner', color: 'bg-green-100 text-green-700' };
-  if (index < 5) return { level: 'Intermediate', color: 'bg-yellow-100 text-yellow-700' };
-  return { level: 'Advanced', color: 'bg-red-100 text-red-700' };
+  if (index < 2) return { level: 'Pemula', color: 'bg-green-100 text-green-700' };
+  if (index < 5) return { level: 'Menengah', color: 'bg-yellow-100 text-yellow-700' };
+  return { level: 'Lanjutan', color: 'bg-red-100 text-red-700' };
 };
 
 export const ModuleSyllabusItem: React.FC<ModuleSyllabusItemProps> = ({
@@ -73,6 +79,7 @@ export const ModuleSyllabusItem: React.FC<ModuleSyllabusItemProps> = ({
   moduleType,
   durationMinutes,
   learningOutcomes,
+  lessons = [],
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const config = getModuleTypeConfig(moduleType);
@@ -147,29 +154,67 @@ export const ModuleSyllabusItem: React.FC<ModuleSyllabusItemProps> = ({
         />
       </button>
 
-      {/* Accordion Content - Learning Outcomes */}
-      {isExpanded && outcomes.length > 0 && (
-        <div className="border-t border-gray-200 px-6 py-5 bg-gradient-to-br from-white to-gray-50">
-          <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <div className={`p-2 rounded-lg bg-gradient-to-br ${config.color} text-white`}>
-              <BookOpen className="h-4 w-4" />
-            </div>
-            Capaian pada modul ini:
-          </h4>
-          
-          <div className="grid grid-cols-1 gap-3">
-            {outcomes.map((outcome, index) => (
-              <div
-                key={index}
-                className="flex items-start gap-3 p-3 rounded-lg bg-white hover:shadow-md transition-all"
-              >
-                <div className={`flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br ${config.color} text-white flex items-center justify-center text-sm font-bold mt-0.5`}>
-                  ✓
+      {/* Accordion Content - Learning Outcomes & Lessons */}
+      {isExpanded && (
+        <div className="border-t border-gray-200 px-6 py-5 bg-gradient-to-br from-white to-gray-50 space-y-6">
+          {/* Lessons Section */}
+          {lessons.length > 0 && (
+            <div>
+              <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <div className={`p-2 rounded-lg bg-gradient-to-br ${config.color} text-white`}>
+                  <BookOpen className="h-4 w-4" />
                 </div>
-                <span className="text-gray-700 text-sm font-medium leading-relaxed">{outcome}</span>
+                Pelajaran dalam modul ini ({lessons.length}):
+              </h4>
+              
+              <div className="grid grid-cols-1 gap-2">
+                {lessons
+                  .sort((a, b) => a.order_index - b.order_index)
+                  .map((lesson, index) => (
+                    <div
+                      key={lesson.id}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-white hover:shadow-md transition-all border border-gray-100"
+                    >
+                      <div className={`flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br ${config.color} text-white flex items-center justify-center text-xs font-bold`}>
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-gray-900 text-sm font-semibold">{lesson.title}</p>
+                        <span className="inline-flex mt-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: '#E8B824', color: '#1A1A1A' }}>
+                          {lesson.lesson_type}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
+          {/* Learning Outcomes */}
+          {outcomes.length > 0 && (
+            <div>
+              <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <div className={`p-2 rounded-lg bg-gradient-to-br ${config.color} text-white`}>
+                  <BookOpen className="h-4 w-4" />
+                </div>
+                Capaian pada modul ini:
+              </h4>
+              
+              <div className="grid grid-cols-1 gap-3">
+                {outcomes.map((outcome, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-3 p-3 rounded-lg bg-white hover:shadow-md transition-all"
+                  >
+                    <div className={`flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br ${config.color} text-white flex items-center justify-center text-sm font-bold mt-0.5`}>
+                      ✓
+                    </div>
+                    <span className="text-gray-700 text-sm font-medium leading-relaxed">{outcome}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
