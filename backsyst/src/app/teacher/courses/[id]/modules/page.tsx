@@ -333,19 +333,31 @@ export default function ModuleEditorPage() {
   });
 
   // Lesson form state
-  const [newLesson, setNewLesson] = useState({
+  const [newLesson, setNewLesson] = useState<{
+    title: string;
+    description: string;
+    content: string;
+    lesson_type: "explanation" | "vocabulary" | "dialogue" | "reading" | "listening";
+  }>({
     title: "",
     description: "",
     content: "",
-    lesson_type: "explanation" as const,
+    lesson_type: "explanation",
   });
 
   // Material form state
-  const [newMaterial, setNewMaterial] = useState({
+  const [newMaterial, setNewMaterial] = useState<{
+    title: string;
+    description: string;
+    material_type: "video" | "audio" | "pdf" | "image" | "resource";
+    source_type: "upload" | "youtube_link" | "external_link";
+    file_url: string;
+    external_url: string;
+  }>({
     title: "",
     description: "",
-    material_type: "video" as const,
-    source_type: "upload" as const,
+    material_type: "video",
+    source_type: "upload",
     file_url: "",
     external_url: "",
   });
