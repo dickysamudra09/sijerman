@@ -333,12 +333,7 @@ export default function ModuleEditorPage() {
   });
 
   // Lesson form state
-  const [newLesson, setNewLesson] = useState<{
-    title: string;
-    description: string;
-    content: string;
-    lesson_type: "explanation" | "vocabulary" | "dialogue" | "reading" | "listening";
-  }>({
+  const [newLesson, setNewLesson] = useState({
     title: "",
     description: "",
     content: "",
@@ -346,14 +341,7 @@ export default function ModuleEditorPage() {
   });
 
   // Material form state
-  const [newMaterial, setNewMaterial] = useState<{
-    title: string;
-    description: string;
-    material_type: "video" | "audio" | "pdf" | "image" | "resource";
-    source_type: "upload" | "youtube_link" | "external_link";
-    file_url: string;
-    external_url: string;
-  }>({
+  const [newMaterial, setNewMaterial] = useState({
     title: "",
     description: "",
     material_type: "video",
@@ -732,7 +720,7 @@ export default function ModuleEditorPage() {
                 title: newLesson.title,
                 description: newLesson.description,
                 content: newLesson.content,
-                lesson_type: newLesson.lesson_type,
+                lesson_type: newLesson.lesson_type as "explanation" | "vocabulary" | "dialogue" | "reading" | "listening",
               }
             : l
         );
@@ -819,8 +807,8 @@ export default function ModuleEditorPage() {
                 ...m,
                 title: newMaterial.title,
                 description: newMaterial.description,
-                material_type: newMaterial.material_type,
-                source_type: newMaterial.source_type,
+                material_type: newMaterial.material_type as "video" | "audio" | "pdf" | "image" | "resource",
+                source_type: newMaterial.source_type as "upload" | "youtube_link" | "external_link",
                 file_url:
                   newMaterial.source_type === "upload"
                     ? newMaterial.file_url

@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, ArrowLeft, ChevronDown } from "lucide-react";
-import "@/styles/auth-animations.css";
 
 interface RegisterForm {
   name: string;

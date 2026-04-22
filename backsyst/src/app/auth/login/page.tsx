@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { AlertCircle, Eye, EyeOff, ArrowLeft, CheckCircle } from "lucide-react";
-import "@/styles/auth-animations.css";
 
 interface LoginForm {
   email: string;
