@@ -145,6 +145,7 @@ export default function CourseDetailPage() {
   const [aiAttempts, setAiAttempts] = useState(0);
   const [showSidebar, setShowSidebar] = useState(false); // For mobile hamburger
   const [activeTab, setActiveTab] = useState<"lessons" | "materials">("lessons");
+  const [overallProgress, setOverallProgress] = useState(0); // Track overall course progress
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -278,7 +279,10 @@ export default function CourseDetailPage() {
               progressData.forEach((p) => {
                 progressMap[p.lesson_id] = p;
               });
-              setLessonProgress(progressMap);
+              setLessonProgress((prev) => ({
+                ...prev,
+                ...progressMap,
+              }));
             }
           }
 
@@ -298,7 +302,10 @@ export default function CourseDetailPage() {
               materialProgressData.forEach((p) => {
                 progressMap[p.material_id] = p;
               });
-              setMaterialProgress(progressMap);
+              setMaterialProgress((prev) => ({
+                ...prev,
+                ...progressMap,
+              }));
             }
           }
         }
@@ -311,6 +318,14 @@ export default function CourseDetailPage() {
 
     fetchCourse();
   }, [courseId, user, enrollment, access]);
+
+  // Recalculate unlocked modules whenever progress or modules change
+  useEffect(() => {
+    if (modules.length > 0 && user) {
+      calculateUnlockedModules();
+      calculateOverallProgress();
+    }
+  }, [modules, lessonProgress, materialProgress, user]);
 
   // Fetch lessons when module is selected
   useEffect(() => {
@@ -366,7 +381,10 @@ export default function CourseDetailPage() {
               progressData.forEach((p) => {
                 progressMap[p.lesson_id] = p;
               });
-              setLessonProgress(progressMap);
+              setLessonProgress((prev) => ({
+                ...prev,
+                ...progressMap,
+              }));
             }
           }
 
@@ -386,7 +404,10 @@ export default function CourseDetailPage() {
               materialProgressData.forEach((p) => {
                 progressMap[p.material_id] = p;
               });
-              setMaterialProgress(progressMap);
+              setMaterialProgress((prev) => ({
+                ...prev,
+                ...progressMap,
+              }));
             }
           }
         }
@@ -412,13 +433,24 @@ export default function CourseDetailPage() {
       const existing = lessonProgress[lessonId];
 
       if (existing) {
-        await supabase
-          .from("student_lesson_progress")
-          .update({
-            status: "in_progress",
-            viewed_at: new Date().toISOString(),
-          })
-          .eq("id", existing.id);
+        // Only update status if not already completed
+        if (existing.status !== "completed") {
+          await supabase
+            .from("student_lesson_progress")
+            .update({
+              status: "in_progress",
+              viewed_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id);
+        } else {
+          // If already completed, just update viewed_at
+          await supabase
+            .from("student_lesson_progress")
+            .update({
+              viewed_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id);
+        }
       } else {
         await supabase
           .from("student_lesson_progress")
@@ -440,10 +472,10 @@ export default function CourseDetailPage() {
         .single();
 
       if (progressData) {
-        setLessonProgress({
-          ...lessonProgress,
+        setLessonProgress((prev) => ({
+          ...prev,
           [lessonId]: progressData,
-        });
+        }));
       }
     } catch (error) {
       console.error("Error marking lesson as viewed:", error);
@@ -487,10 +519,12 @@ export default function CourseDetailPage() {
         .single();
 
       if (progressData) {
-        setLessonProgress({
+        const updatedProgress = {
           ...lessonProgress,
           [lessonId]: progressData,
-        });
+        };
+        setLessonProgress(updatedProgress);
+        // This will trigger the useEffect to recalculate unlocked modules
       }
     } catch (error) {
       console.error("Error marking lesson as completed:", error);
@@ -505,13 +539,24 @@ export default function CourseDetailPage() {
       const existing = materialProgress[materialId];
 
       if (existing) {
-        await supabase
-          .from("student_material_progress")
-          .update({
-            status: "in_progress",
-            viewed_at: new Date().toISOString(),
-          })
-          .eq("id", existing.id);
+        // Only update status if not already completed
+        if (existing.status !== "completed") {
+          await supabase
+            .from("student_material_progress")
+            .update({
+              status: "in_progress",
+              viewed_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id);
+        } else {
+          // If already completed, just update viewed_at
+          await supabase
+            .from("student_material_progress")
+            .update({
+              viewed_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id);
+        }
       } else {
         await supabase
           .from("student_material_progress")
@@ -533,10 +578,10 @@ export default function CourseDetailPage() {
         .single();
 
       if (progressData) {
-        setMaterialProgress({
-          ...materialProgress,
+        setMaterialProgress((prev) => ({
+          ...prev,
           [materialId]: progressData,
-        });
+        }));
       }
     } catch (error) {
       console.error("Error marking material as viewed:", error);
@@ -580,13 +625,140 @@ export default function CourseDetailPage() {
         .single();
 
       if (progressData) {
-        setMaterialProgress({
+        const updatedProgress = {
           ...materialProgress,
           [materialId]: progressData,
-        });
+        };
+        setMaterialProgress(updatedProgress);
+        // This will trigger the useEffect to recalculate unlocked modules
       }
     } catch (error) {
       console.error("Error marking material as completed:", error);
+    }
+  };
+
+  // Calculate which modules should be unlocked based on completion from DATABASE
+  const calculateUnlockedModules = async () => {
+    const newUnlocked = new Set<number>();
+    newUnlocked.add(0); // First module always unlocked
+
+    if (!user) return;
+
+    for (let i = 1; i < modules.length; i++) {
+      const prevModule = modules[i - 1];
+      
+      // Fetch ALL lessons and materials for previous module from database
+      const { data: prevLessons } = await supabase
+        .from("module_lessons")
+        .select("id")
+        .eq("module_id", prevModule.id);
+
+      const { data: prevMaterials } = await supabase
+        .from("module_materials")
+        .select("id")
+        .eq("module_id", prevModule.id);
+
+      if (!prevLessons || !prevMaterials) continue;
+
+      // Fetch actual completion status from database
+      const { data: completedLessons } = await supabase
+        .from("student_lesson_progress")
+        .select("lesson_id")
+        .eq("student_id", user.id)
+        .eq("status", "completed")
+        .in(
+          "lesson_id",
+          prevLessons.map((l) => l.id)
+        );
+
+      const { data: completedMaterials } = await supabase
+        .from("student_material_progress")
+        .select("material_id")
+        .eq("student_id", user.id)
+        .eq("status", "completed")
+        .in(
+          "material_id",
+          prevMaterials.map((m) => m.id)
+        );
+
+      const completedLessonIds = new Set(completedLessons?.map((p) => p.lesson_id) || []);
+      const completedMaterialIds = new Set(completedMaterials?.map((p) => p.material_id) || []);
+
+      // Check if all lessons are completed
+      const allLessonsCompleted = prevLessons.every((lesson) => completedLessonIds.has(lesson.id));
+
+      // Check if all materials are completed
+      const allMaterialsCompleted = prevMaterials.every((material) => completedMaterialIds.has(material.id));
+
+      // Unlock if both all lessons and materials are completed (or if no content exists)
+      if ((prevLessons.length === 0 || allLessonsCompleted) && 
+          (prevMaterials.length === 0 || allMaterialsCompleted)) {
+        newUnlocked.add(i);
+      }
+    }
+
+    setUnlockedModules(newUnlocked);
+  };
+
+  // Calculate overall course progress from ALL lessons + materials
+  const calculateOverallProgress = async () => {
+    if (!user || modules.length === 0) return;
+
+    try {
+      // Fetch ALL lessons across all modules
+      const { data: allLessons } = await supabase
+        .from("module_lessons")
+        .select("id")
+        .in(
+          "module_id",
+          modules.map((m) => m.id)
+        );
+
+      // Fetch ALL materials across all modules
+      const { data: allMaterials } = await supabase
+        .from("module_materials")
+        .select("id")
+        .in(
+          "module_id",
+          modules.map((m) => m.id)
+        );
+
+      if (!allLessons || !allMaterials) return;
+
+      const totalContent = (allLessons?.length || 0) + (allMaterials?.length || 0);
+      if (totalContent === 0) {
+        setOverallProgress(0);
+        return;
+      }
+
+      // Fetch completed lessons
+      const { data: completedLessons } = await supabase
+        .from("student_lesson_progress")
+        .select("lesson_id")
+        .eq("student_id", user.id)
+        .eq("status", "completed")
+        .in(
+          "lesson_id",
+          allLessons.map((l) => l.id)
+        );
+
+      // Fetch completed materials
+      const { data: completedMaterials } = await supabase
+        .from("student_material_progress")
+        .select("material_id")
+        .eq("student_id", user.id)
+        .eq("status", "completed")
+        .in(
+          "material_id",
+          allMaterials.map((m) => m.id)
+        );
+
+      const completedCount = (completedLessons?.length || 0) + (completedMaterials?.length || 0);
+      const progressPercentage = Math.round((completedCount / totalContent) * 100);
+      
+      setOverallProgress(progressPercentage);
+    } catch (error) {
+      console.error("Error calculating overall progress:", error);
     }
   };
 
@@ -606,23 +778,26 @@ export default function CourseDetailPage() {
   };
 
   const toggleModuleExpand = (moduleIndex: number) => {
-    setExpandedModules((prev) => {
-      const newExpanded = new Set(prev);
-      if (newExpanded.has(moduleIndex)) {
-        newExpanded.delete(moduleIndex);
-      } else {
-        newExpanded.add(moduleIndex);
+    // Check if this module is already expanded
+    const isAlreadyExpanded = expandedModules.has(moduleIndex);
+    
+    if (isAlreadyExpanded) {
+      // Collapse: just remove from expanded set
+      setExpandedModules(new Set());
+      // Don't clear lessons/materials - keep them cached
+    } else {
+      // Expand: add to expanded set (only one at a time)
+      setExpandedModules(new Set([moduleIndex]));
+      
+      // If switching to a different module, update selected and trigger fetch
+      if (selectedModuleIndex !== moduleIndex) {
+        setSelectedModuleIndex(moduleIndex);
+        setSelectedLessonIndex(0);
+        setSelectedMaterialId(null);
+        // useEffect will fetch data when selectedModuleIndex changes
       }
-      return newExpanded;
-    });
-    setSelectedModuleIndex(moduleIndex);
-    setSelectedLessonIndex(0);
-    setSelectedMaterialId(null);
-    // Clear old data immediately when switching modules
-    setLessons([]);
-    setMaterials([]);
-    setLessonProgress({});
-    setMaterialProgress({});
+      // If same module, data is already cached so no action needed
+    }
   };
 
   const currentModule = modules[selectedModuleIndex];
@@ -764,7 +939,7 @@ export default function CourseDetailPage() {
                 </h4>
               </div>
               <WarmProgressBar
-                percentage={Math.round((unlockedModules.size / modules.length) * 100)}
+                percentage={overallProgress}
                 showPercentage={true}
                 height="md"
               />
@@ -796,40 +971,57 @@ export default function CourseDetailPage() {
                           }
                         }}
                         disabled={!isModuleUnlocked}
-                        className="w-full text-left px-4 py-3 transition-all flex items-center justify-between"
+                        className="w-full text-left px-4 py-4 transition-all duration-300 ease-out flex items-center justify-between hover:shadow-md"
                         style={{
-                          backgroundColor: isModuleSelected ? "#E8B824" : "#F9F9F9",
+                          background: isModuleSelected 
+                            ? `linear-gradient(135deg, #E8B824 0%, #D4A520 100%)`
+                            : isModuleCompleted
+                            ? `linear-gradient(135deg, #F0F9FF 0%, #E8F5E9 100%)`
+                            : "#F9F9F9",
                           color: isModuleSelected ? "#1A1A1A" : "#333333",
                           opacity: !isModuleUnlocked ? 0.5 : 1,
                           cursor: isModuleUnlocked ? "pointer" : "not-allowed",
-                          borderBottom: "1px solid #E5E5E5",
+                          borderBottom: "2px solid #E5E5E5",
+                          transition: 'all 0.3s ease-out',
                         }}
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           {isModuleCompleted ? (
-                            <CheckCircle className="h-5 w-5 flex-shrink-0" strokeWidth={1.5} style={{ color: "#6B7280" }} />
+                            <div className="h-5 w-5 flex-shrink-0 relative">
+                              <CheckCircle className="h-5 w-5 animate-pulse" strokeWidth={1.5} style={{ color: "#2E7D32" }} />
+                            </div>
                           ) : isModuleUnlocked ? (
                             <div 
-                              className="h-5 w-5 rounded-full flex-shrink-0 border-2" 
+                              className="h-5 w-5 rounded-full flex-shrink-0 border-2 transition-all" 
                               style={{ borderColor: isModuleSelected ? "#1A1A1A" : "#E8B824" }} 
                             />
                           ) : (
                             <Lock className="h-5 w-5 flex-shrink-0" strokeWidth={1.5} style={{ color: "#D1D5DB" }} />
                           )}
-                          <span className="font-semibold truncate text-md">{module.title}</span>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-bold truncate text-sm" style={{ color: isModuleSelected ? "#1A1A1A" : "#2F3E75" }}>Module {moduleIndex + 1}</span>
+                            <span className="font-semibold truncate text-md block" style={{ color: isModuleSelected ? "#1A1A1A" : "#333333" }}>{module.title}</span>
+                          </div>
                         </div>
                         {isModuleUnlocked && (
                           isModuleExpanded ? (
-                            <ChevronUp className="h-5 w-5 flex-shrink-0 ml-2" strokeWidth={1.5} style={{ color: "#9CA3AF" }} />
+                            <ChevronUp className="h-5 w-5 flex-shrink-0 ml-2 transition-transform duration-500 ease-out" strokeWidth={1.5} style={{ color: "#666" }} />
                           ) : (
-                            <ChevronDown className="h-5 w-5 flex-shrink-0 ml-2" strokeWidth={1.5} style={{ color: "#9CA3AF" }} />
+                            <ChevronDown className="h-5 w-5 flex-shrink-0 ml-2 transition-transform duration-500 ease-out" strokeWidth={1.5} style={{ color: "#666" }} />
                           )
                         )}
                       </button>
 
-                      {/* Module Content - Lessons & Materials */}
-                      {isModuleExpanded && (lessons.length > 0 || materials.length > 0) && (
-                        <div className="bg-white">
+                      {/* Module Content - Lessons & Materials with smooth animation */}
+                      <div
+                        className={`overflow-hidden transition-all ease-out ${
+                          isModuleExpanded 
+                            ? "duration-500 max-h-[2000px] opacity-100" 
+                            : "duration-600 max-h-0 opacity-0"
+                        }`}
+                      >
+                        {(lessons.length > 0 || materials.length > 0) && (
+                          <div className="bg-white">
                           {/* Lessons */}
                           {lessons.map((lesson, lessonIndex) => {
                             const progress = lessonProgress[lesson.id];
@@ -844,32 +1036,38 @@ export default function CourseDetailPage() {
                                   setSelectedLessonIndex(lessonIndex);
                                   setSelectedMaterialId(null);
                                   setActiveTab("lessons");
+                                  setExpandedModules(new Set([moduleIndex])); // Close other modules
                                   markLessonAsViewed(lesson.id);
                                   setShowSidebar(false);
                                 }}
-                                className="w-full text-left px-4 py-3 transition-all border-l-4 flex items-center justify-between hover:bg-yellow-50/50"
+                                className="w-full text-left px-4 py-3 transition-all duration-200 ease-out border-l-4 flex items-center justify-between hover:shadow-sm hover:scale-[1.01] group"
                                 style={{
-                                  backgroundColor: isLessonSelected ? "#FFF9E6" : isCompleted ? "#F0F9FF" : "transparent",
-                                  borderLeftColor: isLessonSelected ? "#E8B824" : "transparent",
-                                  borderBottom: "1px solid #F0F0F0",
+                                  backgroundColor: isLessonSelected ? "#FFF9E6" : isCompleted ? "#F0FFFE" : "#FAFAF8",
+                                  borderLeftColor: isLessonSelected ? "#E8B824" : isCompleted ? "#2E7D32" : "transparent",
+                                  borderBottom: "1px solid #E5E5E5",
+                                  borderRadius: "0px 8px 8px 0px",
+                                  marginRight: "4px",
+                                  animation: isModuleExpanded 
+                                    ? `fadeIn 0.4s ease-out ${lessonIndex * 50}ms both`
+                                    : `fadeOut 0.3s ease-in ${((lessons.length - lessonIndex - 1) + materials.length) * 50}ms both`,
                                 }}
                               >
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                   {isCompleted ? (
-                                    <CheckCircle className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} style={{ color: "#6B7280" }} />
+                                    <CheckCircle className="h-4 w-4 flex-shrink-0 animate-pulse" strokeWidth={2} style={{ color: "#2E7D32" }} />
                                   ) : isLessonSelected ? (
-                                    <div className="h-4 w-4 rounded-full flex-shrink-0" style={{ backgroundColor: "#E8B824" }} />
+                                    <div className="h-4 w-4 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: "#E8B824" }} />
                                   ) : (
-                                    <Play className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} style={{ color: "#9CA3AF" }} />
+                                    <Play className="h-4 w-4 flex-shrink-0 group-hover:text-yellow-600 transition-colors" strokeWidth={1.5} style={{ color: "#9CA3AF" }} />
                                   )}
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium text-gray-800 truncate">{lesson.title}</div>
+                                    <div className="text-sm font-semibold text-gray-800 truncate group-hover:text-yellow-700 transition-colors">{lesson.title}</div>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                                   {isCompleted && (
-                                    <span className="text-xs font-medium" style={{ color: "#2E7D32", whiteSpace: "nowrap" }}>
-                                      Selesai
+                                    <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ color: "#fff", backgroundColor: "#2E7D32", whiteSpace: "nowrap" }}>
+                                      ✓ Selesai
                                     </span>
                                   )}
                                 </div>
@@ -891,23 +1089,29 @@ export default function CourseDetailPage() {
                                   setSelectedModuleIndex(moduleIndex);
                                   setSelectedMaterialId(material.id);
                                   setActiveTab("materials");
+                                  setExpandedModules(new Set([moduleIndex])); // Close other modules
                                   markMaterialAsViewed(material.id);
                                   setShowSidebar(false);
                                 }}
-                                className="w-full text-left px-4 py-3 transition-all border-l-4 flex items-center justify-between hover:bg-orange-50/50"
+                                className="w-full text-left px-4 py-3 transition-all duration-200 ease-out border-l-4 flex items-center justify-between hover:shadow-sm hover:scale-[1.01] group"
                                 style={{
-                                  backgroundColor: isMaterialSelected ? "#FFF4E6" : isCompleted ? "#F0F9FF" : "transparent",
-                                  borderLeftColor: isMaterialSelected ? "#E87835" : "transparent",
-                                  borderBottom: "1px solid #F0F0F0",
+                                  backgroundColor: isMaterialSelected ? "#FFF4E6" : isCompleted ? "#F0FFFE" : "#FAFAF8",
+                                  borderLeftColor: isMaterialSelected ? "#E87835" : isCompleted ? "#2E7D32" : "transparent",
+                                  borderBottom: "1px solid #E5E5E5",
+                                  borderRadius: "0px 8px 8px 0px",
+                                  marginRight: "4px",
+                                  animation: isModuleExpanded 
+                                    ? `fadeIn 0.4s ease-out ${(lessons.length + materials.findIndex(m => m.id === material.id)) * 50}ms both`
+                                    : `fadeOut 0.3s ease-in ${(materials.length - materials.findIndex(m => m.id === material.id) - 1) * 50}ms both`,
                                 }}
                               >
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                   {isCompleted ? (
-                                    <CheckCircle className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} style={{ color: "#6B7280" }} />
+                                    <CheckCircle className="h-4 w-4 flex-shrink-0 animate-pulse" strokeWidth={2} style={{ color: "#2E7D32" }} />
                                   ) : isMaterialSelected ? (
-                                    <div className="h-4 w-4 rounded-full flex-shrink-0" style={{ backgroundColor: "#E87835" }} />
+                                    <div className="h-4 w-4 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: "#E87835" }} />
                                   ) : (
-                                    <span style={{ color: "#9CA3AF" }}>
+                                    <span style={{ color: "#9CA3AF" }} className="group-hover:text-orange-500 transition-colors">
                                       {material.material_type === "video" && <Video className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
                                       {material.material_type === "audio" && <Headphones className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
                                       {material.material_type === "pdf" && <FileText className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
@@ -916,18 +1120,18 @@ export default function CourseDetailPage() {
                                     </span>
                                   )}
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium text-gray-800 truncate">{material.title}</div>
+                                    <div className="text-sm font-semibold text-gray-800 truncate group-hover:text-orange-600 transition-colors">{material.title}</div>
                                     {durationMinutes && (
                                       <div className="text-xs" style={{ color: "#999999" }}>
-                                        {durationMinutes} Menit
+                                        ⏱ {durationMinutes} Menit
                                       </div>
                                     )}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                                   {isCompleted && (
-                                    <span className="text-xs font-medium" style={{ color: "#2E7D32", whiteSpace: "nowrap" }}>
-                                      Selesai
+                                    <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ color: "#fff", backgroundColor: "#2E7D32", whiteSpace: "nowrap" }}>
+                                      ✓ Selesai
                                     </span>
                                   )}
                                 </div>
@@ -935,7 +1139,8 @@ export default function CourseDetailPage() {
                             );
                           })}
                         </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -992,7 +1197,7 @@ export default function CourseDetailPage() {
                     }
                     totalModules={modules.length}
                     estimatedHours={modules.length * 2} // Estimate 2 hours per module
-                    progressPercentage={Math.round((unlockedModules.size / modules.length) * 100)}
+                    progressPercentage={overallProgress}
                     teacherName={course.teacher?.name || "Instruktur"}
                     courseId={courseId}
                   />
@@ -1470,7 +1675,7 @@ export default function CourseDetailPage() {
                   selectedLessonIndex === 0 && selectedModuleIndex === 0 ? "#999999" : "#1A1A1A",
               }}
             >
-              ⬅ Sebelumnya
+               Sebelumnya
             </Button>
             
             {selectedModuleIndex < modules.length - 1 || activeTab === "lessons" || activeTab === "materials" ? (
@@ -1540,7 +1745,7 @@ export default function CourseDetailPage() {
                   color: '#1A1A1A',
                 }}
               >
-                Lanjutkan ➡
+                Lanjutkan 
               </Button>
             ) : (
               <Button
