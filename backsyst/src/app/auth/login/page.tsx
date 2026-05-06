@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { AlertCircle, Eye, EyeOff, ArrowLeft, CheckCircle } from "lucide-react";
+import { createSession, enforceSessionLimit, logSessionActivity } from "@/lib/session-manager";
+import { createSessionSimple } from "@/lib/session-manager-simple";
+import { getUserIP } from "@/lib/get-ip";
 
 interface LoginForm {
   email: string;
@@ -15,7 +18,6 @@ interface LoginForm {
   remember?: boolean;
 }
 
-// Animation Hook
 const useFormAnimation = () => {
   const [isVisible, setIsVisible] = useState(false);
   
@@ -36,7 +38,6 @@ export default function LoginPage() {
   const [successNotification, setSuccessNotification] = useState(isRegistered);
   const isVisible = useFormAnimation();
 
-  // Auto-hide success notification after 5 seconds
   useEffect(() => {
     if (successNotification) {
       const timer = setTimeout(() => {
@@ -58,66 +59,78 @@ export default function LoginPage() {
     setIsLoading(true);
     setError("");
 
-    const { email, password } = loginForm.getValues();
+    try {
+      const { email, password } = loginForm.getValues();
+      console.log("Login attempt:", { email });
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (signInError) {
-      setError(signInError.message);
-      setIsLoading(false);
-      return;
-    }
-
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !userData.user) {
-      setError("Gagal mendapatkan data user.");
-      setIsLoading(false);
-      return;
-    }
-
-    const userId = userData.user.id;
-
-    const { data: userProfile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", userId)
-      .single();
-
-    const { error: profileError } = await supabase.from("users").upsert(
-      {
-        id: userId,
-        name: userData.user.user_metadata?.full_name || "",
-        email: userData.user.email || "",
-        role: userProfile?.role || "student",
-      },
-      { onConflict: "id" }
-    );
-    if (profileError) {
-      console.error("Error syncing profile:", profileError.message);
-    }
-
-    const authUid = (await supabase.auth.getUser()).data.user?.id;
-    if (authUid && authUid === userId) {
-      const { error: sessionError } = await supabase.from("sessions").insert({
-        user_id: authUid,
-        user_agent: navigator.userAgent,
-        is_active: true,
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      if (sessionError) {
-        setError("Gagal menyimpan sesi: " + sessionError.message);
+      if (signInError) {
+        console.error("SignIn error:", signInError.message);
+        setError(signInError.message);
         setIsLoading(false);
         return;
       }
-    }
 
-    setIsLoading(false);
-    const role = userProfile?.role || "student";
-    router.push(`/home/${role}`);
+      console.log("Authentication successful");
+
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !userData.user) {
+        console.error("Error getting user data:", userError?.message);
+        setError("Gagal mendapatkan data user.");
+        setIsLoading(false);
+        return;
+      }
+
+      const userId = userData.user.id;
+      console.log("User ID:", userId);
+
+      const { data: userProfile } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", userId)
+        .single();
+
+      const { error: profileError } = await supabase.from("users").upsert(
+        {
+          id: userId,
+          name: userData.user.user_metadata?.full_name || "",
+          email: userData.user.email || "",
+          role: userProfile?.role || "student",
+        },
+        { onConflict: "id" }
+      );
+
+      if (profileError) {
+        console.warn("Error syncing profile:", profileError.message);
+      } else {
+        console.log("User profile synced");
+      }
+
+      const userIP = await getUserIP();
+      console.log("User IP:", userIP);
+
+      console.log('Session creation temporarily disabled - continuing login');
+      let sessionData = { id: 'temp-session-disabled' }; 
+
+      console.log("Session limit enforcement temporarily disabled");
+
+      console.log("Activity logging temporarily disabled");
+
+      setIsLoading(false);
+      const role = userProfile?.role || "student";
+      console.log("Redirecting to dashboard for role:", role);
+      router.push(`/home/${role}`);
+
+    } catch (error) {
+      console.error("Unexpected error during login:", error);
+      setError("Terjadi kesalahan yang tidak terduga. Silakan coba lagi.");
+      setIsLoading(false);
+    }
   };
 
   return (

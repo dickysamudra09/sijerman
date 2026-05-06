@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, ArrowLeft, ChevronDown } from "lucide-react";
+import { createSession, enforceSessionLimit, logSessionActivity } from "@/lib/session-manager";
+import { getUserIP } from "@/lib/get-ip";
 
 interface RegisterForm {
   name: string;
@@ -61,64 +63,93 @@ export default function RegisterPage() {
     setError("");
     setSuccessMessage("");
 
-    const { name, email, password, role } = registerForm.getValues();
-    console.log("Register attempt with:", { name, email, role });
+    try {
+      const { name, email, password, role } = registerForm.getValues();
+      console.log("Register attempt with:", { name, email, role });
 
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: name },
-      },
-    });
-    console.log("SignUp response:", { data: signUpData, error: signUpError });
-
-    if (signUpError) {
-      setError(signUpError.message);
-      setIsLoading(false);
-      return;
-    }
-
-    const userId = signUpData.user?.id;
-    if (!userId) {
-      setError("Gagal mendapatkan ID user.");
-      setIsLoading(false);
-      return;
-    }
-
-    const { error: profileError } = await supabase
-      .from("users")
-      .insert({
-        id: userId,
-        name,
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
-        role,
+        password,
+        options: {
+          data: { full_name: name },
+        },
       });
-    if (profileError) {
-      console.error("Error syncing profile:", profileError.message);
-    }
 
-    const authUid = (await supabase.auth.getUser()).data.user?.id;
-    if (authUid && authUid === userId) {
-      const { error: sessionError } = await supabase.from("sessions").insert({
-        user_id: authUid,
-        user_agent: navigator.userAgent,
-        is_active: true,
-      });
-      console.log("Session insert:", { error: sessionError });
-
-      if (sessionError) {
-        setError("Gagal menyimpan sesi: " + sessionError.message);
+      if (signUpError) {
+        console.error("SignUp error:", signUpError.message);
+        setError(signUpError.message);
         setIsLoading(false);
         return;
       }
-    } else {
-      console.warn("Authentication UID not available after signUp, skipping session insert.");
-    }
 
-    setIsLoading(false);
-    // Redirect immediately to login with smooth transition animation
-    router.push("/auth/login?registered=true");
+      const userId = signUpData.user?.id;
+      if (!userId) {
+        console.error("No user ID returned from signup");
+        setError("Gagal mendapatkan ID user.");
+        setIsLoading(false);
+        return;
+      }
+
+      console.log("User created with ID:", userId);
+
+      const { error: profileError } = await supabase
+        .from("users")
+        .insert({
+          id: userId,
+          name,
+          email,
+          role,
+        });
+
+      if (profileError) {
+        console.error("Error creating profile:", profileError.message);
+      } else {
+        console.log("User profile created");
+      }
+
+      const authUid = (await supabase.auth.getUser()).data.user?.id;
+      if (!authUid || authUid !== userId) {
+        console.warn("Authentication UID mismatch, skipping session creation");
+        setIsLoading(false);
+        router.push("/auth/login?registered=true");
+        return;
+      }
+
+      const userIP = await getUserIP();
+      console.log("User IP:", userIP);
+
+      const sessionData = await createSession({
+        user_id: authUid,
+        ip_address: userIP,
+      });
+
+      if (!sessionData) {
+        console.error("Failed to create session");
+        setError("Gagal membuat sesi. Silakan login secara manual.");
+        setIsLoading(false);
+        router.push("/auth/login?registered=true");
+        return;
+      }
+
+      console.log("Session created:", sessionData.id);
+
+      await enforceSessionLimit(authUid, 3);
+      console.log("Session limit enforced (max 3 devices)");
+
+      await logSessionActivity(sessionData.id, "login", userIP);
+      console.log("Login activity logged");
+
+      setSuccessMessage("Akun berhasil dibuat! Mengarahkan ke login...");
+      
+      setTimeout(() => {
+        router.push("/auth/login?registered=true");
+      }, 1500);
+
+    } catch (error) {
+      console.error("Unexpected error during registration:", error);
+      setError("Terjadi kesalahan yang tidak terduga. Silakan coba lagi.");
+      setIsLoading(false);
+    }
   };
 
   return (
