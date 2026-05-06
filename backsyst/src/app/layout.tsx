@@ -3,6 +3,14 @@ import '../styles/globals.css';
 import { cookies } from 'next/headers';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Metadata } from 'next';
+import { Plus_Jakarta_Sans } from 'next/font/google';
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-plus-jakarta-sans',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Si Jerman - Platform Pembelajaran Online Bahasa Jerman',
@@ -25,7 +33,7 @@ export default async function RootLayout({
 
   return (
     <html lang="id" suppressHydrationWarning>
-      <body className="antialiased">
+      <body className={`${plusJakartaSans.variable} antialiased`}>
         {children}
       </body>
     </html>

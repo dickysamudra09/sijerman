@@ -8,25 +8,48 @@ export interface PromptConfig {
   userPrompt: string;
 }
 
-const SYSTEM_PROMPT_EXPERT_TUTOR = `Kamu tutor bahasa Jerman untuk siswa A1-A2.
+const SYSTEM_PROMPT_EXPERT_TUTOR = `Kamu tutor bahasa Jerman yang ramah dan supportive untuk siswa A1-A2 yang sedang belajar membaca teks Jerman (Leseverstehen).
 
-ATURAN OUTPUT:
-- Kembalikan HANYA JSON: {"feedback_text": "isi feedback"}
-- JANGAN tampilkan instruksi, placeholder, atau meta-text
-- JANGAN gunakan tanda kurung siku [...] dalam output
-- Pisahkan bagian dengan \\n\\n (double line break)
-- Gunakan label: "RESPONS:", "KENAPA SALAH:", "TIPS:"
-- Bahasa Indonesia, hangat dan supportive
+Aturan output:
+- Kembalikan feedback dalam format text biasa (BUKAN JSON)
+- Jangan tampilkan instruksi, placeholder, atau meta-text
+- Jangan gunakan tanda kurung siku [...] dalam output
+- WAJIB pisahkan bagian dengan label dan \\n\\n (double line break)
+- WAJIB gunakan label ini: "Hasil:", "Kenapa salah? 🤔", "Tips untuk kamu ✨"
+- Setiap label harus di baris baru dan diikuti konten di baris berikutnya
+- Bahasa Indonesia yang hangat, ramah, dan memotivasi
 - Maksimal 200 kata
 
-ATURAN KONTEN:
-- Analisis HANYA berdasarkan materi lesson yang diberikan
-- JANGAN mengarang informasi di luar lesson content
-- Gunakan contoh dan kosakata dari lesson content
-- Jika lesson content tidak ada, gunakan grammatik dasar A1-A2 yang akurat
-- Validasi semua terjemahan dan konjugasi - JANGAN sampai salah!
+Format struktur yang WAJIB diikuti:
+Hasil:
+[Kalimat pembuka yang memotivasi]
 
-REFERENSI GRAMMATIK AKURAT:
+Kenapa salah? 🤔
+[Penjelasan dengan kutipan teks lengkap]
+
+Tips untuk kamu ✨
+• [Tip 1]
+• [Tip 2]
+• [Tip 3]
+
+Aturan konten - Leseverstehen:
+- Selalu kutip kalimat lengkap dari teks bacaan sebagai bukti
+- Format kutipan: "Di teks tertulis: '[kalimat lengkap dari teks]'"
+- Jelaskan dengan lembut hubungan antara kutipan dengan jawaban
+- Hanya gunakan informasi dari teks bacaan yang diberikan
+- Gunakan kata kunci yang sama antara soal dan teks
+- Tunjukkan letak informasi spesifik di teks dengan cara yang membantu
+
+Contoh bukti yang baik:
+✓ "Di teks tertulis: 'Rania kommt aus Jakarta und wohnt jetzt in Malang.' Dari kalimat ini kita bisa lihat bahwa Rania memang berasal dari Jakarta dan sekarang tinggal di Malang."
+✗ "Berdasarkan teks, Rania dari Jakarta." (terlalu singkat, tidak ada kutipan lengkap)
+
+Nada bicara:
+- Gunakan kata-kata yang memotivasi seperti "Ayo kita lihat...", "Coba perhatikan...", "Kamu hampir benar..."
+- Hindari kata-kata yang terkesan menyalahkan atau menakuti
+- Fokus pada pembelajaran, bukan kesalahan
+
+Referensi grammatik akurat:
 - sein: ich bin, du bist, er/sie/es ist, wir/sie/Sie sind
 - haben: ich habe, du hast, er/sie/es hat, wir/sie/Sie haben
 - Verb reguler: ich -e, du -st, er/sie/es -t, wir/sie/Sie -en`;
@@ -79,7 +102,78 @@ Tulis feedback lengkap sekarang (tanpa placeholder atau [...]):
 `
 
   return {
-    model: 'llama-3.1-8b-instant',
+    model: 'llama-3.3-70b-versatile',
+    temperature: 0.2,
+    maxTokens: 600,
+    topP: 0.9,
+    systemMessage: SYSTEM_PROMPT_EXPERT_TUTOR,
+    userPrompt
+  };
+}
+
+export function buildTrueFalsePrompt(
+  instruction: string,
+  statement: string,
+  studentAnswer: string,
+  correctAnswer: string,
+  isCorrect: boolean,
+  lessonContent?: string
+): PromptConfig {
+  const cleanLesson = lessonContent
+    ? lessonContent.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 2000)
+    : '';
+
+  const lessonSection = cleanLesson
+    ? `\nTeks bacaan:\n${cleanLesson}\n\n`
+    : '';
+
+  const fullQuestion = instruction 
+    ? `${instruction}\n${statement}` 
+    : statement;
+
+  const userPrompt = isCorrect 
+    ? `${lessonSection}Instruksi: "${instruction}"
+Pernyataan: "${statement}"
+Jawaban siswa: ${studentAnswer}
+Jawaban benar: ${correctAnswer}
+
+WAJIB gunakan format ini (dengan label dan line break):
+
+Hasil:
+Tepat sekali! Kamu berhasil memahami teks dengan baik. Pernyataan ini memang ${correctAnswer === 'Richtig (R)' ? 'benar' : 'salah'}.
+
+Kenapa ${correctAnswer === 'Richtig (R)' ? 'benar' : 'salah'}? 🤔
+Ayo kita lihat buktinya di teks. Di teks tertulis: "[kutip kalimat lengkap dari teks yang relevan]". Dari kalimat ini kita bisa melihat bahwa [jelaskan dengan ramah mengapa pernyataan ${correctAnswer === 'Richtig (R)' ? 'benar' : 'salah'}].
+
+Tips untuk kamu ✨
+• Coba perhatikan kata kunci penting dalam pernyataan
+• Bandingkan dengan informasi yang ada di teks bacaan
+
+PENTING: Tulis dengan format di atas, jangan gabung jadi satu paragraf!
+`
+    : `${lessonSection}Instruksi: "${instruction}"
+Pernyataan: "${statement}"
+Jawaban siswa: ${studentAnswer}
+Jawaban benar: ${correctAnswer}
+
+WAJIB gunakan format ini (dengan label dan line break):
+
+Hasil:
+Hampir benar! Jangan khawatir, ini kesempatan bagus untuk belajar. Jawaban yang tepat adalah ${correctAnswer}.
+
+Kenapa salah? 🤔
+Ayo kita lihat buktinya di teks bersama-sama. Di teks tertulis: "[kutip kalimat lengkap dari teks yang relevan]". Dari kalimat ini kita bisa melihat bahwa pernyataan "${statement}" sebenarnya ${correctAnswer === 'Richtig (R)' ? 'benar' : 'salah'} karena [jelaskan dengan lembut dan detail].
+
+Tips untuk kamu ✨
+• Coba baca teks dengan lebih teliti dan cari bukti konkret
+• Perhatikan kata-kata kunci dalam pernyataan dan bandingkan dengan teks
+• Ingat, membaca pemahaman butuh latihan - kamu pasti bisa!
+
+PENTING: Tulis dengan format di atas, jangan gabung jadi satu paragraf!
+`
+
+  return {
+    model: 'llama-3.3-70b-versatile',
     temperature: 0.2,
     maxTokens: 600,
     topP: 0.9,
@@ -101,7 +195,7 @@ export function buildMultipleChoicePrompt(
     : '';
 
   const lessonSection = cleanLesson
-    ? `\nTEKS BACAAN:\n${cleanLesson}\n\n`
+    ? `\nTeks bacaan:\n${cleanLesson}\n\n`
     : '';
 
   const userPrompt = isCorrect 
@@ -109,35 +203,42 @@ export function buildMultipleChoicePrompt(
 Jawaban siswa: "${studentAnswer}"
 Jawaban benar: "${correctAnswer}"
 
-Tulis feedback dalam format:
+WAJIB gunakan format ini (dengan label dan line break):
 
-RESPONS:
-Bagus! Kamu sudah memahami teks dengan baik.
+Hasil:
+Bagus sekali! Jawabanmu tepat. Kamu berhasil memahami teks dengan baik.
 
-TIPS:
-- Latih kemampuan membaca dari teks lesson
-- Perhatikan kata kunci penting
+Kenapa benar? 🤔
+Ayo kita lihat buktinya di teks. Di teks tertulis: "[kutip kalimat lengkap dari teks yang mendukung jawaban]". Dari kalimat ini kita bisa melihat bahwa jawaban "${correctAnswer}" memang sesuai dengan informasi di teks.
 
-Tulis feedback lengkap sekarang (tanpa placeholder atau [...]):
+Tips untuk kamu ✨
+• Terus latih kemampuan membaca dengan mencari bukti konkret di teks
+• Perhatikan kata kunci yang menghubungkan soal dengan teks
+
+PENTING: Tulis dengan format di atas, jangan gabung jadi satu paragraf!
 `
     : `${lessonSection}Soal: "${question}"
 Jawaban siswa: "${studentAnswer}"
 Jawaban benar: "${correctAnswer}"
 
-Tulis feedback dalam format:
+WAJIB gunakan format ini (dengan label dan line break):
 
-KENAPA SALAH:
-Jawaban yang benar adalah "${correctAnswer}" karena (jelaskan berdasarkan teks bacaan atau grammatik).
+Hasil:
+Hampir benar! Jangan berkecil hati, ini bagian dari proses belajar. Jawaban yang tepat adalah "${correctAnswer}".
 
-TIPS:
-- (Tip 1 berdasarkan teks lesson)
-- (Tip 2 dengan kata kunci dari teks)
+Kenapa salah? 🤔
+Ayo kita lihat buktinya di teks bersama-sama. Di teks tertulis: "[kutip kalimat lengkap dari teks yang relevan]". Dari kalimat ini kita bisa melihat bahwa jawaban yang tepat adalah "${correctAnswer}", bukan "${studentAnswer}", karena [jelaskan dengan lembut dan detail perbedaannya].
 
-Tulis feedback lengkap sekarang (tanpa placeholder atau [...]):
+Tips untuk kamu ✨
+• Coba baca teks dengan lebih teliti dan cari bukti konkret
+• Bandingkan setiap pilihan jawaban dengan informasi yang ada di teks
+• Ingat, setiap latihan membuat kamu semakin mahir!
+
+PENTING: Tulis dengan format di atas, jangan gabung jadi satu paragraf!
 `
 
   return {
-    model: 'llama-3.1-8b-instant',
+    model: 'llama-3.3-70b-versatile',
     temperature: 0.2,
     maxTokens: 600,
     topP: 0.9,
@@ -194,7 +295,7 @@ Tulis feedback lengkap sekarang (tanpa placeholder atau [...]):
 `
 
   return {
-    model: 'llama-3.1-8b-instant',
+    model: 'llama-3.3-70b-versatile',
     temperature: 0.2,
     maxTokens: 600,
     topP: 0.9,
@@ -210,7 +311,9 @@ export function buildOptimizedPrompt(
   correctAnswer: string,
   isCorrect: boolean,
   allOptions?: string[],
-  lessonContent?: string
+  lessonContent?: string,
+  instruction?: string,
+  statement?: string
 ): PromptConfig {
   switch (questionType) {
     case 'sentence_arrangement':
@@ -219,8 +322,15 @@ export function buildOptimizedPrompt(
     case 'essay':
       return buildEssayPrompt(questionText, studentAnswer, correctAnswer, isCorrect, lessonContent);
     
-    case 'multiple_choice':
     case 'true_false':
+      // Use specialized true_false prompt if instruction and statement are provided
+      if (instruction && statement) {
+        return buildTrueFalsePrompt(instruction, statement, studentAnswer, correctAnswer, isCorrect, lessonContent);
+      }
+      // Fallback to multiple choice prompt
+      return buildMultipleChoicePrompt(questionText, studentAnswer, correctAnswer, isCorrect, allOptions, lessonContent);
+    
+    case 'multiple_choice':
       return buildMultipleChoicePrompt(questionText, studentAnswer, correctAnswer, isCorrect, allOptions, lessonContent);
     
     default:

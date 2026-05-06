@@ -2,24 +2,10 @@
 
 import React, { useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import {
-  Bold,
-  Italic,
-  Underline,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  Link2,
-  Upload,
-  Music,
-  Video,
-  Image,
   X,
   Plus,
-  Code,
-  Strikethrough,
   Loader,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,10 +14,11 @@ import { Input } from "@/components/ui/input";
 interface LessonContentEditorProps {
   content: string;
   onChange: (content: string) => void;
+  disabled?: boolean;
 }
 
-export function LessonContentEditor({ content, onChange }: LessonContentEditorProps) {
-  const editorRef = useRef<HTMLTextAreaElement>(null);
+export function LessonContentEditor({ content, onChange, disabled = false }: LessonContentEditorProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [showAudioModal, setShowAudioModal] = useState(false);
@@ -54,60 +41,21 @@ export function LessonContentEditor({ content, onChange }: LessonContentEditorPr
   const [linkUrl, setLinkUrl] = useState("");
   const [linkText, setLinkText] = useState("");
 
-  const insertAtCursor = (text: string) => {
-    if (editorRef.current) {
-      const startPos = editorRef.current.selectionStart;
-      const endPos = editorRef.current.selectionEnd;
-      const newContent =
-        content.substring(0, startPos) + text + content.substring(endPos);
-      onChange(newContent);
+  const insertHtmlAtEnd = (html: string) => {
+    // Append HTML to the end of content
+    onChange(content + '\n' + html);
+  };
 
-      setTimeout(() => {
-        if (editorRef.current) {
-          editorRef.current.selectionStart = editorRef.current.selectionEnd =
-            startPos + text.length;
-          editorRef.current.focus();
-        }
-      }, 0);
+  // Extract YouTube ID from URL
+  const extractYouTubeId = (url: string): string | null => {
+    const regExp =
+      /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+
+    if (match && match[2].length === 11) {
+      return match[2];
     }
-  };
-
-  const insertBold = () => {
-    insertAtCursor("<strong>bold text</strong>");
-  };
-
-  const insertItalic = () => {
-    insertAtCursor("<em>italic text</em>");
-  };
-
-  const insertUnderline = () => {
-    insertAtCursor("<u>underlined text</u>");
-  };
-
-  const insertStrikethrough = () => {
-    insertAtCursor("<s>strikethrough text</s>");
-  };
-
-  const insertHeading = (level: 1 | 2 | 3 | 4 | 5 | 6) => {
-    insertAtCursor(`\n<h${level}>Heading ${level}</h${level}>\n`);
-  };
-
-  const insertList = () => {
-    insertAtCursor(
-      "\n<ul>\n  <li>Item 1</li>\n  <li>Item 2</li>\n  <li>Item 3</li>\n</ul>\n"
-    );
-  };
-
-  const insertOrderedList = () => {
-    insertAtCursor(
-      "\n<ol>\n  <li>First item</li>\n  <li>Second item</li>\n  <li>Third item</li>\n</ol>\n"
-    );
-  };
-
-  const insertCode = () => {
-    insertAtCursor(
-      "<pre><code>// Your code here\nlet example = 'code';</code></pre>"
-    );
+    return null;
   };
 
   const uploadFileToSupabase = async (
@@ -161,7 +109,7 @@ export function LessonContentEditor({ content, onChange }: LessonContentEditorPr
   </video>
 </div>`;
 
-      insertAtCursor(videoHtml);
+      insertHtmlAtEnd(videoHtml);
       setVideoFile(null);
       setVideoUrl("");
       setVideoUploading(false);
@@ -197,7 +145,7 @@ export function LessonContentEditor({ content, onChange }: LessonContentEditorPr
     }
 
     if (videoHtml) {
-      insertAtCursor(videoHtml);
+      insertHtmlAtEnd(videoHtml);
       setVideoUrl("");
       setShowVideoModal(false);
     }
@@ -221,7 +169,7 @@ export function LessonContentEditor({ content, onChange }: LessonContentEditorPr
   />
 </div>`;
 
-      insertAtCursor(imageHtml);
+      insertHtmlAtEnd(imageHtml);
       setImageFile(null);
       setImageUrl("");
       setImageUploading(false);
@@ -239,7 +187,7 @@ export function LessonContentEditor({ content, onChange }: LessonContentEditorPr
   />
 </div>`;
 
-    insertAtCursor(imageHtml);
+    insertHtmlAtEnd(imageHtml);
     setImageUrl("");
     setShowImageModal(false);
   };
@@ -261,7 +209,7 @@ export function LessonContentEditor({ content, onChange }: LessonContentEditorPr
   </audio>
 </div>`;
 
-      insertAtCursor(audioHtml);
+      insertHtmlAtEnd(audioHtml);
       setAudioFile(null);
       setAudioUrl("");
       setAudioUploading(false);
@@ -278,7 +226,7 @@ export function LessonContentEditor({ content, onChange }: LessonContentEditorPr
   </audio>
 </div>`;
 
-    insertAtCursor(audioHtml);
+    insertHtmlAtEnd(audioHtml);
     setAudioUrl("");
     setShowAudioModal(false);
   };
@@ -288,162 +236,24 @@ export function LessonContentEditor({ content, onChange }: LessonContentEditorPr
 
     const linkHtml = `<a href="${linkUrl}" target="_blank" rel="noopener noreferrer" style="color: #E87835; text-decoration: underline; font-weight: 500;">${linkText}</a>`;
 
-    insertAtCursor(linkHtml);
+    insertHtmlAtEnd(linkHtml);
     setLinkUrl("");
     setLinkText("");
     setShowLinkModal(false);
   };
 
   return (
-    <div className="space-y-3">
-      {/* Toolbar - Row 1: Text Formatting */}
-      <div className="flex gap-1 flex-wrap p-2 rounded-lg border border-gray-200" style={{ backgroundColor: "#F5F5F5" }}>
-        <div className="flex gap-1 border-r pr-2" style={{ borderRightColor: "#D4D4D4" }}>
-          <button
-            onClick={insertBold}
-            className="p-2 rounded hover:bg-yellow-100 transition-colors"
-            title="Bold"
-            style={{ backgroundColor: "transparent", color: "#1A1A1A" }}
-          >
-            <Bold className="h-4 w-4" />
-          </button>
-          <button
-            onClick={insertItalic}
-            className="p-2 rounded hover:bg-yellow-100 transition-colors"
-            title="Italic"
-            style={{ backgroundColor: "transparent", color: "#1A1A1A" }}
-          >
-            <Italic className="h-4 w-4" />
-          </button>
-          <button
-            onClick={insertUnderline}
-            className="p-2 rounded hover:bg-yellow-100 transition-colors"
-            title="Underline"
-            style={{ backgroundColor: "transparent", color: "#1A1A1A" }}
-          >
-            <Underline className="h-4 w-4" />
-          </button>
-          <button
-            onClick={insertStrikethrough}
-            className="p-2 rounded hover:bg-yellow-100 transition-colors"
-            title="Strikethrough"
-            style={{ backgroundColor: "transparent", color: "#1A1A1A" }}
-          >
-            <Strikethrough className="h-4 w-4" />
-          </button>
-          <button
-            onClick={insertCode}
-            className="p-2 rounded hover:bg-yellow-100 transition-colors"
-            title="Code Block"
-            style={{ backgroundColor: "transparent", color: "#1A1A1A" }}
-          >
-            <Code className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="flex gap-1 border-r pr-2" style={{ borderRightColor: "#D4D4D4" }}>
-          <button
-            onClick={() => insertHeading(1)}
-            className="px-2 py-2 rounded hover:bg-yellow-100 transition-colors text-sm font-bold"
-            title="Heading 1"
-            style={{ backgroundColor: "transparent", color: "#1A1A1A" }}
-          >
-            H1
-          </button>
-          <button
-            onClick={() => insertHeading(2)}
-            className="px-2 py-2 rounded hover:bg-yellow-100 transition-colors text-sm font-bold"
-            title="Heading 2"
-            style={{ backgroundColor: "transparent", color: "#1A1A1A" }}
-          >
-            H2
-          </button>
-          <button
-            onClick={() => insertHeading(3)}
-            className="px-2 py-2 rounded hover:bg-yellow-100 transition-colors text-sm font-bold"
-            title="Heading 3"
-            style={{ backgroundColor: "transparent", color: "#1A1A1A" }}
-          >
-            H3
-          </button>
-        </div>
-
-        <div className="flex gap-1">
-          <button
-            onClick={insertList}
-            className="p-2 rounded hover:bg-yellow-100 transition-colors"
-            title="Bullet List"
-            style={{ backgroundColor: "transparent", color: "#1A1A1A" }}
-          >
-            <List className="h-4 w-4" />
-          </button>
-          <button
-            onClick={insertOrderedList}
-            className="p-2 rounded hover:bg-yellow-100 transition-colors"
-            title="Numbered List"
-            style={{ backgroundColor: "transparent", color: "#1A1A1A" }}
-          >
-            <ListOrdered className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Toolbar - Row 2: Media Insertion */}
-      <div className="flex gap-1 flex-wrap p-2 rounded-lg border border-gray-200" style={{ backgroundColor: "#F5F5F5" }}>
-        <div className="flex gap-1">
-          <button
-            onClick={() => setShowVideoModal(true)}
-            className="p-2 rounded hover:bg-yellow-100 transition-colors"
-            title="Add Video"
-            style={{ backgroundColor: "transparent", color: "#E87835" }}
-          >
-            <Video className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setShowImageModal(true)}
-            className="p-2 rounded hover:bg-yellow-100 transition-colors"
-            title="Add Image"
-            style={{ backgroundColor: "transparent", color: "#E8B824" }}
-          >
-            <Image className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setShowAudioModal(true)}
-            className="p-2 rounded hover:bg-yellow-100 transition-colors"
-            title="Add Audio"
-            style={{ backgroundColor: "transparent", color: "#9333EA" }}
-          >
-            <Music className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setShowLinkModal(true)}
-            className="p-2 rounded hover:bg-yellow-100 transition-colors"
-            title="Add Link"
-            style={{ backgroundColor: "transparent", color: "#0891B2" }}
-          >
-            <Link2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Editor Textarea */}
-      <textarea
-        ref={editorRef}
-        value={content}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Add your lesson content here... Use the toolbar above for media, formatting, and more."
-        rows={10}
-        className="w-full rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 p-3 text-sm resize-none"
-        style={{
-          backgroundColor: "#FFFFFC",
-          fontFamily: "monospace",
-          fontSize: "12px",
-        }}
+    <div className="space-y-3" ref={editorRef}>
+      {/* Rich Text Editor with TipTap */}
+      <RichTextEditor
+        content={content}
+        onChange={onChange}
+        disabled={disabled}
+        onOpenVideoModal={() => setShowVideoModal(true)}
+        onOpenImageModal={() => setShowImageModal(true)}
+        onOpenAudioModal={() => setShowAudioModal(true)}
+        onOpenLinkModal={() => setShowLinkModal(true)}
       />
-
-      <p className="text-xs" style={{ color: "#999999" }}>
-        💡 Tip: Use formatting buttons to add media and content, or write HTML directly.
-      </p>
 
       {/* Video Modal */}
       {showVideoModal && (
@@ -826,16 +636,4 @@ export function LessonContentEditor({ content, onChange }: LessonContentEditorPr
       )}
     </div>
   );
-}
-
-function extractYouTubeId(url: string): string | null {
-  const regExp =
-    /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-  const match = url.match(regExp);
-
-  if (match && match[2].length == 11) {
-    return match[2];
-  } else {
-    return null;
-  }
 }

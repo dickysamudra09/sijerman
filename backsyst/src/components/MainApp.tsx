@@ -159,7 +159,7 @@ const HeroSection = ({ language }: LanguageProps) => {
   return (
     <section 
       ref={ref}
-      className="relative w-full overflow-hidden px-4 py-12 md:py-16 lg:py-24" 
+      className="relative w-full overflow-hidden px-4 py-8 md:py-12 lg:py-16 xl:py-24" 
       style={{
         visibility: isVisible ? 'visible' : 'hidden',
         animation: isVisible ? 'fadeScaleIn 0.8s ease-out forwards' : 'none'
@@ -207,12 +207,12 @@ const HeroSection = ({ language }: LanguageProps) => {
 
       {/* Content Container */}
       <div className="container mx-auto px-0 lg:px-4 relative z-10 max-w-6xl">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-14">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 md:gap-8 lg:gap-14">
           
           {/* Left Content */}
           <div className="w-full lg:w-1/2 px-4 lg:px-0">
             {/* Heading */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-4 max-w-2xl" style={{color: '#1A1A1A', lineHeight: '1.1'}}>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-3 md:mb-4 max-w-2xl" style={{color: '#1A1A1A', lineHeight: '1.1'}}>
               {getText("Kembangkan Potensimu, dengan", "Entwickle dein Potenzial mit")}
               <span style={{color: '#E8B824', marginLeft: '8px'}}>
                 {getText("Si Jerman.", "Si Jerman.")}
@@ -220,7 +220,7 @@ const HeroSection = ({ language }: LanguageProps) => {
             </h1>
 
             {/* Description */}
-            <p className="text-base sm:text-lg leading-relaxed mb-8 max-w-md" style={{color: '#4A4A4A', lineHeight: '1.6'}}>
+            <p className="text-sm sm:text-base md:text-lg leading-relaxed mb-4 md:mb-6 max-w-md" style={{color: '#4A4A4A', lineHeight: '1.6'}}>
               {getText(
                 "Pelajari Bahasa Jerman dengan latihan AI cerdas, kuis interaktif, serta sistem pembelajaran yang terstruktur dan kolaboratif.",
                 "Lernen Sie Deutsch mit intelligenten KI-Übungen, interaktiven Quizzes und strukturiertem Lernsystem."
@@ -228,10 +228,10 @@ const HeroSection = ({ language }: LanguageProps) => {
             </p>
 
             {/* Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-8 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row gap-3 mb-4 md:mb-6 w-full sm:w-auto">
               <Button
                 onClick={() => window.location.href = '/open-courses'}
-                className="px-6 py-2.5 rounded-full font-bold flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg text-sm"
+                className="px-4 py-2.5 md:px-6 md:py-2.5 rounded-full font-bold flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg text-xs sm:text-sm w-full sm:w-auto"
                 style={{
                   backgroundColor: '#E8B824',
                   color: '#1A1A1A'
@@ -241,19 +241,19 @@ const HeroSection = ({ language }: LanguageProps) => {
                 {getText("Mulai Belajar Gratis", "Kostenlos Starten")}
               </Button>
               <Button
-                className="px-6 py-2.5 rounded-full font-bold flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg text-sm"
+                className="px-4 py-2.5 md:px-6 md:py-2.5 rounded-full font-bold flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg text-xs sm:text-sm w-full sm:w-auto"
                 style={{
                   backgroundColor: '#1A1A1A',
                   color: '#FFFFFF'
                 }}
               >
-                <Search className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Search className="w-4 h-4" />
                 {getText("Coba Latihan AI", "KI-Übungen Testen")}
               </Button>
             </div>
 
             {/* Trust Badges */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 md:gap-4 text-xs sm:text-sm">
               <div className="flex items-center gap-2" style={{color: '#4A4A4A'}}>
                 <svg className="w-4 h-4" style={{color: '#10B981'}} fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -269,10 +269,10 @@ const HeroSection = ({ language }: LanguageProps) => {
             </div>
           </div>
 
-          {/* Right Side - Image & Cards */}
-          <div className="w-full lg:w-1/2 flex justify-center items-center relative px-4 lg:px-0" style={{minHeight: '520px', position: 'relative'}}>
+          {/* Right Side - Image & Cards - Hidden on Mobile */}
+          <div className="hidden lg:flex w-full lg:w-1/2 justify-center items-center relative px-4 lg:px-0" style={{minHeight: '400px', position: 'relative'}}>
             {/* Animated Circle Gradient */}
-            <div style={{
+            <div className="hidden md:block" style={{
               position: 'absolute',
               width: '420px',
               height: '420px',
@@ -423,7 +423,8 @@ const HeroSection = ({ language }: LanguageProps) => {
               position: 'relative',
               zIndex: 3,
               width: '100%',
-              maxWidth: '320px'
+              maxWidth: '280px',
+              margin: '0 auto'
             }}>
               <img
                 src="/img/3.png"
@@ -435,6 +436,16 @@ const HeroSection = ({ language }: LanguageProps) => {
 
             {/* Animations */}
             <style>{`
+              /* Disable heavy animations on mobile for better performance */}
+              @media (max-width: 1024px) {
+                .floating-card {
+                  animation: none !important;
+                }
+                @keyframes spinGradient {
+                  0%, 100% { transform: rotate(0deg); }
+                }
+              }
+
               @keyframes floatCard1 {
                 0%, 100% {
                   transform: translateY(0px) translateX(0px);
@@ -500,7 +511,7 @@ const MainFeatures = ({ language }: LanguageProps) => {
   const { ref, isVisible } = useScrollAnimation();
 
   return (
-    <section className="relative w-full overflow-hidden px-4 py-12 md:py-20 lg:py-24" ref={ref}>
+    <section className="relative w-full overflow-hidden px-4 py-12 md:py-16 lg:py-20" ref={ref}>
       {/* Gradient Background */}
       <div style={{
         position: 'absolute',
@@ -538,11 +549,11 @@ const MainFeatures = ({ language }: LanguageProps) => {
       {/* Content Container */}
       <div className="container mx-auto px-0 lg:px-4 relative z-10 max-w-6xl">
         {/* Heading */}
-        <div className="text-center mb-12 md:mb-16">
-          <span className="text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full inline-block" style={{backgroundColor: 'rgba(232, 184, 36, 0.15)', color: '#E8B824', border: '1px solid rgba(232, 184, 36, 0.3)', letterSpacing: '0.1em'}}>
+        <div className="text-center mb-10 md:mb-12 lg:mb-16">
+          <span className="text-xs font-bold uppercase tracking-wider px-3 py-1.5 md:px-4 md:py-2 rounded-full inline-block" style={{backgroundColor: 'rgba(232, 184, 36, 0.15)', color: '#E8B824', border: '1px solid rgba(232, 184, 36, 0.3)', letterSpacing: '0.1em'}}>
             {getText("Mengapa Si Jerman?", "Warum Si Jerman?")}
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mt-6 leading-tight max-w-3xl mx-auto" style={{color: '#FFFFFC', lineHeight: '1.3'}}>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mt-4 md:mt-6 leading-tight max-w-3xl mx-auto px-4" style={{color: '#FFFFFC', lineHeight: '1.3'}}>
             {getText(
               "Platform Pembelajaran dengan Fitur Lengkap dan Inovatif",
               "Lernplattform mit vollständigen und innovativen Funktionen"
@@ -551,13 +562,13 @@ const MainFeatures = ({ language }: LanguageProps) => {
         </div>
 
         {/* Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
           {/* Card 1 - Interactive Exercises - Yellow */}
           <div 
             style={{
               backgroundColor: 'rgba(232, 184, 36, 0.08)',
               borderRadius: '16px',
-              padding: '32px 24px',
+              padding: '24px 20px',
               border: '1px solid rgba(232, 184, 36, 0.25)',
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
@@ -577,22 +588,24 @@ const MainFeatures = ({ language }: LanguageProps) => {
             }}
           >
             <div style={{
-              width: '56px',
-              height: '56px',
+              width: '48px',
+              height: '48px',
               borderRadius: '12px',
               backgroundColor: '#E8B824',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: '16px'
-            }}>
-              <span style={{fontSize: '28px'}}>✓</span>
+              marginBottom: '14px'
+            }}
+            className="md:w-14 md:h-14"
+            >
+              <span className="text-2xl md:text-3xl">✓</span>
             </div>
-            <h3 className="text-4xl font-bold mb-2" style={{color: '#E8B824'}}>96+</h3>
-            <h4 className="text-lg font-bold mb-3" style={{color: '#FFFFFC'}}>
+            <h3 className="text-3xl md:text-4xl font-bold mb-2" style={{color: '#E8B824'}}>96+</h3>
+            <h4 className="text-base md:text-lg font-bold mb-2 md:mb-3" style={{color: '#FFFFFC'}}>
               {getText("Latihan Interaktif", "Interaktive Übungen")}
             </h4>
-            <p className="text-sm leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
+            <p className="text-xs md:text-sm leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
               {getText(
                 "Nikmati berbagai latihan soal dengan analisis AI — bukan sekadar teori, tapi praktik bahasa yang nyata.",
                 "Genießen Sie verschiedene Übungsaufgaben mit KI-Analyse – nicht nur Theorie, sondern echte Sprachpraxis."
@@ -605,7 +618,7 @@ const MainFeatures = ({ language }: LanguageProps) => {
             style={{
               backgroundColor: 'rgba(245, 158, 11, 0.08)',
               borderRadius: '16px',
-              padding: '32px 24px',
+              padding: '24px 20px',
               border: '1px solid rgba(245, 158, 11, 0.25)',
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
@@ -625,22 +638,24 @@ const MainFeatures = ({ language }: LanguageProps) => {
             }}
           >
             <div style={{
-              width: '56px',
-              height: '56px',
+              width: '48px',
+              height: '48px',
               borderRadius: '12px',
               backgroundColor: '#F59E0B',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: '16px'
-            }}>
-              <span style={{fontSize: '28px'}}>⭐</span>
+              marginBottom: '14px'
+            }}
+            className="md:w-14 md:h-14"
+            >
+              <span className="text-2xl md:text-3xl">⭐</span>
             </div>
-            <h3 className="text-4xl font-bold mb-2" style={{color: '#F59E0B'}}>4+</h3>
-            <h4 className="text-lg font-bold mb-3" style={{color: '#FFFFFC'}}>
+            <h3 className="text-3xl md:text-4xl font-bold mb-2" style={{color: '#F59E0B'}}>4+</h3>
+            <h4 className="text-base md:text-lg font-bold mb-2 md:mb-3" style={{color: '#FFFFFC'}}>
               {getText("Proyek Tiap Level", "Projekte pro Level")}
             </h4>
-            <p className="text-sm leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
+            <p className="text-xs md:text-sm leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
               {getText(
                 "Setiap level menghadirkan tugas nyata yang melatih kosakata, tata bahasa, serta kreativitas pengguna.",
                 "Jedes Level bietet echte Aufgaben, die Wortschatz, Grammatik und Kreativität trainieren."
@@ -653,7 +668,7 @@ const MainFeatures = ({ language }: LanguageProps) => {
             style={{
               backgroundColor: 'rgba(232, 184, 36, 0.08)',
               borderRadius: '16px',
-              padding: '32px 24px',
+              padding: '24px 20px',
               border: '1px solid rgba(232, 184, 36, 0.25)',
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
@@ -673,22 +688,24 @@ const MainFeatures = ({ language }: LanguageProps) => {
             }}
           >
             <div style={{
-              width: '56px',
-              height: '56px',
+              width: '48px',
+              height: '48px',
               borderRadius: '12px',
               backgroundColor: '#E8B824',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: '16px'
-            }}>
-              <span style={{fontSize: '28px'}}>🎯</span>
+              marginBottom: '14px'
+            }}
+            className="md:w-14 md:h-14"
+            >
+              <span className="text-2xl md:text-3xl">🎯</span>
             </div>
-            <h3 className="text-4xl font-bold mb-2" style={{color: '#E8B824'}}>192+</h3>
-            <h4 className="text-lg font-bold mb-3" style={{color: '#FFFFFC'}}>
+            <h3 className="text-3xl md:text-4xl font-bold mb-2" style={{color: '#E8B824'}}>192+</h3>
+            <h4 className="text-base md:text-lg font-bold mb-2 md:mb-3" style={{color: '#FFFFFC'}}>
               {getText("Total Jam Belajar", "Gesamte Lernstunden")}
             </h4>
-            <p className="text-sm leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
+            <p className="text-xs md:text-sm leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
               {getText(
                 "Kurikulum dirancang seimbang antara keseruan kuis, forum diskusi, dan pembelajaran mendalam dari materi.",
                 "Lehrplan ausgewogen zwischen unterhaltsamen Quizzes, Forumsdiskussionen und tiefem Lernen."
@@ -718,7 +735,7 @@ const AboutSection = ({ language }: LanguageProps) => {
   const { ref, isVisible } = useScrollAnimation();
 
   return (
-    <section className="relative w-full overflow-hidden px-4 py-12 md:py-24" ref={ref}>
+    <section className="relative w-full overflow-hidden px-4 py-10 md:py-16 lg:py-20" ref={ref}>
       {/* Gradient Background */}
       <div style={{
         position: 'absolute',
@@ -755,9 +772,9 @@ const AboutSection = ({ language }: LanguageProps) => {
 
       {/* Content Container */}
       <div className="container mx-auto px-0 lg:px-4 relative z-10 max-w-6xl">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-20">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12 lg:gap-20">
           {/* Image - Left side with styling */}
-          <div className="relative flex-shrink-0 w-full max-w-md order-2 lg:order-1" style={{visibility: isVisible ? 'visible' : 'hidden', animation: isVisible ? 'slideLeftFade 0.9s ease-out forwards' : 'none'}}>
+          <div className="relative flex-shrink-0 w-full max-w-xs md:max-w-md order-2 lg:order-1" style={{visibility: isVisible ? 'visible' : 'hidden', animation: isVisible ? 'slideLeftFade 0.9s ease-out forwards' : 'none'}}>
             {/* Image Frame */}
             <div 
               style={{
@@ -765,13 +782,14 @@ const AboutSection = ({ language }: LanguageProps) => {
                 borderRadius: '20px',
                 overflow: 'hidden',
                 border: '2px solid rgba(232, 184, 36, 0.2)',
-                padding: '12px',
+                padding: '10px',
                 background: 'linear-gradient(135deg, rgba(232, 184, 36, 0.05), rgba(245, 158, 11, 0.03))',
                 boxShadow: '0 20px 40px rgba(232, 184, 36, 0.1)',
                 transition: 'all 0.4s ease',
                 cursor: 'pointer',
                 animation: 'float 4s ease-in-out infinite'
               }}
+              className="md:p-3"
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = 'rgba(232, 184, 36, 0.5)';
                 e.currentTarget.style.boxShadow = '0 30px 60px rgba(232, 184, 36, 0.25)';
@@ -817,32 +835,37 @@ const AboutSection = ({ language }: LanguageProps) => {
           {/* Text Content - Right side */}
           <div className="relative z-10 text-center lg:text-left w-full lg:w-1/2 order-1 lg:order-2 px-4 lg:px-0" style={{visibility: isVisible ? 'visible' : 'hidden', animation: isVisible ? 'slideRightFade 0.9s ease-out forwards' : 'none'}}>
             {/* Badge */}
-            <div style={{
-              display: 'inline-block',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: '#E8B824',
-              paddingLeft: '12px',
-              marginBottom: '20px',
-              position: 'relative'
-            }}>
-              <span style={{
-                position: 'absolute',
-                left: 0,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: '3px',
-                height: '16px',
-                backgroundColor: '#E8B824',
-                borderRadius: '2px'
-              }} />
-              {getText("Sapa Si Jerman?", "Wer ist Si Jerman?")}
+            <div className="mb-4 md:mb-4 flex justify-center lg:justify-start">
+              <div style={{
+                display: 'inline-block',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                color: '#E8B824',
+                paddingLeft: '12px',
+                position: 'relative'
+              }}
+              className="md:text-xs"
+              >
+                <span style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '3px',
+                  height: '14px',
+                  backgroundColor: '#E8B824',
+                  borderRadius: '2px'
+                }}
+                className="md:h-4"
+                />
+                {getText("Sapa Si Jerman?", "Wer ist Si Jerman?")}
+              </div>
             </div>
 
             {/* Heading */}
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mt-2 mb-6 leading-tight max-w-xl" style={{color: '#1A1A1A', lineHeight: '1.3'}}>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 md:mb-6 leading-tight max-w-xl mx-auto lg:mx-0" style={{color: '#1A1A1A', lineHeight: '1.3'}}>
               {getText(
                 "Temui Si Jerman - Tempat Belajar Bahasa Jerman yang Interaktif dan Menyenangkan",
                 "Treffen Sie Si Jerman - Ihr interaktiver und unterhaltsamer Ort, um Deutsch zu lernen"
@@ -850,13 +873,13 @@ const AboutSection = ({ language }: LanguageProps) => {
             </h2>
 
             {/* Description paragraphs */}
-            <p className="text-base sm:text-lg mb-4 max-w-lg leading-relaxed" style={{color: '#4A4A4A', lineHeight: '1.8'}}>
+            <p className="text-sm sm:text-base md:text-lg mb-3 md:mb-4 max-w-lg mx-auto lg:mx-0 leading-relaxed" style={{color: '#4A4A4A', lineHeight: '1.8'}}>
               {getText(
                 "Si Jerman adalah platform edukasi digital untuk mengembangkan kompetensi bahasa Jerman secara efektif.",
                 "Si Jerman ist eine digitale Bildungsplattform zur effektiven Entwicklung von Deutschkenntnissen."
               )}
             </p>
-            <p className="text-base sm:text-lg mb-8 max-w-lg leading-relaxed" style={{color: '#4A4A4A', lineHeight: '1.8'}}>
+            <p className="text-sm sm:text-base md:text-lg mb-6 md:mb-8 max-w-lg mx-auto lg:mx-0 leading-relaxed" style={{color: '#4A4A4A', lineHeight: '1.8'}}>
               {getText(
                 "Dengan fitur interaktif seperti latihan soal AI, kuis multiplayer, dashboard, forum, dan course terstruktur, kami membantu Anda membangun keterampilan bahasa, berpikir kritis, dan kepercayaan diri.",
                 "Mit interaktiven Funktionen wie KI-Übungsaufgaben, Multiplayer-Quizzes, Dashboard, Forum und strukturierten Kursen helfen wir Ihnen, Ihre Sprachkenntnisse, Ihr kritisches Denken und Ihr Selbstvertrauen aufzubauen."
@@ -865,7 +888,7 @@ const AboutSection = ({ language }: LanguageProps) => {
 
             {/* CTA Button */}
             <button
-              className="px-8 py-3 rounded-full font-bold transition-all duration-300 shadow-md hover:shadow-lg"
+              className="px-6 py-2.5 md:px-8 md:py-3 rounded-full font-bold transition-all duration-300 shadow-md hover:shadow-lg text-sm md:text-base"
               style={{
                 backgroundColor: '#E8B824',
                 color: '#1A1A1A'
@@ -893,7 +916,7 @@ const WhyChooseSection = ({ language }: LanguageProps) => {
   const { ref, isVisible } = useScrollAnimation();
 
   return (
-    <section className="relative w-full overflow-hidden px-4 py-12 md:py-24" ref={ref}>
+    <section className="relative w-full overflow-hidden px-4 py-12 md:py-16 lg:py-20" ref={ref}>
       {/* Gradient Background */}
       <div style={{
         position: 'absolute',
@@ -931,42 +954,47 @@ const WhyChooseSection = ({ language }: LanguageProps) => {
       {/* Content Container */}
       <div className="container mx-auto px-0 lg:px-4 relative z-10 max-w-6xl">
         {/* Heading */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-12 md:mb-16">
           {/* Badge */}
-          <div style={{
-            display: 'inline-block',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            color: '#E8B824',
-            paddingLeft: '12px',
-            marginBottom: '16px',
-            position: 'relative'
-          }}>
-            <span style={{
-              position: 'absolute',
-              left: 0,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              width: '3px',
-              height: '16px',
-              backgroundColor: '#E8B824',
-              borderRadius: '2px'
-            }} />
-            {getText("Mengapa Si Jerman?", "Warum Si Jerman?")}
+          <div className="mb-3 md:mb-4 flex justify-center">
+            <div style={{
+              display: 'inline-block',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              color: '#E8B824',
+              paddingLeft: '12px',
+              position: 'relative'
+            }}
+            className="md:text-xs"
+            >
+              <span style={{
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '3px',
+                height: '14px',
+                backgroundColor: '#E8B824',
+                borderRadius: '2px'
+              }}
+              className="md:h-4"
+              />
+              {getText("Mengapa Si Jerman?", "Warum Si Jerman?")}
+            </div>
           </div>
 
           {/* Heading */}
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mt-2 leading-tight" style={{color: '#FFFFFC', lineHeight: '1.3'}}>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold leading-tight px-4" style={{color: '#FFFFFC', lineHeight: '1.3'}}>
             {getText("Belajar. Berlatih. Kuasai. Ulangi.", "Lernen. Üben. Meistern. Wiederholen.")}
           </h2>
         </div>
 
         {/* Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 items-center gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 items-center gap-8 md:gap-10 lg:gap-12">
           {/* Left cards */}
-          <div className="flex flex-col gap-8" style={{visibility: isVisible ? 'visible' : 'hidden', animation: isVisible ? 'slideUpFade 0.8s ease-out forwards' : 'none'}}>
+          <div className="flex flex-col gap-6 md:gap-8" style={{visibility: isVisible ? 'visible' : 'hidden', animation: isVisible ? 'slideUpFade 0.8s ease-out forwards' : 'none'}}>
             {/* Card 1 - Yellow */}
             <div 
               style={{
@@ -984,23 +1012,23 @@ const WhyChooseSection = ({ language }: LanguageProps) => {
                 parent.style.transform = 'translateY(0)';
               }}
             >
-              <div className="flex items-start gap-4">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 md:gap-4 text-center sm:text-left">
                 {/* Icon Box */}
                 <div 
-                  className="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300"
+                  className="w-12 h-12 md:w-16 md:h-16 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300"
                   style={{
                     backgroundColor: '#E8B824',
                     boxShadow: '0 8px 16px rgba(232, 184, 36, 0.2)'
                   }}
                 >
-                  <BookOpen className="w-8 h-8" style={{color: '#1A1A1A'}} />
+                  <BookOpen className="w-6 h-6 md:w-8 md:h-8" style={{color: '#1A1A1A'}} />
                 </div>
                 {/* Text */}
-                <div>
-                  <h3 className="font-bold text-lg leading-tight mt-1" style={{color: '#FFFFFC'}}>
+                <div className="flex-1">
+                  <h3 className="font-bold text-base md:text-lg leading-tight" style={{color: '#FFFFFC'}}>
                     {getText("Belajar dengan Praktik", "Lernen durch Übung")}
                   </h3>
-                  <p className="text-sm sm:text-base mt-3 leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
+                  <p className="text-xs sm:text-sm md:text-base mt-2 md:mt-3 leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
                     {getText(
                       "Tidak ada pembelajaran membosankan — hanya latihan interaktif, analisis AI, dan tantangan bahasa yang kreatif.",
                       "Kein langweiliges Lernen mehr, nur interaktive Übungen, KI-Analysen und kreative Quizzes."
@@ -1027,23 +1055,23 @@ const WhyChooseSection = ({ language }: LanguageProps) => {
                 parent.style.transform = 'translateY(0)';
               }}
             >
-              <div className="flex items-start gap-4">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 md:gap-4 text-center sm:text-left">
                 {/* Icon Box */}
                 <div 
-                  className="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300"
+                  className="w-12 h-12 md:w-16 md:h-16 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300"
                   style={{
                     backgroundColor: '#F59E0B',
                     boxShadow: '0 8px 16px rgba(245, 158, 11, 0.2)'
                   }}
                 >
-                  <Smile className="w-8 h-8" style={{color: '#FFFFFF'}} />
+                  <Smile className="w-6 h-6 md:w-8 md:h-8" style={{color: '#FFFFFF'}} />
                 </div>
                 {/* Text */}
-                <div>
-                  <h3 className="font-bold text-lg leading-tight mt-1" style={{color: '#FFFFFC'}}>
+                <div className="flex-1">
+                  <h3 className="font-bold text-base md:text-lg leading-tight" style={{color: '#FFFFFC'}}>
                     {getText("Suasana Menyenangkan & Ramah", "Spaßige und freundliche Atmosphäre")}
                   </h3>
-                  <p className="text-sm sm:text-base mt-3 leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
+                  <p className="text-xs sm:text-sm md:text-base mt-2 md:mt-3 leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
                     {getText(
                       "Dari kuis seru hingga pengajar yang inspiratif, kami membuat belajar Bahasa Jerman terasa seperti bermain.",
                       "In einer freundlichen und unterstützenden Umgebung helfen wir Ihnen, Deutsch ohne den Druck von Nachhilfe zu lernen."
@@ -1063,13 +1091,14 @@ const WhyChooseSection = ({ language }: LanguageProps) => {
                 borderRadius: '20px',
                 overflow: 'hidden',
                 border: '2px solid rgba(232, 184, 36, 0.2)',
-                padding: '12px',
+                padding: '10px',
                 background: 'linear-gradient(135deg, rgba(232, 184, 36, 0.05), rgba(245, 158, 11, 0.03))',
                 boxShadow: '0 20px 40px rgba(232, 184, 36, 0.1)',
                 transition: 'all 0.4s ease',
                 cursor: 'pointer',
                 animation: 'float 4s ease-in-out infinite'
               }}
+              className="md:p-3"
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = 'rgba(232, 184, 36, 0.5)';
                 e.currentTarget.style.boxShadow = '0 30px 60px rgba(232, 184, 36, 0.25)';
@@ -1084,13 +1113,13 @@ const WhyChooseSection = ({ language }: LanguageProps) => {
               <img
                 src="/img/2.png"
                 alt="Black cat mascot waving"
-                className="w-full max-w-sm h-auto object-contain rounded-lg"
+                className="w-full max-w-xs md:max-w-sm h-auto object-contain rounded-lg mx-auto"
               />
             </div>
           </div>
 
           {/* Right cards */}
-          <div className="flex flex-col gap-8" style={{visibility: isVisible ? 'visible' : 'hidden', animation: isVisible ? 'slideUpFade 0.8s ease-out forwards' : 'none'}}>
+          <div className="flex flex-col gap-6 md:gap-8" style={{visibility: isVisible ? 'visible' : 'hidden', animation: isVisible ? 'slideUpFade 0.8s ease-out forwards' : 'none'}}>
             {/* Card 3 - Yellow */}
             <div 
               style={{
@@ -1108,23 +1137,23 @@ const WhyChooseSection = ({ language }: LanguageProps) => {
                 parent.style.transform = 'translateY(0)';
               }}
             >
-              <div className="flex items-start gap-4">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 md:gap-4 text-center sm:text-left">
                 {/* Icon Box */}
                 <div 
-                  className="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300"
+                  className="w-12 h-12 md:w-16 md:h-16 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300"
                   style={{
                     backgroundColor: '#E8B824',
                     boxShadow: '0 8px 16px rgba(232, 184, 36, 0.2)'
                   }}
                 >
-                  <Compass className="w-8 h-8" style={{color: '#1A1A1A'}} />
+                  <Compass className="w-6 h-6 md:w-8 md:h-8" style={{color: '#1A1A1A'}} />
                 </div>
                 {/* Text */}
-                <div>
-                  <h3 className="font-bold text-lg leading-tight mt-1" style={{color: '#FFFFFC'}}>
+                <div className="flex-1">
+                  <h3 className="font-bold text-base md:text-lg leading-tight" style={{color: '#FFFFFC'}}>
                     {getText("Pilih Jalur Belajarmu", "Wählen Sie Ihren Lernpfad")}
                   </h3>
-                  <p className="text-sm sm:text-base mt-3 leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
+                  <p className="text-xs sm:text-sm md:text-base mt-2 md:mt-3 leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
                     {getText(
                       "Ikuti course sesuai level, tantang diri dengan latihan soal, atau jelajah forum untuk diskusi dan berbagi ide.",
                       "Folgen Sie Kursen je nach Niveau, legen Sie die Dauer mit Übungsaufgaben fest oder erkunden Sie andere Funktionen."
@@ -1151,23 +1180,23 @@ const WhyChooseSection = ({ language }: LanguageProps) => {
                 parent.style.transform = 'translateY(0)';
               }}
             >
-              <div className="flex items-start gap-4">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 md:gap-4 text-center sm:text-left">
                 {/* Icon Box */}
                 <div 
-                  className="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300"
+                  className="w-12 h-12 md:w-16 md:h-16 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300"
                   style={{
                     backgroundColor: '#F59E0B',
                     boxShadow: '0 8px 16px rgba(245, 158, 11, 0.2)'
                   }}
                 >
-                  <Target className="w-8 h-8" style={{color: '#FFFFFF'}} />
+                  <Target className="w-6 h-6 md:w-8 md:h-8" style={{color: '#FFFFFF'}} />
                 </div>
                 {/* Text */}
-                <div>
-                  <h3 className="font-bold text-lg leading-tight mt-1" style={{color: '#FFFFFC'}}>
+                <div className="flex-1">
+                  <h3 className="font-bold text-base md:text-lg leading-tight" style={{color: '#FFFFFC'}}>
                     {getText("Keterampilan yang Melekat", "Feste Fähigkeiten")}
                   </h3>
-                  <p className="text-sm sm:text-base mt-3 leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
+                  <p className="text-xs sm:text-sm md:text-base mt-2 md:mt-3 leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
                     {getText(
                       "Penguasaan kosakata, tata bahasa, percakapan, serta berpikir kritis — semua bekal untuk masa depanmu.",
                       "Wortschatz, Grammatik, Konversation und Schreibfähigkeiten können Sie sofort im Alltag anwenden."
@@ -1551,18 +1580,18 @@ export default function App() {
         borderBottomColor: 'rgba(232, 184, 36, 0.3)',
         boxShadow: '0 4px 20px rgba(232, 184, 36, 0.05)'
       }} className="sticky top-0 overflow-visible">
-        <div className="container mx-auto px-4 py-4 overflow-visible" style={{ overflow: 'visible' }}>
-          <div className="flex items-center justify-between">
+        <div className="container mx-auto px-3 md:px-4 py-3 md:py-4 overflow-visible" style={{ overflow: 'visible' }}>
+          <div className="flex items-center justify-between gap-2">
             {/* Logo */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3 min-w-0">
               <img
                 src="/img/1.png"
                 alt="Logo"
-                className="h-12 w-auto"
+                className="h-8 md:h-12 w-auto flex-shrink-0"
               />
-              <div>
-                <h1 className="text-xl font-bold" style={{color: '#F59E0B'}}>Si Jerman</h1>
-                <p className="text-xs uppercase tracking-wider" style={{color: '#FFFFFC', letterSpacing: '0.05em'}}>Platform Pembelajaran</p>
+              <div className="min-w-0">
+                <h1 className="text-base md:text-xl font-bold truncate" style={{color: '#F59E0B'}}>Si Jerman</h1>
+                <p className="text-xs uppercase tracking-wider hidden sm:block" style={{color: '#FFFFFC', letterSpacing: '0.05em'}}>Platform Pembelajaran</p>
               </div>
             </div>
 
@@ -1572,6 +1601,7 @@ export default function App() {
                 variant="ghost" 
                 className="font-semibold transition-all duration-300"
                 style={{color: '#F59E0B'}}
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = '#E8B824';
                   e.currentTarget.style.transform = 'translateY(-2px)';
@@ -1587,6 +1617,10 @@ export default function App() {
                 variant="ghost" 
                 className="font-semibold transition-all duration-300"
                 style={{color: '#F59E0B'}}
+                onClick={() => {
+                  const featuresSection = document.querySelector('section:nth-of-type(2)');
+                  featuresSection?.scrollIntoView({ behavior: 'smooth' });
+                }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = '#E8B824';
                   e.currentTarget.style.transform = 'translateY(-2px)';
@@ -1602,6 +1636,7 @@ export default function App() {
                 variant="ghost" 
                 className="font-semibold transition-all duration-300"
                 style={{color: '#F59E0B'}}
+                onClick={() => navigateToFeature("forum")}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = '#E8B824';
                   e.currentTarget.style.transform = 'translateY(-2px)';
@@ -1617,6 +1652,10 @@ export default function App() {
                 variant="ghost" 
                 className="font-semibold transition-all duration-300"
                 style={{color: '#F59E0B'}}
+                onClick={() => {
+                  const footer = document.querySelector('footer');
+                  footer?.scrollIntoView({ behavior: 'smooth' });
+                }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = '#E8B824';
                   e.currentTarget.style.transform = 'translateY(-2px)';
@@ -1631,11 +1670,11 @@ export default function App() {
             </nav>
 
             {/* Action Buttons & Language/Theme - Desktop */}
-            <div className="hidden lg:flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-3 md:gap-4">
               <div className="relative flex items-center">
                 <Input
                   placeholder={getText("Cari course...", "Kurse suchen...")}
-                  className="pl-8 w-48 transition-all duration-300"
+                  className="pl-8 w-40 md:w-48 transition-all duration-300 text-sm"
                   style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.08)',
                     color: '#FFFFFC',
@@ -1661,7 +1700,7 @@ export default function App() {
                 variant="ghost"
                 size="sm"
                 onClick={toggleLanguage}
-                className="flex items-center gap-1 transition-all duration-300"
+                className="flex items-center gap-1 transition-all duration-300 text-xs md:text-sm"
                 style={{color: '#FFFFFC'}}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = '#E8B824';
@@ -1687,6 +1726,7 @@ export default function App() {
                     variant="outline"
                     size="sm"
                     onClick={() => (window.location.href = "/auth/login")}
+                    className="text-xs md:text-sm"
                     style={{
                       backgroundColor: 'rgba(255, 255, 252, 0.9)',
                       color: '#1E1E1E',
@@ -1709,6 +1749,7 @@ export default function App() {
                   <Button
                     size="sm"
                     onClick={() => (window.location.href = "/auth/register")}
+                    className="text-xs md:text-sm"
                     style={{
                       backgroundColor: '#E8B824',
                       color: '#1A1A1A',
@@ -1735,110 +1776,247 @@ export default function App() {
             <div className="md:hidden">
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" className="p-2">
                     <Menu className="h-5 w-5" style={{color: '#FFFFFC'}} />
                   </Button>
                 </SheetTrigger>
-                <SheetContent>
-                  <SheetHeader>
-                            <SheetTitle>Menu</SheetTitle>
-                    <SheetDescription>
-                      {getText(
-                        "Akses fitur dan navigasi",
-                        "Zugang zu Funktionen und Navigation"
-                      )}
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="mt-6 space-y-4">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                      <Input
-                        placeholder={getText("Cari course...", "Kurse suchen...")}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                    <Button
-                      variant="ghost"
-                      onClick={() => navigateToFeature("home")}
-                      className="w-full justify-start"
-                    >
-                      {getText("Beranda", "Startseite")}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => navigateToFeature("forum")}
-                      className="w-full justify-start"
-                    >
-                      {getText("Forum", "Forum")}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => navigateToFeature("home")}
-                      className="w-full justify-start"
-                    >
-                      {getText("Hubungi Kami", "Kontakt")}
-                    </Button>
-                    <div className="pt-4 border-t space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">
-                          {getText("Bahasa", "Sprache")}
-                        </span>
-                        <Button variant="ghost" size="sm" onClick={toggleLanguage}>
-                          <Globe className="h-4 w-4 mr-2" />
-                          {language.toUpperCase()}
-                        </Button>
+                <SheetContent 
+                  side="right" 
+                  className="w-[85vw] sm:w-[400px] p-0"
+                  style={{
+                    backgroundColor: '#FAFAF7',
+                    border: 'none'
+                  }}
+                >
+                  <div className="flex flex-col h-full">
+                    {/* Header */}
+                    <SheetHeader className="px-6 py-5 border-b" style={{borderColor: '#E0DDD0'}}>
+                      <SheetTitle className="text-lg font-bold text-left" style={{color: '#1A1A1A'}}>
+                        Menu
+                      </SheetTitle>
+                      <SheetDescription className="text-sm text-left" style={{color: '#6B7280'}}>
+                        {getText(
+                          "Akses fitur dan navigasi",
+                          "Zugang zu Funktionen und Navigation"
+                        )}
+                      </SheetDescription>
+                    </SheetHeader>
+
+                    {/* Content */}
+                    <div className="flex-1 overflow-y-auto px-6 py-4">
+                      <div className="space-y-4">
+                        {/* Search Bar */}
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4" style={{color: '#92400E'}} />
+                          <Input
+                            placeholder={getText("Cari course...", "Kurse suchen...")}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10 h-11 text-sm"
+                            style={{
+                              backgroundColor: '#FFFFFF',
+                              borderColor: '#E0DDD0',
+                              color: '#1A1A1A'
+                            }}
+                          />
+                        </div>
+
+                        {/* Navigation Buttons */}
+                        <div className="space-y-1 pt-2">
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="w-full justify-start h-11 text-sm font-medium hover:bg-[#F5F5F0] transition-colors"
+                            style={{color: '#1A1A1A'}}
+                          >
+                            <Home className="h-4 w-4 mr-3" style={{color: '#92400E'}} />
+                            {getText("Beranda", "Startseite")}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              // Scroll to features section
+                              const featuresSection = document.querySelector('section:nth-of-type(2)');
+                              featuresSection?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className="w-full justify-start h-11 text-sm font-medium hover:bg-[#F5F5F0] transition-colors"
+                            style={{color: '#1A1A1A'}}
+                          >
+                            <Target className="h-4 w-4 mr-3" style={{color: '#92400E'}} />
+                            {getText("Fitur", "Funktionen")}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              navigateToFeature("forum");
+                            }}
+                            className="w-full justify-start h-11 text-sm font-medium hover:bg-[#F5F5F0] transition-colors"
+                            style={{color: '#1A1A1A'}}
+                          >
+                            <MessageSquare className="h-4 w-4 mr-3" style={{color: '#92400E'}} />
+                            {getText("Forum", "Forum")}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              // Scroll to footer/contact section
+                              const footer = document.querySelector('footer');
+                              footer?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className="w-full justify-start h-11 text-sm font-medium hover:bg-[#F5F5F0] transition-colors"
+                            style={{color: '#1A1A1A'}}
+                          >
+                            <MessageSquare className="h-4 w-4 mr-3" style={{color: '#92400E'}} />
+                            {getText("Hubungi Kami", "Kontakt")}
+                          </Button>
+                        </div>
+
+                        {/* Language Selector */}
+                        <div className="pt-4 border-t" style={{borderColor: '#E0DDD0'}}>
+                          <div className="flex items-center justify-between py-2">
+                            <span className="text-sm font-semibold" style={{color: '#1A1A1A'}}>
+                              {getText("Bahasa", "Sprache")}
+                            </span>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={toggleLanguage}
+                              className="h-9 px-3 text-sm font-medium hover:bg-[#F5F5F0]"
+                              style={{color: '#92400E'}}
+                            >
+                              <Globe className="h-4 w-4 mr-2" />
+                              {language.toUpperCase()}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* User Actions */}
+                        <div className="pt-4 border-t space-y-2" style={{borderColor: '#E0DDD0'}}>
+                          {user ? (
+                            <>
+                              {/* User Name Header */}
+                              <div className="px-3 py-2 border-b" style={{borderColor: '#E0DDD0'}}>
+                                <p className="text-sm font-semibold" style={{color: '#1A1A1A'}}>
+                                  {user.user_metadata?.full_name || user.email?.split("@")[0] || "User"}
+                                </p>
+                              </div>
+
+                              {/* Home */}
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-start h-11 text-sm font-medium hover:bg-[#F5F5F0] transition-colors"
+                                style={{color: '#1A1A1A'}}
+                                onClick={() => {
+                                  setIsMobileMenuOpen(false);
+                                  window.location.href = "/";
+                                }}
+                              >
+                                <Home className="h-4 w-4 mr-3" style={{color: '#92400E'}} />
+                                {getText("Home", "Startseite")}
+                              </Button>
+
+                              {/* Kursus Saya */}
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-start h-11 text-sm font-medium hover:bg-[#F5F5F0] transition-colors"
+                                style={{color: '#1A1A1A'}}
+                                onClick={() => {
+                                  setIsMobileMenuOpen(false);
+                                  // Determine URL based on user role (need to fetch from DB or use state)
+                                  window.location.href = "/home/student";
+                                }}
+                              >
+                                <BookOpen className="h-4 w-4 mr-3" style={{color: '#92400E'}} />
+                                {getText("Kursus Saya", "Meine Kurse")}
+                              </Button>
+
+                              {/* Kursus Terbuka */}
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-start h-11 text-sm font-medium hover:bg-[#F5F5F0] transition-colors"
+                                style={{color: '#1A1A1A'}}
+                                onClick={() => {
+                                  setIsMobileMenuOpen(false);
+                                  window.location.href = "/open-courses";
+                                }}
+                              >
+                                <Globe className="h-4 w-4 mr-3" style={{color: '#92400E'}} />
+                                {getText("Kursus Terbuka", "Offene Kurse")}
+                              </Button>
+
+                              {/* Divider */}
+                              <div className="border-t my-2" style={{borderColor: '#E0DDD0'}}></div>
+
+                              {/* Logout */}
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-start h-11 text-sm font-medium hover:bg-red-50 transition-colors"
+                                style={{color: '#DC2626'}}
+                                onClick={() => {
+                                  setIsMobileMenuOpen(false);
+                                  handleLogout();
+                                }}
+                              >
+                                <X className="h-4 w-4 mr-3" />
+                                {getText("Logout", "Abmelden")}
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              {/* Masuk - Outline Button */}
+                              <Button
+                                variant="outline"
+                                className="w-full h-11 text-sm font-semibold transition-all border-2"
+                                style={{
+                                  backgroundColor: '#FFFFFF',
+                                  borderColor: '#92400E',
+                                  color: '#92400E'
+                                }}
+                                onClick={() => {
+                                  setIsMobileMenuOpen(false);
+                                  window.location.href = "/auth/login";
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#92400E';
+                                  e.currentTarget.style.color = '#FFFFFF';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                                  e.currentTarget.style.color = '#92400E';
+                                }}
+                              >
+                                {getText("Masuk", "Anmelden")}
+                              </Button>
+
+                              {/* Daftar - Primary Button */}
+                              <Button
+                                className="w-full h-11 text-sm font-bold shadow-md hover:shadow-lg transition-all"
+                                onClick={() => {
+                                  setIsMobileMenuOpen(false);
+                                  window.location.href = "/auth/register";
+                                }}
+                                style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#D4A521';
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#E8B824';
+                                  e.currentTarget.style.transform = 'translateY(0)';
+                                }}
+                              >
+                                {getText("Daftar", "Registrieren")}
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="pt-4 border-t space-y-2">
-                      {user ? (
-                        <>
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={() => {
-                              setIsMobileMenuOpen(false);
-                              router.push("/dashboard");
-                            }}
-                          >
-                            <User className="h-4 w-4 mr-2" />
-                            {getText("Dasbor", "Dashboard")}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={handleLogout}
-                          >
-                            <User className="h-4 w-4 mr-2" />
-                            {getText("Keluar", "Abmelden")}
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={() => {
-                              setIsMobileMenuOpen(false);
-                              router.push("/auth/login");
-                            }}
-                          >
-                            <User className="h-4 w-4 mr-2" />
-                            {getText("Masuk", "Anmelden")}
-                          </Button>
-                          <Button
-                            className="w-full"
-                            onClick={() => {
-                              setIsMobileMenuOpen(false);
-                              router.push("/auth/register");
-                            }}
-                            style={{backgroundColor: '#E8B824', color: '#1A1A1A'}}
-                          >
-                            {getText("Daftar", "Registrieren")}
-                          </Button>
-                        </>
-                      )}
                     </div>
                   </div>
                 </SheetContent>
@@ -1861,25 +2039,25 @@ export default function App() {
       <WhyChooseSection language={language} />
 
       {/* Footer */}
-      <footer className="border-t py-16 md:py-20" style={{backgroundColor: '#1A1A1A', borderColor: '#333333'}}>
+      <footer className="border-t py-12 md:py-16 lg:py-20" style={{backgroundColor: '#1A1A1A', borderColor: '#333333'}}>
         <div className="container mx-auto px-4 lg:px-20">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-16">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-12 lg:gap-16">
             {/* Brand Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
+            <div className="space-y-3 md:space-y-4">
+              <div className="flex items-center gap-2 md:gap-3">
                 <img
                   src="/img/1.png"
                   alt="Logo"
-                  className="h-12 w-auto"
+                  className="h-10 md:h-12 w-auto"
                 />
                 <div>
-                  <span className="font-bold text-xl" style={{color: '#F59E0B'}}>Si Jerman</span>
+                  <span className="font-bold text-lg md:text-xl" style={{color: '#F59E0B'}}>Si Jerman</span>
                   <p className="text-xs uppercase tracking-wider" style={{color: '#999999', letterSpacing: '0.05em'}}>
                     {getText("Belajar tanpa batas", "Lernen ohne Grenzen")}
                   </p>
                 </div>
               </div>
-              <p className="text-base leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
+              <p className="text-sm md:text-base leading-relaxed" style={{color: '#CCCCCC', lineHeight: '1.6'}}>
                 {getText(
                   "Platform pembelajaran online terbaik untuk siswa Indonesia",
                   "Die beste Online-Lernplattform für indonesische Studenten"
@@ -1889,30 +2067,30 @@ export default function App() {
 
             {/* Course Section */}
             <div>
-              <h4 className="font-bold text-base mb-6 uppercase tracking-wider" style={{color: '#E8B824', letterSpacing: '0.05em'}}>
+              <h4 className="font-bold text-sm md:text-base mb-4 md:mb-6 uppercase tracking-wider" style={{color: '#E8B824', letterSpacing: '0.05em'}}>
                 {getText("Kursus", "Kurse")}
               </h4>
-              <ul className="space-y-3">
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Kelas A-1", "Klasse A-1")}</a></li>
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Kelas A-2", "Klasse A-2")}</a></li>
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Course Gratis", "Kostenlose Kurse")}</a></li>
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Sertifikasi", "Zertifizierung")}</a></li>
+              <ul className="space-y-2 md:space-y-3">
+                <li><a href="#" className="text-sm md:text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Kelas A-1", "Klasse A-1")}</a></li>
+                <li><a href="#" className="text-sm md:text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Kelas A-2", "Klasse A-2")}</a></li>
+                <li><a href="#" className="text-sm md:text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Course Gratis", "Kostenlose Kurse")}</a></li>
+                <li><a href="#" className="text-sm md:text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Sertifikasi", "Zertifizierung")}</a></li>
               </ul>
             </div>
 
             {/* Support Section */}
             <div>
-              <h4 className="font-bold text-base mb-6 uppercase tracking-wider" style={{color: '#E8B824', letterSpacing: '0.05em'}}>
+              <h4 className="font-bold text-sm md:text-base mb-4 md:mb-6 uppercase tracking-wider" style={{color: '#E8B824', letterSpacing: '0.05em'}}>
                 {getText("Dukungan", "Unterstützung")}
               </h4>
-              <ul className="space-y-3">
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>FAQ</a></li>
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Bantuan", "Hilfe")}</a></li>
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Kontak", "Kontakt")}</a></li>
+              <ul className="space-y-2 md:space-y-3">
+                <li><a href="#" className="text-sm md:text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>FAQ</a></li>
+                <li><a href="#" className="text-sm md:text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Bantuan", "Hilfe")}</a></li>
+                <li><a href="#" className="text-sm md:text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Kontak", "Kontakt")}</a></li>
                 <li>
                   <button
                     onClick={() => navigateToFeature("forum")}
-                    className="text-base transition-colors hover:text-white"
+                    className="text-sm md:text-base transition-colors hover:text-white"
                     style={{color: '#CCCCCC'}}
                   >
                     Forum
@@ -1923,21 +2101,21 @@ export default function App() {
 
             {/* Company Section */}
             <div>
-              <h4 className="font-bold text-base mb-6 uppercase tracking-wider" style={{color: '#E8B824', letterSpacing: '0.05em'}}>
+              <h4 className="font-bold text-sm md:text-base mb-4 md:mb-6 uppercase tracking-wider" style={{color: '#E8B824', letterSpacing: '0.05em'}}>
                 {getText("Perusahaan", "Unternehmen")}
               </h4>
-              <ul className="space-y-3">
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Tentang Kami", "Über uns")}</a></li>
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Karir", "Karriere")}</a></li>
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>Blog</a></li>
-                <li><a href="#" className="text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Kebijakan Privasi", "Datenschutz")}</a></li>
+              <ul className="space-y-2 md:space-y-3">
+                <li><a href="#" className="text-sm md:text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Tentang Kami", "Über uns")}</a></li>
+                <li><a href="#" className="text-sm md:text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Karir", "Karriere")}</a></li>
+                <li><a href="#" className="text-sm md:text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>Blog</a></li>
+                <li><a href="#" className="text-sm md:text-base transition-colors hover:text-white" style={{color: '#CCCCCC'}}>{getText("Kebijakan Privasi", "Datenschutz")}</a></li>
               </ul>
             </div>
           </div>
 
           {/* Divider */}
-          <div className="border-t mt-12 md:mt-16 pt-8" style={{borderColor: '#333333'}}>
-            <p className="text-center text-sm" style={{color: '#999999'}}>
+          <div className="border-t mt-10 md:mt-12 lg:mt-16 pt-6 md:pt-8" style={{borderColor: '#333333'}}>
+            <p className="text-center text-xs md:text-sm" style={{color: '#999999'}}>
               &copy; 2025 Si Jerman. {getText("Semua hak dilindungi.", "Alle Rechte vorbehalten.")}
             </p>
           </div>

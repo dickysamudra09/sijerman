@@ -151,6 +151,14 @@ export default function CourseDetailPage() {
   const [showSidebar, setShowSidebar] = useState(true); // Sidebar visible by default on desktop, hidden on mobile
   const [activeTab, setActiveTab] = useState<"lessons" | "materials">("lessons");
   const [overallProgress, setOverallProgress] = useState(0); // Track overall course progress
+  
+  // ✨ NEW: Feedback state management untuk persist feedback per exercise
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, any>>({});
+
+  // Debug: Log feedbackMap changes
+  useEffect(() => {
+    console.log('[DEBUG] feedbackMap updated:', Object.keys(feedbackMap));
+  }, [feedbackMap]);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -1249,8 +1257,8 @@ export default function CourseDetailPage() {
             backgroundColor: '#E8B824',
             color: '#1A1A1A',
             top: '50%',
-            // Mobile: 75vw - 16px (sidebar is w-3/4), Desktop: 304px (sidebar is 320px)
-            left: showSidebar ? 'calc(min(75vw, 320px) - 16px)' : '-16px',
+            // Mobile: 75vw - 20px (sidebar is w-3/4), Desktop: 300px (sidebar is 320px - 20px)
+            left: showSidebar ? 'calc(min(75vw, 320px) - 20px)' : '-20px',
             transform: 'translateY(-50%)',
             width: '40px',
             height: '80px',
@@ -1372,6 +1380,13 @@ export default function CourseDetailPage() {
                         courseId={courseId}
                         userId={user.id}
                         lessonContent={currentLesson.content}
+                        feedbackMap={feedbackMap}
+                        onFeedbackGenerated={(exerciseId: string, feedback: any) => {
+                          setFeedbackMap(prev => ({
+                            ...prev,
+                            [exerciseId]: feedback
+                          }));
+                        }}
                       />
                     )}
 

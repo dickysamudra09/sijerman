@@ -59,10 +59,10 @@ export const CourseSyllabus: React.FC<CourseSyllabusProps> = ({
         </div>
       </div>
 
-      {/* Learning Outcomes */}
-      <div className="w-full bg-white rounded-lg border border-gray-100 p-6 md:p-8 shadow-sm mt-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Apa Yang Akan Kamu Pelajari</h2>
-        {outcomes.length > 0 ? (
+      {/* Learning Outcomes - Only show if there are outcomes */}
+      {outcomes.length > 0 && (
+        <div className="w-full bg-white rounded-lg border border-gray-100 p-6 md:p-8 shadow-sm mt-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Apa Yang Akan Kamu Pelajari</h2>
           <ul className="space-y-3">
             {outcomes.map((outcome, index) => (
               <li key={index} className="flex items-start gap-3">
@@ -73,10 +73,8 @@ export const CourseSyllabus: React.FC<CourseSyllabusProps> = ({
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="text-gray-500 italic">Belum ada learning outcomes yang ditentukan.</p>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

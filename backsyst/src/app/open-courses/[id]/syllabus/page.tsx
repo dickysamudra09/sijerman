@@ -9,6 +9,7 @@ import { ModuleSyllabusItem } from '@/components/ModuleSyllabusItem';
 import { Button } from '@/components/ui/button';
 import UserMenuDropdown from '@/components/UserMenuDropdown';
 import { BookOpen } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface Course {
@@ -199,15 +200,15 @@ export default function CourseSyllabusPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FFFFFF" }}>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: "#14B8A6" }}></div>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#F5F5F0" }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: "#92400E" }}></div>
       </div>
     );
   }
 
   if (!course) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FFFFFF" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#F5F5F0" }}>
         <div className="text-center">
           <p className="text-lg" style={{ color: "#1A1A1A" }}>Kursus tidak ditemukan</p>
           <Button onClick={() => router.push('/open-courses')} className="mt-4">
@@ -228,7 +229,7 @@ export default function CourseSyllabusPage() {
   const outcomes = aggregatedOutcomes.split('|').filter((o) => o.trim().length > 0);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#FFFFFF" }}>
+    <div className="min-h-screen" style={{ backgroundColor: "#F5F5F0" }}>
       {/* Header */}
       <header
         className="fixed top-0 left-0 right-0 z-30 border-b w-full"
@@ -238,12 +239,12 @@ export default function CourseSyllabusPage() {
           borderBottomColor: "#333333",
         }}
       >
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <img src="/img/1.png" alt="Logo" className="h-12 w-auto" />
+        <div className="container mx-auto px-3 py-3 md:px-4 md:py-4 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 md:gap-3">
+            <img src="/img/1.png" alt="Logo" className="h-8 md:h-12 w-auto" />
             <div>
-              <h1 className="text-xl font-bold" style={{ color: "#E8B824" }}>Si Jerman</h1>
-              <p className="text-xs uppercase tracking-wider" style={{ color: "#FFFFFC" }}>Platform Pembelajaran</p>
+              <h1 className="text-base md:text-xl font-bold" style={{ color: "#E8B824" }}>Si Jerman</h1>
+              <p className="text-xs uppercase tracking-wider hidden sm:block" style={{ color: "#FFFFFC" }}>Platform Pembelajaran</p>
             </div>
           </Link>
 
@@ -259,10 +260,37 @@ export default function CourseSyllabusPage() {
       </header>
 
       {/* Main Content */}
-      <main className="w-full relative z-10 pt-28">
+      <main className="w-full relative z-10 pt-20 md:pt-28">
+        {/* Breadcrumbs */}
+        <div className="w-full" style={{ backgroundColor: "#F5F5F0", borderBottom: "1px solid #E0DDD0" }}>
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <nav className="flex items-center gap-2 text-xs md:text-sm flex-wrap">
+              <Link 
+                href="/" 
+                className="hover:underline transition-colors"
+                style={{ color: "#64748B" }}
+              >
+                Beranda
+              </Link>
+              <ChevronRight className="h-3 w-3 md:h-4 md:w-4" style={{ color: "#94A3B8" }} />
+              <Link 
+                href="/open-courses" 
+                className="hover:underline transition-colors"
+                style={{ color: "#64748B" }}
+              >
+                Kursus
+              </Link>
+              <ChevronRight className="h-3 w-3 md:h-4 md:w-4" style={{ color: "#94A3B8" }} />
+              <span className="font-semibold" style={{ color: "#92400E" }}>
+                Silabus
+              </span>
+            </nav>
+          </div>
+        </div>
+
         {/* Course Overview - Full Width Section */}
-        <div className="w-full" style={{ backgroundColor: "#FFFFFF", borderBottom: "1px solid #E2E8F0" }}>
-          <div className="max-w-7xl mx-auto px-4 py-12">
+        <div className="w-full" style={{ backgroundColor: "#FAFAF7", borderBottom: "1px solid #E0DDD0" }}>
+          <div className="max-w-7xl mx-auto px-4 py-6 md:py-12">
             <CourseSyllabusPreview
               courseTitle={course.title}
               courseDescription={course.description}
@@ -277,16 +305,16 @@ export default function CourseSyllabusPage() {
         </div>
 
         {/* Syllabus Section - Full Width */}
-        <div className="w-full" style={{ backgroundColor: "#FFFFFF" }}>
-          <div className="max-w-7xl mx-auto px-4 py-12 space-y-6">
+        <div className="w-full" style={{ backgroundColor: "#F5F5F0" }}>
+          <div className="max-w-7xl mx-auto px-4 py-6 md:py-12 space-y-6">
           {/* Section Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <div className="p-3 rounded-lg" style={{ backgroundColor: "#E0F2FE" }}>
-              <BookOpen className="h-6 w-6" style={{ color: "#0F766E" }} />
+          <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
+            <div className="p-2 md:p-3 rounded-lg" style={{ backgroundColor: "#F5F1E8" }}>
+              <BookOpen className="h-5 w-5 md:h-6 md:w-6" style={{ color: "#92400E" }} />
             </div>
             <div>
-              <h2 className="text-3xl font-bold" style={{ color: "#1A1A1A" }}>Daftar Modul</h2>
-              <p className="text-sm mt-1" style={{ color: "#64748B" }}>{modules.length} modul pembelajaran untuk Anda</p>
+              <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold" style={{ color: "#1A1A1A" }}>Daftar Modul</h2>
+              <p className="text-xs md:text-sm mt-1" style={{ color: "#64748B" }}>{modules.length} modul pembelajaran untuk Anda</p>
             </div>
           </div>
 
@@ -309,56 +337,61 @@ export default function CourseSyllabusPage() {
         </div>
 
         {/* CTA Section - Sticky */}
-        <div className="fixed bottom-0 left-0 right-0 shadow-2xl z-20" style={{ backgroundColor: "rgba(255, 255, 255, 0.95)", backdropFilter: "blur(10px)", borderTop: "1px solid #E2E8F0" }}>
-          <div className="container mx-auto px-4 py-4 max-w-7xl flex items-center justify-between gap-4">
-            <div>
-              {enrollment ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#14B8A6" }}></div>
-                  <p className="text-sm font-semibold" style={{ color: "#0F766E" }}>✓ Sudah terdaftar di kursus ini</p>
-                </div>
-              ) : user ? (
-                <p className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>Siap untuk memulai belajar?</p>
-              ) : (
-                <p className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>Login terlebih dahulu untuk mendaftar</p>
-              )}
-            </div>
+        <div className="fixed bottom-0 left-0 right-0 shadow-2xl z-20" style={{ backgroundColor: "rgba(250, 250, 247, 0.95)", backdropFilter: "blur(10px)", borderTop: "1px solid #E0DDD0" }}>
+          <div className="container mx-auto px-4 py-3 md:py-4 max-w-7xl">
+            {/* Mobile: Stack vertically */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+              <div className="text-center sm:text-left">
+                {enrollment ? (
+                  <div className="flex items-center justify-center sm:justify-start gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#92400E" }}></div>
+                    <p className="text-xs md:text-sm font-semibold" style={{ color: "#92400E" }}>✓ Sudah terdaftar di kursus ini</p>
+                  </div>
+                ) : user ? (
+                  <p className="text-xs md:text-sm font-semibold" style={{ color: "#1A1A1A" }}>Siap untuk memulai belajar?</p>
+                ) : (
+                  <p className="text-xs md:text-sm font-semibold" style={{ color: "#1A1A1A" }}>Login terlebih dahulu untuk mendaftar</p>
+                )}
+              </div>
 
-            <div className="flex items-center gap-3">
-              {!enrollment && (
+              <div className="flex items-center justify-center sm:justify-end gap-2 md:gap-3">
+                {/* Preview button hidden for now */}
+                {/* {!enrollment && (
+                  <Button
+                    variant="outline"
+                    onClick={handlePreview}
+                    className="h-9 md:h-10 px-4 md:px-6 text-xs md:text-sm font-semibold transition-all"
+                    style={{ borderColor: "#E0DDD0", color: "#64748B" }}
+                  >
+                    <span className="hidden sm:inline">Preview Gratis</span>
+                    <span className="sm:hidden">Preview</span>
+                  </Button>
+                )} */}
+
                 <Button
-                  variant="outline"
-                  onClick={handlePreview}
-                  className="h-10 px-6 font-semibold transition-all"
-                  style={{ borderColor: "#E2E8F0", color: "#64748B" }}
+                  onClick={handleEnroll}
+                  disabled={isEnrolling}
+                  className="h-9 md:h-10 px-6 md:px-8 text-xs md:text-sm font-semibold rounded-lg transition-all"
+                  style={{
+                    backgroundColor: enrollment ? "#92400E" : "#E8B824",
+                    color: "#FFFFFF",
+                  }}
                 >
-                  Preview Gratis
+                  {isEnrolling
+                    ? 'Mendaftar...'
+                    : enrollment
+                      ? '✓ Lanjutkan →'
+                      : user
+                        ? 'Daftar Sekarang'
+                        : 'Login dulu'}
                 </Button>
-              )}
-
-              <Button
-                onClick={handleEnroll}
-                disabled={isEnrolling}
-                className="h-10 px-8 font-semibold rounded-lg transition-all"
-                style={{
-                  backgroundColor: enrollment ? "#14B8A6" : "#F59E0B",
-                  color: enrollment ? "#FFFFFF" : "#FFFFFF",
-                }}
-              >
-                {isEnrolling
-                  ? 'Mendaftar...'
-                  : enrollment
-                    ? '✓ Lanjutkan Belajar →'
-                    : user
-                      ? 'Daftar Sekarang'
-                      : 'Login dulu'}
-              </Button>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Spacing for sticky footer */}
-        <div className="h-24"></div>
+        <div className="h-20 md:h-24"></div>
       </main>
     </div>
   );

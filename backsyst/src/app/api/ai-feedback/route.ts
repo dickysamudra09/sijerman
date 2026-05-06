@@ -69,14 +69,14 @@ interface GroqAPIConfig {
   topP?: number;
 }
 
-async function callGroqAPI(config: GroqAPIConfig): Promise<string> {
+async function callGroqAPI(config: GroqAPIConfig, retryCount = 0, maxRetries = 3): Promise<string> {
   if (!GROQ_API_KEY) {
     console.warn('Groq API key not configured, will use local analysis');
     return '';
   }
 
   try {
-    console.log('Calling Groq API with structured prompt...');
+    console.log(`Calling Groq API (attempt ${retryCount + 1}/${maxRetries + 1})...`);
     
     const response = await fetch(GROQ_API_URL, {
       headers: { 
@@ -85,7 +85,7 @@ async function callGroqAPI(config: GroqAPIConfig): Promise<string> {
       },
       method: 'POST',
       body: JSON.stringify({ 
-        model: 'llama-3.1-8b-instant',
+        model: 'llama-3.3-70b-versatile',
         messages: [
           {
             role: 'system',
@@ -108,8 +108,21 @@ async function callGroqAPI(config: GroqAPIConfig): Promise<string> {
       console.error('Error details:', errorData);
       
       if (response.status === 429) {
-        console.error('Rate limit hit! Retry after:', response.headers.get('retry-after'));
-        throw new Error('API rate limit exceeded - please try again in a moment');
+        // Rate limit hit - extract retry-after time
+        const retryAfter = response.headers.get('retry-after');
+        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 15000; // Default 15 seconds
+        
+        console.log(`Rate limit hit! Waiting ${waitTime / 1000}s before retry...`);
+        
+        // If we haven't exceeded max retries, wait and retry
+        if (retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          console.log(`Retrying after ${waitTime / 1000}s delay...`);
+          return callGroqAPI(config, retryCount + 1, maxRetries);
+        } else {
+          console.error('Max retries exceeded for rate limit');
+          throw new Error('API rate limit exceeded - please try again later');
+        }
       }
       
       return '';
@@ -186,21 +199,33 @@ async function callGroqAPIWithValidationAndRetry(
     let feedbackText = '';
     try {
       let cleanContent = response.trim();
+      
+      // Try to parse as JSON first
       cleanContent = cleanContent.replace(/```(?:json)?\s*|\s*```/g, '');
       const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+      
       if (jsonMatch) {
-        cleanContent = jsonMatch[0];
+        // Found JSON structure
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          feedbackText = parsed.feedback_text || '';
+        } catch (jsonError) {
+          // JSON parsing failed, treat entire response as feedback text
+          console.log(`Attempt ${currentAttempt}: JSON parsing failed, using raw response`);
+          feedbackText = cleanContent;
+        }
+      } else {
+        // No JSON structure found, use entire response as feedback
+        console.log(`Attempt ${currentAttempt}: No JSON structure found, using raw response`);
+        feedbackText = cleanContent;
       }
-      const parsed = JSON.parse(cleanContent);
-      feedbackText = parsed.feedback_text || '';
     } catch (e) {
-      console.log(`Attempt ${currentAttempt}: Failed to parse JSON`);
-      currentAttempt++;
-      continue;
+      console.log(`Attempt ${currentAttempt}: Error processing response, using raw text`);
+      feedbackText = response.trim();
     }
 
-    if (!feedbackText) {
-      console.log(`Attempt ${currentAttempt}: Empty feedback text`);
+    if (!feedbackText || feedbackText.length < 50) {
+      console.log(`Attempt ${currentAttempt}: Feedback too short or empty (${feedbackText.length} chars)`);
       currentAttempt++;
       continue;
     }
@@ -619,7 +644,7 @@ async function generateAIFeedbackWithGroq(
         feedback_text: parsedContent.feedback_text || "Feedback tidak tersedia",
         reference_materials: relevantReferences,
         processing_time_ms: processingTime,
-        ai_model: 'groq-llama-3.1-8b-instant',
+        ai_model: 'groq-llama-3.3-70b-versatile',
       }
     };
   } catch (error: unknown) {
@@ -794,7 +819,7 @@ async function generateAIFeedback(
         feedback_text: parsedContent.feedback_text || "Feedback tidak tersedia",
         reference_materials: relevantReferences,
         processing_time_ms: processingTime,
-        ai_model: `groq-llama-3.1-8b-instant (validated: ${validationResult.validated}, score: ${validationResult.finalScore})`,
+        ai_model: `groq-llama-3.3-70b-versatile (validated: ${validationResult.validated}, score: ${validationResult.finalScore})`,
       }
     };
   } catch (error: unknown) {
@@ -1104,6 +1129,8 @@ export async function POST(request: Request): Promise<Response> {
         question_type,
         points,
         instruction:perintah,
+        answer_statement:jawaban,
+        correct_answer:jawaban_benar,
         course_options (id, option_text:jawaban, is_correct, order_index)
       `)
       .eq('id', questionId)
@@ -1113,8 +1140,13 @@ export async function POST(request: Request): Promise<Response> {
       rawQuestionData = courseQuestionResult.data;
       questionError = null;
       
-      if ((rawQuestionData as any).question_type === 'true_false' && !(rawQuestionData as any).question_text && (rawQuestionData as any).instruction) {
-        (rawQuestionData as any).question_text = (rawQuestionData as any).instruction;
+      // For true_false: use jawaban (answer statement) as question_text
+      if ((rawQuestionData as any).question_type === 'true_false') {
+        if ((rawQuestionData as any).answer_statement) {
+          (rawQuestionData as any).question_text = (rawQuestionData as any).answer_statement;
+        } else if (!(rawQuestionData as any).question_text && (rawQuestionData as any).instruction) {
+          (rawQuestionData as any).question_text = (rawQuestionData as any).instruction;
+        }
       }
     } else {
       const regularQuestionResult = await supabaseAdmin
@@ -1159,24 +1191,106 @@ export async function POST(request: Request): Promise<Response> {
       const selectedOption = options.find((opt: any) => opt.id === selectedOptionId);
       const correctOption = options.find((opt: any) => opt.is_correct);
       
-      if (questionData.question_type === 'true_false' && !selectedOption && textAnswer) {
-        studentAnswerText = textAnswer === 'true' ? 'Benar (R)' : 'Salah (F)';
+      if (questionData.question_type === 'true_false') {
+        // For true_false: use jawaban_benar field to determine correct answer
+        const correctAnswerBoolean = (questionData as any).correct_answer;
+        const instruction = (questionData as any).instruction || '';
+        const answerStatement = (questionData as any).answer_statement || questionData.question_text;
+        
+        // Student answer
+        if (!selectedOption && textAnswer) {
+          studentAnswerText = textAnswer === 'true' ? 'Richtig (R)' : 'Falsch (F)';
+        } else {
+          studentAnswerText = selectedOption?.option_text || 'Tidak ada jawaban';
+        }
+        
+        // Correct answer based on jawaban_benar boolean
+        correctAnswerText = correctAnswerBoolean ? 'Richtig (R)' : 'Falsch (F)';
+        
+        // Build complete question text with instruction and statement
+        const fullQuestionText = instruction 
+          ? `${instruction}\n\n${answerStatement}` 
+          : answerStatement;
+        
+        console.log('[AI-FEEDBACK] True/False Question:', {
+          instruction,
+          answerStatement,
+          correctAnswerBoolean,
+          studentAnswer: studentAnswerText,
+          correctAnswer: correctAnswerText
+        });
+        
+        // Create modified question data with full context
+        const modifiedQuestionData = {
+          ...questionData,
+          question_text: fullQuestionText
+        };
+        
+        // Call AI with instruction and statement separately for better context
+        const promptConfig = buildOptimizedPrompt(
+          'true_false',
+          fullQuestionText,
+          studentAnswerText,
+          correctAnswerText,
+          finalIsCorrect,
+          undefined,
+          lessonContent,
+          instruction,
+          answerStatement
+        );
+        
+        const validationResult = await callGroqAPIWithValidationAndRetry(
+          {
+            systemMessage: promptConfig.systemMessage,
+            userMessage: promptConfig.userPrompt,
+            temperature: promptConfig.temperature,
+            maxTokens: promptConfig.maxTokens,
+            topP: promptConfig.topP
+          },
+          studentAnswerText,
+          correctAnswerText,
+          fullQuestionText,
+          finalIsCorrect,
+          2
+        );
+        
+        if (!validationResult.content) {
+          throw new Error('No valid response from Groq after validation retry');
+        }
+        
+        const referenceMatches = selectSmartReferences(
+          studentAnswerText,
+          correctAnswerText,
+          fullQuestionText,
+          3
+        );
+        const relevantReferences = convertToReferenceMaterials(referenceMatches);
+        
+        aiResponse = {
+          success: true,
+          data: {
+            feedback_text: validationResult.content,
+            reference_materials: relevantReferences,
+            processing_time_ms: Date.now() - startTime,
+            ai_model: `groq-llama-3.3-70b-versatile (validated: ${validationResult.validated}, score: ${validationResult.finalScore})`
+          }
+        };
       } else {
+        // Multiple choice logic (unchanged)
         studentAnswerText = selectedOption?.option_text || 'Tidak ada jawaban';
-      }
-      
-      correctAnswerText = correctOption?.option_text || 'Tidak diketahui';
-      
-      console.log('[AI-FEEDBACK] Lesson content:', lessonContent ? `${lessonContent.length} chars` : 'None');
-      console.log('[AI-FEEDBACK] Question type:', questionType);
+        correctAnswerText = correctOption?.option_text || 'Tidak diketahui';
+        
+        console.log('[AI-FEEDBACK] Lesson content:', lessonContent ? `${lessonContent.length} chars` : 'None');
+        console.log('[AI-FEEDBACK] Question type:', questionType);
 
-      aiResponse = await generateAIFeedback(
-        questionData,
-        studentAnswerText,
-        correctAnswerText,
-        finalIsCorrect,
-        lessonContent
-      );
+        aiResponse = await generateAIFeedback(
+          questionData,
+          studentAnswerText,
+          correctAnswerText,
+          finalIsCorrect,
+          lessonContent
+        );
+      }
     } else if (questionData.question_type === 'sentence_arrangement') {
       studentAnswerText = textAnswer || 'Tidak ada jawaban';
 
