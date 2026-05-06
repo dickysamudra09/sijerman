@@ -1275,6 +1275,7 @@ export default function CourseDetailPage() {
           className={`flex-1 w-full overflow-y-auto transition-all duration-300 ease-out pb-2 pt-24 ${
             showSidebar ? 'md:ml-80' : 'md:ml-0'
           }`}
+          style={{ backgroundColor: '#FAFAF8' }}
         >
           <div className="w-full py-6 md:py-8 space-y-6">
             <div className="w-full px-4 md:px-8">
@@ -1304,8 +1305,8 @@ export default function CourseDetailPage() {
                 <div
                     className="rounded-lg p-6 md:p-8 shadow-md"
                     style={{
-                      backgroundColor: "#FFFFFC",
-                      border: "1px solid #E5E5E5",
+                      backgroundColor: "#FFFFFF",
+                      border: "1px solid #F0E9D2",
                     }}
                   >
                     <div className="mb-6 pb-6 border-b border-gray-200">
@@ -1379,8 +1380,8 @@ export default function CourseDetailPage() {
                 <div
                     className="rounded-lg p-6 md:p-8 shadow-md text-center"
                     style={{
-                      backgroundColor: "#FFFFFC",
-                      border: "1px solid #E5E5E5",
+                      backgroundColor: "#FFFFFF",
+                      border: "1px solid #F0E9D2",
                     }}
                   >
                     <p style={{ color: "#4A4A4A" }}>
@@ -1401,8 +1402,8 @@ export default function CourseDetailPage() {
                         <div
                             className="rounded-lg p-6 md:p-8 shadow-md"
                             style={{
-                              backgroundColor: "#FFFFFC",
-                              border: "1px solid #E5E5E5",
+                              backgroundColor: "#FFFFFF",
+                              border: "1px solid #F0E9D2",
                             }}
                           >
                             <div className="mb-6 pb-6 border-b border-gray-200">
@@ -1612,8 +1613,8 @@ export default function CourseDetailPage() {
                         <div
                             className="rounded-lg p-6 md:p-8 shadow-md text-center"
                             style={{
-                              backgroundColor: "#FFFFFC",
-                              border: "1px solid #E5E5E5",
+                              backgroundColor: "#FFFFFF",
+                              border: "1px solid #F0E9D2",
                             }}
                           >
                             <p style={{ color: "#4A4A4A" }}>
@@ -1626,7 +1627,7 @@ export default function CourseDetailPage() {
                     <div
                         className="rounded-lg p-6 md:p-8 shadow-md text-center"
                         style={{
-                          backgroundColor: "#FFFBF0",
+                          backgroundColor: "#FFFFFF",
                           border: "2px solid #F5C518",
                         }}
                       >
