@@ -11,6 +11,8 @@ import UserMenuDropdown from "@/components/UserMenuDropdown";
 import { CourseSyllabus } from "@/components/CourseSyllabus";
 import { ModuleTimeline, type ModuleItem } from "@/components/ModuleTimeline";
 import { WarmProgressBar } from "@/components/WarmProgressBar";
+import ExerciseInline from "@/components/ExerciseInline";
+import AIFeedbackInline from "@/components/AIFeedbackInline";
 import {
   BookOpen,
   Lock,
@@ -32,8 +34,11 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Play,
   HelpCircle,
+  Trophy,
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -143,7 +148,7 @@ export default function CourseDetailPage() {
   const [access, setAccess] = useState<any>(null);
   const [showAIUpgrade, setShowAIUpgrade] = useState(false);
   const [aiAttempts, setAiAttempts] = useState(0);
-  const [showSidebar, setShowSidebar] = useState(false); // For mobile hamburger
+  const [showSidebar, setShowSidebar] = useState(true); // Sidebar visible by default on desktop, hidden on mobile
   const [activeTab, setActiveTab] = useState<"lessons" | "materials">("lessons");
   const [overallProgress, setOverallProgress] = useState(0); // Track overall course progress
 
@@ -846,24 +851,42 @@ export default function CourseDetailPage() {
       <header
         className="fixed top-0 left-0 right-0 z-30 border-b overflow-visible w-full"
         style={{
-          backgroundColor: "rgba(13, 13, 13, 0.90)",
-          backdropFilter: "blur(10px)",
+          backgroundColor: "rgba(13, 13, 13, 0.95)",
+          backdropFilter: "blur(12px)",
           borderBottomColor: "#333333",
           overflow: "visible"
         }}
       >
-        <div className="container mx-auto px-4 py-4 overflow-visible" style={{ overflow: 'visible' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#EFF6FF" }}>
-                <BookOpen className="h-6 w-6" style={{ color: "#0F766E" }} />
+        <div className="container mx-auto px-4 py-3 overflow-visible" style={{ overflow: 'visible' }}>
+          <div className="flex items-center justify-between gap-4">
+            {/* Left: Course Info */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#EFF6FF" }}>
+                <BookOpen className="h-5 w-5" style={{ color: "#0F766E" }} />
               </div>
-              <div>
-                <h1 className="text-xl font-bold line-clamp-2" style={{ color: "#FFFFFF" }}>{course?.title || "Loading..."}</h1>
-                <p className="text-xs uppercase tracking-wider" style={{ color: "#FFFFFC" }}>Status Aktif</p>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base font-bold truncate" style={{ color: "#FFFFFF" }}>
+                  {course?.title || "Loading..."}
+                </h1>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs" style={{ color: "#9CA3AF" }}>
+                    {overallProgress}% Complete
+                  </span>
+                  <div className="h-1.5 w-24 rounded-full overflow-hidden" style={{ backgroundColor: "#374151" }}>
+                    <div 
+                      className="h-full transition-all duration-500 rounded-full"
+                      style={{ 
+                        width: `${overallProgress}%`,
+                        backgroundColor: overallProgress === 100 ? "#16A34A" : "#E8B824"
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+
+            {/* Right: Actions */}
+            <div className="flex items-center gap-3 flex-shrink-0">
               <UserMenuDropdown
                 user={user}
                 onLogout={async () => {
@@ -872,17 +895,6 @@ export default function CourseDetailPage() {
                 }}
                 onNavigate={router.push}
               />
-              
-              {/* Hamburger Menu - Mobile Only */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowSidebar(!showSidebar)}
-                className="md:hidden"
-                style={{ color: "#FFFFFC" }}
-              >
-                {showSidebar ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </Button>
             </div>
           </div>
         </div>
@@ -899,20 +911,20 @@ export default function CourseDetailPage() {
           />
         )}
 
-        {/* Sidebar - FIXED on desktop (20%) / Overlay on mobile */}
+        {/* Sidebar - Collapsible on desktop / Overlay on mobile */}
         <aside
           className={`${
-            showSidebar ? 'translate-x-0' : '-translate-x-full'
-          } fixed w-3/4 md:w-1/5 bg-white border-r border-gray-200 overflow-y-auto transition-transform duration-300 ease-out z-30 md:translate-x-0`}
+            showSidebar ? 'translate-x-0' : '-translate-x-full md:-translate-x-full'
+          } fixed w-3/4 md:w-80 bg-white border-r overflow-y-auto transition-all duration-300 ease-out z-30`}
           style={{
-            backgroundColor: '#F9F9F9',
-            borderColor: '#E5E5E5',
+            backgroundColor: '#FFFFFF',
+            borderColor: '#E0E0E0',
             top: '80px',
             left: 0,
             height: 'calc(100vh - 80px)',
           }}
         >
-          <div className="p-4 md:p-6 space-y-6">
+          <div className="p-6 md:p-8 space-y-6">
             {/* Hide Menu Button - Mobile Only */}
             <Button
               onClick={() => setShowSidebar(false)}
@@ -925,35 +937,46 @@ export default function CourseDetailPage() {
             </Button>
             {/* Progress Summary */}
             <div
-              className="rounded-lg p-4 backdrop-blur-md"
+              className="rounded-xl p-5 border-2"
               style={{
-                backgroundColor: "rgba(255, 255, 255, 0.7)",
-                border: "1px solid rgba(255, 255, 255, 0.3)",
-                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
+                backgroundColor: "#FFFBEB",
+                borderColor: "#FDE68A",
+                boxShadow: "0 2px 8px rgba(232, 184, 36, 0.1)",
               }}
             >
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="h-5 w-5" strokeWidth={1.5} style={{ color: "#6B7280" }} />
-                <h4 className="font-bold text-sm" style={{ color: "#1A1A1A" }}>
-                  Kemajuan
-                </h4>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#E8B824" }}>
+                    <Trophy className="h-4 w-4" style={{ color: "#1A1A1A" }} />
+                  </div>
+                  <h4 className="font-bold text-base" style={{ color: "#1A1A1A" }}>
+                    Progress Kamu
+                  </h4>
+                </div>
+                <span className="text-2xl font-bold" style={{ color: "#E8B824" }}>
+                  {overallProgress}%
+                </span>
               </div>
               <WarmProgressBar
                 percentage={overallProgress}
-                showPercentage={true}
+                showPercentage={false}
                 height="md"
               />
+              <p className="text-xs mt-3" style={{ color: "#92400E" }}>
+                {overallProgress === 100 
+                  ? "🎉 Selamat! Kamu sudah menyelesaikan semua materi!" 
+                  : overallProgress >= 75 
+                  ? "💪 Hampir selesai! Terus semangat!"
+                  : overallProgress >= 50
+                  ? "🚀 Kamu sudah setengah jalan! Keep going!"
+                  : overallProgress >= 25
+                  ? "✨ Awal yang bagus! Lanjutkan belajarnya!"
+                  : "🌟 Yuk mulai perjalanan belajarmu!"}
+              </p>
             </div>
 
             {/* Modules & Lessons & Materials List */}
-            <div
-              className="rounded-xl overflow-hidden"
-              style={{
-                backgroundColor: "#FFFFFF",
-                border: "1px solid #E5E5E5",
-              }}
-            >
-              <div className="space-y-0">
+            <div className="space-y-3">
                 {modules.map((module, moduleIndex) => {
                   const isModuleSelected = moduleIndex === selectedModuleIndex;
                   const isModuleUnlocked = unlockedModules.has(moduleIndex);
@@ -961,54 +984,76 @@ export default function CourseDetailPage() {
                   const isModuleExpanded = expandedModules.has(moduleIndex);
 
                   return (
-                    <div key={module.id}>
+                    <div key={module.id} className="mb-3">
                       {/* Module Header */}
                       <button
                         onClick={() => {
                           if (isModuleUnlocked) {
                             toggleModuleExpand(moduleIndex);
-                            setShowSidebar(false);
                           }
                         }}
                         disabled={!isModuleUnlocked}
-                        className="w-full text-left px-4 py-4 transition-all duration-300 ease-out flex items-center justify-between hover:shadow-md"
+                        className="w-full text-left px-5 py-4 rounded-xl transition-all duration-200 ease-out flex items-center justify-between group"
                         style={{
-                          background: isModuleSelected 
-                            ? `linear-gradient(135deg, #E8B824 0%, #D4A520 100%)`
+                          backgroundColor: isModuleSelected 
+                            ? "#E8B824"
                             : isModuleCompleted
-                            ? `linear-gradient(135deg, #F0F9FF 0%, #E8F5E9 100%)`
-                            : "#F9F9F9",
+                            ? "#F0FDF4"
+                            : "#FAFAFA",
                           color: isModuleSelected ? "#1A1A1A" : "#333333",
-                          opacity: !isModuleUnlocked ? 0.5 : 1,
+                          opacity: !isModuleUnlocked ? 0.6 : 1,
                           cursor: isModuleUnlocked ? "pointer" : "not-allowed",
-                          borderBottom: "2px solid #E5E5E5",
-                          transition: 'all 0.3s ease-out',
+                          border: `2px solid ${
+                            isModuleSelected 
+                              ? "#E8B824" 
+                              : isModuleCompleted 
+                              ? "#BBF7D0" 
+                              : "#E5E7EB"
+                          }`,
+                          boxShadow: isModuleSelected 
+                            ? "0 4px 12px rgba(232, 184, 36, 0.2)" 
+                            : "0 1px 3px rgba(0, 0, 0, 0.05)",
                         }}
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           {isModuleCompleted ? (
-                            <div className="h-5 w-5 flex-shrink-0 relative">
-                              <CheckCircle className="h-5 w-5 animate-pulse" strokeWidth={1.5} style={{ color: "#2E7D32" }} />
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#D1FAE5" }}>
+                              <CheckCircle className="h-5 w-5" strokeWidth={2.5} style={{ color: "#059669" }} />
                             </div>
                           ) : isModuleUnlocked ? (
                             <div 
-                              className="h-5 w-5 rounded-full flex-shrink-0 border-2 transition-all" 
-                              style={{ borderColor: isModuleSelected ? "#1A1A1A" : "#E8B824" }} 
-                            />
+                              className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-all" 
+                              style={{ 
+                                backgroundColor: isModuleSelected ? "#1A1A1A" : "#FEF3C7",
+                                border: `2px solid ${isModuleSelected ? "#1A1A1A" : "#E8B824"}`
+                              }} 
+                            >
+                              <span className="text-sm font-bold" style={{ color: isModuleSelected ? "#E8B824" : "#92400E" }}>
+                                {moduleIndex + 1}
+                              </span>
+                            </div>
                           ) : (
-                            <Lock className="h-5 w-5 flex-shrink-0" strokeWidth={1.5} style={{ color: "#D1D5DB" }} />
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#F3F4F6" }}>
+                              <Lock className="h-5 w-5" strokeWidth={2} style={{ color: "#9CA3AF" }} />
+                            </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <span className="font-bold truncate text-sm" style={{ color: isModuleSelected ? "#1A1A1A" : "#2F3E75" }}>Module {moduleIndex + 1}</span>
-                            <span className="font-semibold truncate text-md block" style={{ color: isModuleSelected ? "#1A1A1A" : "#333333" }}>{module.title}</span>
+                            <span className="text-xs font-bold uppercase tracking-wider block mb-0.5" style={{ color: isModuleSelected ? "#1A1A1A" : "#6B7280" }}>
+                              Module {moduleIndex + 1}
+                            </span>
+                            <span className="font-bold text-base truncate block" style={{ color: isModuleSelected ? "#1A1A1A" : "#1F2937" }}>
+                              {module.title}
+                            </span>
                           </div>
                         </div>
                         {isModuleUnlocked && (
-                          isModuleExpanded ? (
-                            <ChevronUp className="h-5 w-5 flex-shrink-0 ml-2 transition-transform duration-500 ease-out" strokeWidth={1.5} style={{ color: "#666" }} />
-                          ) : (
-                            <ChevronDown className="h-5 w-5 flex-shrink-0 ml-2 transition-transform duration-500 ease-out" strokeWidth={1.5} style={{ color: "#666" }} />
-                          )
+                          <div className="flex-shrink-0 ml-2">
+                            {isModuleExpanded ? (
+                              <ChevronUp className="h-5 w-5 transition-transform duration-200" strokeWidth={2} style={{ color: isModuleSelected ? "#1A1A1A" : "#6B7280" }} />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 transition-transform duration-200" strokeWidth={2} style={{ color: isModuleSelected ? "#1A1A1A" : "#6B7280" }} />
+                            )}
+                          </div>
                         )}
                       </button>
 
@@ -1016,12 +1061,12 @@ export default function CourseDetailPage() {
                       <div
                         className={`overflow-hidden transition-all ease-out ${
                           isModuleExpanded 
-                            ? "duration-500 max-h-[2000px] opacity-100" 
+                            ? "duration-500 max-h-[2000px] opacity-100 mt-2" 
                             : "duration-600 max-h-0 opacity-0"
                         }`}
                       >
                         {(lessons.length > 0 || materials.length > 0) && (
-                          <div className="bg-white">
+                          <div className="space-y-2 pl-2">
                           {/* Lessons */}
                           {lessons.map((lesson, lessonIndex) => {
                             const progress = lessonProgress[lesson.id];
@@ -1038,36 +1083,46 @@ export default function CourseDetailPage() {
                                   setActiveTab("lessons");
                                   setExpandedModules(new Set([moduleIndex])); // Close other modules
                                   markLessonAsViewed(lesson.id);
-                                  setShowSidebar(false);
                                 }}
-                                className="w-full text-left px-4 py-3 transition-all duration-200 ease-out border-l-4 flex items-center justify-between hover:shadow-sm hover:scale-[1.01] group"
+                                className="w-full text-left px-4 py-3.5 rounded-lg transition-all duration-200 ease-out flex items-center justify-between hover:shadow-md hover:scale-[1.02] group"
                                 style={{
-                                  backgroundColor: isLessonSelected ? "#FFF9E6" : isCompleted ? "#F0FFFE" : "#FAFAF8",
-                                  borderLeftColor: isLessonSelected ? "#E8B824" : isCompleted ? "#2E7D32" : "transparent",
-                                  borderBottom: "1px solid #E5E5E5",
-                                  borderRadius: "0px 8px 8px 0px",
-                                  marginRight: "4px",
-                                  animation: isModuleExpanded 
-                                    ? `fadeIn 0.4s ease-out ${lessonIndex * 50}ms both`
-                                    : `fadeOut 0.3s ease-in ${((lessons.length - lessonIndex - 1) + materials.length) * 50}ms both`,
+                                  backgroundColor: isLessonSelected ? "#FFF9E6" : isCompleted ? "#F0FDF4" : "#FFFFFF",
+                                  border: `2px solid ${
+                                    isLessonSelected ? "#E8B824" : isCompleted ? "#BBF7D0" : "#E5E7EB"
+                                  }`,
+                                  boxShadow: isLessonSelected 
+                                    ? "0 2px 8px rgba(232, 184, 36, 0.15)" 
+                                    : "0 1px 2px rgba(0, 0, 0, 0.05)",
                                 }}
                               >
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  {isCompleted ? (
-                                    <CheckCircle className="h-4 w-4 flex-shrink-0 animate-pulse" strokeWidth={2} style={{ color: "#2E7D32" }} />
-                                  ) : isLessonSelected ? (
-                                    <div className="h-4 w-4 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: "#E8B824" }} />
-                                  ) : (
-                                    <Play className="h-4 w-4 flex-shrink-0 group-hover:text-yellow-600 transition-colors" strokeWidth={1.5} style={{ color: "#9CA3AF" }} />
-                                  )}
+                                  <div className="flex-shrink-0">
+                                    {isCompleted ? (
+                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#D1FAE5" }}>
+                                        <CheckCircle className="h-4 w-4" strokeWidth={2.5} style={{ color: "#059669" }} />
+                                      </div>
+                                    ) : isLessonSelected ? (
+                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#FEF3C7" }}>
+                                        <Play className="h-4 w-4" strokeWidth={2.5} style={{ color: "#E8B824" }} fill="#E8B824" />
+                                      </div>
+                                    ) : (
+                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center group-hover:bg-gray-100 transition-colors" style={{ backgroundColor: "#F9FAFB" }}>
+                                        <Play className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />
+                                      </div>
+                                    )}
+                                  </div>
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-semibold text-gray-800 truncate group-hover:text-yellow-700 transition-colors">{lesson.title}</div>
+                                    <div className="text-sm font-semibold truncate" style={{ 
+                                      color: isLessonSelected ? "#92400E" : isCompleted ? "#047857" : "#374151" 
+                                    }}>
+                                      {lesson.title}
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                                   {isCompleted && (
-                                    <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ color: "#fff", backgroundColor: "#2E7D32", whiteSpace: "nowrap" }}>
-                                      ✓ Selesai
+                                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ color: "#065F46", backgroundColor: "#D1FAE5", whiteSpace: "nowrap" }}>
+                                      ✓
                                     </span>
                                   )}
                                 </div>
@@ -1091,47 +1146,59 @@ export default function CourseDetailPage() {
                                   setActiveTab("materials");
                                   setExpandedModules(new Set([moduleIndex])); // Close other modules
                                   markMaterialAsViewed(material.id);
-                                  setShowSidebar(false);
                                 }}
-                                className="w-full text-left px-4 py-3 transition-all duration-200 ease-out border-l-4 flex items-center justify-between hover:shadow-sm hover:scale-[1.01] group"
+                                className="w-full text-left px-4 py-3.5 rounded-lg transition-all duration-200 ease-out flex items-center justify-between hover:shadow-md hover:scale-[1.02] group"
                                 style={{
-                                  backgroundColor: isMaterialSelected ? "#FFF4E6" : isCompleted ? "#F0FFFE" : "#FAFAF8",
-                                  borderLeftColor: isMaterialSelected ? "#E87835" : isCompleted ? "#2E7D32" : "transparent",
-                                  borderBottom: "1px solid #E5E5E5",
-                                  borderRadius: "0px 8px 8px 0px",
-                                  marginRight: "4px",
-                                  animation: isModuleExpanded 
-                                    ? `fadeIn 0.4s ease-out ${(lessons.length + materials.findIndex(m => m.id === material.id)) * 50}ms both`
-                                    : `fadeOut 0.3s ease-in ${(materials.length - materials.findIndex(m => m.id === material.id) - 1) * 50}ms both`,
+                                  backgroundColor: isMaterialSelected ? "#FFF4E6" : isCompleted ? "#F0FDF4" : "#FFFFFF",
+                                  border: `2px solid ${
+                                    isMaterialSelected ? "#F97316" : isCompleted ? "#BBF7D0" : "#E5E7EB"
+                                  }`,
+                                  boxShadow: isMaterialSelected 
+                                    ? "0 2px 8px rgba(249, 115, 22, 0.15)" 
+                                    : "0 1px 2px rgba(0, 0, 0, 0.05)",
                                 }}
                               >
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  {isCompleted ? (
-                                    <CheckCircle className="h-4 w-4 flex-shrink-0 animate-pulse" strokeWidth={2} style={{ color: "#2E7D32" }} />
-                                  ) : isMaterialSelected ? (
-                                    <div className="h-4 w-4 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: "#E87835" }} />
-                                  ) : (
-                                    <span style={{ color: "#9CA3AF" }} className="group-hover:text-orange-500 transition-colors">
-                                      {material.material_type === "video" && <Video className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
-                                      {material.material_type === "audio" && <Headphones className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
-                                      {material.material_type === "pdf" && <FileText className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
-                                      {material.material_type === "image" && <Image className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
-                                      {material.material_type === "resource" && <Link2 className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />}
-                                    </span>
-                                  )}
+                                  <div className="flex-shrink-0">
+                                    {isCompleted ? (
+                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#D1FAE5" }}>
+                                        <CheckCircle className="h-4 w-4" strokeWidth={2.5} style={{ color: "#059669" }} />
+                                      </div>
+                                    ) : isMaterialSelected ? (
+                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#FFF4E6" }}>
+                                        {material.material_type === "video" && <Video className="h-4 w-4" strokeWidth={2.5} style={{ color: "#F97316" }} />}
+                                        {material.material_type === "audio" && <Headphones className="h-4 w-4" strokeWidth={2.5} style={{ color: "#F97316" }} />}
+                                        {material.material_type === "pdf" && <FileText className="h-4 w-4" strokeWidth={2.5} style={{ color: "#F97316" }} />}
+                                        {material.material_type === "image" && <Image className="h-4 w-4" strokeWidth={2.5} style={{ color: "#F97316" }} />}
+                                        {material.material_type === "resource" && <Link2 className="h-4 w-4" strokeWidth={2.5} style={{ color: "#F97316" }} />}
+                                      </div>
+                                    ) : (
+                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center group-hover:bg-gray-100 transition-colors" style={{ backgroundColor: "#F9FAFB" }}>
+                                        {material.material_type === "video" && <Video className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />}
+                                        {material.material_type === "audio" && <Headphones className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />}
+                                        {material.material_type === "pdf" && <FileText className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />}
+                                        {material.material_type === "image" && <Image className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />}
+                                        {material.material_type === "resource" && <Link2 className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />}
+                                      </div>
+                                    )}
+                                  </div>
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-semibold text-gray-800 truncate group-hover:text-orange-600 transition-colors">{material.title}</div>
+                                    <div className="text-sm font-semibold truncate" style={{ 
+                                      color: isMaterialSelected ? "#C2410C" : isCompleted ? "#047857" : "#374151" 
+                                    }}>
+                                      {material.title}
+                                    </div>
                                     {durationMinutes && (
-                                      <div className="text-xs" style={{ color: "#999999" }}>
-                                        ⏱ {durationMinutes} Menit
+                                      <div className="text-xs mt-0.5" style={{ color: "#9CA3AF" }}>
+                                        ⏱ {durationMinutes} menit
                                       </div>
                                     )}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                                   {isCompleted && (
-                                    <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ color: "#fff", backgroundColor: "#2E7D32", whiteSpace: "nowrap" }}>
-                                      ✓ Selesai
+                                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ color: "#065F46", backgroundColor: "#D1FAE5", whiteSpace: "nowrap" }}>
+                                      ✓
                                     </span>
                                   )}
                                 </div>
@@ -1144,7 +1211,6 @@ export default function CourseDetailPage() {
                     </div>
                   );
                 })}
-              </div>
             </div>
 
             {/* Access Badge - TODO: Enable when AI feedback is ready */}
@@ -1175,16 +1241,46 @@ export default function CourseDetailPage() {
           </div>
         </aside>
 
-        {/* Main Content - Full width, but with margin-left on desktop for fixed sidebar */}
-        <main 
-          className="flex-1 w-full overflow-y-auto main-with-fixed-sidebar pb-2 pt-24"
+        {/* Floating Sidebar Toggle Button - All Devices */}
+        <button
+          onClick={() => setShowSidebar(!showSidebar)}
+          className="flex fixed z-40 items-center justify-center transition-all duration-300 ease-out hover:brightness-110 active:scale-95"
+          style={{
+            backgroundColor: '#E8B824',
+            color: '#1A1A1A',
+            top: '50%',
+            // Mobile: 75vw - 16px (sidebar is w-3/4), Desktop: 304px (sidebar is 320px)
+            left: showSidebar ? 'calc(min(75vw, 320px) - 16px)' : '-16px',
+            transform: 'translateY(-50%)',
+            width: '40px',
+            height: '80px',
+            borderRadius: '0 12px 12px 0',
+            boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+            borderLeft: 'none',
+            borderTop: '1px solid rgba(0,0,0,0.1)',
+            borderRight: '1px solid rgba(0,0,0,0.1)',
+            borderBottom: '1px solid rgba(0,0,0,0.1)',
+          }}
+          title={showSidebar ? "Sembunyikan Menu" : "Tampilkan Menu"}
         >
-          <div className="w-full px-0 md:px-0 py-6 md:py-8 space-y-6">
-            <div className="max-w-full mx-auto px-2 md:px-4">
+          {showSidebar ? (
+            <ChevronLeft className="h-6 w-6" />
+          ) : (
+            <ChevronRight className="h-6 w-6" />
+          )}
+        </button>
+
+        {/* Main Content - Responsive width based on sidebar state */}
+        <main 
+          className={`flex-1 w-full overflow-y-auto transition-all duration-300 ease-out pb-2 pt-24 ${
+            showSidebar ? 'md:ml-80' : 'md:ml-0'
+          }`}
+        >
+          <div className="w-full py-6 md:py-8 space-y-6">
+            <div className="w-full px-4 md:px-8">
               {/* Course Syllabus */}
               {course && (
-                <div className="mx-4 md:mx-8">
-                  <CourseSyllabus
+                <CourseSyllabus
                     courseTitle={course.title}
                     courseDescription={course.description}
                     learningOutcomes={
@@ -1201,13 +1297,11 @@ export default function CourseDetailPage() {
                     teacherName={course.teacher?.name || "Instruktur"}
                     courseId={courseId}
                   />
-                </div>
               )}
 
               {/* Lesson Content Card */}
               {activeTab === "lessons" && currentLesson ? (
-                <div className="mx-4 md:mx-8">
-                  <div
+                <div
                     className="rounded-lg p-6 md:p-8 shadow-md"
                     style={{
                       backgroundColor: "#FFFFFC",
@@ -1249,8 +1343,8 @@ export default function CourseDetailPage() {
                     </div>
 
                     <div
-                      style={{ color: "#4A4A4A" }}
-                      className="leading-relaxed mb-8 prose prose-sm max-w-none"
+                      style={{ color: "#374151", lineHeight: "1.8" }}
+                      className="leading-relaxed mb-8 prose prose-lg max-w-none"
                     >
                       {currentLesson.content ? (
                         <div
@@ -1260,6 +1354,7 @@ export default function CourseDetailPage() {
                           style={{
                             wordWrap: "break-word",
                             overflowWrap: "break-word",
+                            fontSize: "1.0625rem", // 17px for better readability
                           }}
                         />
                       ) : (
@@ -1269,12 +1364,19 @@ export default function CourseDetailPage() {
                       )}
                     </div>
 
+                    {/* Exercise Inline Component */}
+                    {currentLesson && user && (
+                      <ExerciseInline
+                        lessonId={currentLesson.id}
+                        courseId={courseId}
+                        userId={user.id}
+                        lessonContent={currentLesson.content}
+                      />
+                    )}
 
                   </div>
-                </div>
               ) : (
-                <div className="mx-4 md:mx-8">
-                  <div
+                <div
                     className="rounded-lg p-6 md:p-8 shadow-md text-center"
                     style={{
                       backgroundColor: "#FFFFFC",
@@ -1285,7 +1387,6 @@ export default function CourseDetailPage() {
                       Pilih pelajaran untuk memulai.
                     </p>
                   </div>
-                </div>
               )}
 
               {/* Materials Content */}
@@ -1297,8 +1398,7 @@ export default function CourseDetailPage() {
                    lessons.every(l => lessonProgress[l.id]?.completed_at) ? (
                     <>
                       {currentMaterial ? (
-                        <div className="mx-4 md:mx-8">
-                          <div
+                        <div
                             className="rounded-lg p-6 md:p-8 shadow-md"
                             style={{
                               backgroundColor: "#FFFFFC",
@@ -1508,10 +1608,8 @@ export default function CourseDetailPage() {
                               )}
                             </div>
                           </div>
-                        </div>
                       ) : (
-                        <div className="mx-4 md:mx-8">
-                          <div
+                        <div
                             className="rounded-lg p-6 md:p-8 shadow-md text-center"
                             style={{
                               backgroundColor: "#FFFFFC",
@@ -1522,12 +1620,10 @@ export default function CourseDetailPage() {
                               Pilih materi dari sidebar untuk memulai.
                             </p>
                           </div>
-                        </div>
                       )}
                     </>
                   ) : (
-                    <div className="mx-4 md:mx-8">
-                      <div
+                    <div
                         className="rounded-lg p-6 md:p-8 shadow-md text-center"
                         style={{
                           backgroundColor: "#FFFBF0",
@@ -1545,7 +1641,6 @@ export default function CourseDetailPage() {
                           Selesaikan semua pelajaran untuk mengakses materi.
                         </p>
                       </div>
-                    </div>
                   )}
                 </>
               )}
@@ -1615,7 +1710,9 @@ export default function CourseDetailPage() {
       </div>
 
       {/* Fixed Navigation Footer */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-2xl z-20 footer-with-sidebar">
+      <div className={`fixed bottom-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-2xl z-20 transition-all duration-300 ease-out ${
+        showSidebar ? 'left-0 md:left-80' : 'left-0'
+      }`}>
         <div className="px-6 md:px-8 py-3 flex items-center justify-between">
           <div className="flex-1"></div>
           
