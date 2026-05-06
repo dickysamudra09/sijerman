@@ -55,7 +55,7 @@ export default function RegisterPage() {
       role: "student",
       terms: false,
     },
-    mode: "onBlur",
+    mode: "onChange",
   });
 
   const handleRegister = async () => {

@@ -85,7 +85,7 @@ async function callGroqAPI(config: GroqAPIConfig, retryCount = 0, maxRetries = 3
       },
       method: 'POST',
       body: JSON.stringify({ 
-        model: 'llama-3.3-70b-versatile',
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
         messages: [
           {
             role: 'system',
@@ -1272,7 +1272,7 @@ export async function POST(request: Request): Promise<Response> {
             feedback_text: validationResult.content,
             reference_materials: relevantReferences,
             processing_time_ms: Date.now() - startTime,
-            ai_model: `groq-llama-3.3-70b-versatile (validated: ${validationResult.validated}, score: ${validationResult.finalScore})`
+            ai_model: `groq-llama-4-scout-17b (validated: ${validationResult.validated}, score: ${validationResult.finalScore})`
           }
         };
       } else {

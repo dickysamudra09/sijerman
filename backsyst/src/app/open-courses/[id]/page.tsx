@@ -857,7 +857,7 @@ export default function CourseDetailPage() {
     <div className="min-h-screen" style={{ backgroundColor: "#FFFFFC" }}>
       {/* Header */}
       <header
-        className="fixed top-0 left-0 right-0 z-30 border-b overflow-visible w-full"
+        className="fixed top-0 left-0 right-0 z-40 border-b overflow-visible w-full"
         style={{
           backgroundColor: "rgba(13, 13, 13, 0.95)",
           backdropFilter: "blur(12px)",
@@ -927,9 +927,10 @@ export default function CourseDetailPage() {
           style={{
             backgroundColor: '#FFFFFF',
             borderColor: '#E0E0E0',
-            top: '80px',
+            top: '0',
             left: 0,
-            height: 'calc(100vh - 80px)',
+            height: '100vh',
+            paddingTop: '80px',
           }}
         >
           <div className="p-6 md:p-8 space-y-6">

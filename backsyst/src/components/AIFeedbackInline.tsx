@@ -641,7 +641,7 @@ export default function AIFeedbackInline({
             <div className="flex items-center gap-1.5">
               <ThumbsUp className="h-3 w-3" style={{ color: "#D1D5DB" }} />
               <span className="text-xs" style={{ color: "#9CA3AF" }}>
-                Dibuat oleh AI · {state.feedback.ai_model || "Llama 3.3"}
+                Dibuat oleh AI · {state.feedback.ai_model || "Llama 4 Scout"}
               </span>
             </div>
             {state.feedback.processing_time_ms && (

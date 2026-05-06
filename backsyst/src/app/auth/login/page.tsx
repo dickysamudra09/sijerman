@@ -52,7 +52,7 @@ export default function LoginPage() {
       password: "",
       remember: false,
     },
-    mode: "onBlur",
+    mode: "onChange",
   });
 
   const handleLogin = async () => {
