@@ -9,11 +9,11 @@ import { NextRequest, NextResponse } from 'next/server';
 export const GET = async (request: NextRequest) => {
   try {
     // Get IP from headers (in order of preference)
+    // Note: request.ip is not available in Next.js 15, use headers instead
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
       request.headers.get('x-real-ip') ||
       request.headers.get('cf-connecting-ip') || // Cloudflare
-      request.ip ||
       'unknown';
 
     return NextResponse.json(
