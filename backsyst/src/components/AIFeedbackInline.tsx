@@ -128,7 +128,8 @@ function parseFeedbackSections(feedbackText: string): FeedbackSection[] {
   if (!feedbackText) return [];
 
   // Try to parse numbered sections first: "1. LABEL: content"
-  const numberedSectionRegex = /(\d+)\.\s+([A-ZÀÁÂ][A-ZÀÁÂ\s]+?):\s*(.*?)(?=\s*\d+\.\s+[A-Z]|$)/gs;
+  // Use [\s\S] instead of . with s flag for ES5 compatibility
+  const numberedSectionRegex = /(\d+)\.\s+([A-ZÀÁÂ][A-ZÀÁÂ\s]+?):\s*([\s\S]*?)(?=\s*\d+\.\s+[A-Z]|$)/g;
   const sections: FeedbackSection[] = [];
   let match;
 
