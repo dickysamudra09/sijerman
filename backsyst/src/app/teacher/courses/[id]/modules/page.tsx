@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LessonContentEditor } from "@/components/LessonContentEditor";
+import { ExerciseBuilderModal } from "@/components/Exercise/ExerciseBuilderModal";
 import {
   Plus,
   Trash2,
@@ -31,6 +32,7 @@ import {
   Dumbbell,
   Eye,
   X,
+  Brain,
 } from "lucide-react";
 import {
   DndContext,
@@ -49,6 +51,17 @@ import {
 } from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { CourseDashboard } from "@/components/DashboardFlow/CourseDashboard";
+import { DashboardModals } from "@/components/DashboardFlow/DashboardModals";
+import { SimpleCRUD } from "@/components/SimpleCRUD/SimpleCRUD";
+import { SimpleExerciseBuilder } from "@/components/SimpleCRUD/SimpleExerciseBuilder";
+import { SimplePreview } from "@/components/SimpleCRUD/SimplePreview";
+import { ModalProvider, useModal } from "@/contexts/ModalContext";
+import { ModalShell } from "@/components/ModalShell";
+import { LessonFormModal } from "@/components/forms/LessonFormModal";
+import { ExerciseFormModal } from "@/components/forms/ExerciseFormModal";
+import { LessonPreview } from "@/components/previews/LessonPreview";
+import { ExercisePreview } from "@/components/previews/ExercisePreview";
 
 
 // Interfaces for hierarchical structure
@@ -76,6 +89,124 @@ interface ModuleMaterial {
   external_url: string | null;
   file_size_mb: number | null;
   duration_seconds: number | null;
+  order_index: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Sortable Material Item Component
+function SortableMaterialItem({
+  material,
+  index,
+  isSelected,
+  onSelect,
+  onEdit,
+  onDelete,
+  getMaterialIcon,
+}: {
+  material: ModuleMaterial;
+  index: number;
+  isSelected?: boolean;
+  onSelect?: (id: string) => void;
+  onEdit?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  getMaterialIcon: (type: string) => React.ReactElement;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: material.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        ...style,
+        backgroundColor: isSelected ? "#E87835" : "#F5F5F5",
+        border: `1px solid ${isSelected ? "#D4701A" : "#E5E5E5"}`,
+      }}
+      className="rounded-lg p-3 transition-all flex items-start gap-2 cursor-pointer"
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing flex-shrink-0 mt-1 hover:opacity-70"
+      >
+        <GripVertical
+          className="h-4 w-4"
+          style={{
+            color: isSelected ? "#1A1A1A" : "#999999",
+          }}
+        />
+      </button>
+
+      <div className="flex items-start gap-2 flex-1 min-w-0">
+        <div className="flex-shrink-0 mt-1">
+          {getMaterialIcon(material.material_type)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p
+            className="text-sm font-semibold truncate"
+            style={{
+              color: isSelected ? "#1A1A1A" : "#1A1A1A",
+            }}
+          >
+            {material.title}
+          </p>
+          <p
+            className="text-xs truncate"
+            style={{
+              color: "#999999",
+            }}
+          >
+            {material.material_type}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit?.(material.id);
+          }}
+          className="p-1 hover:bg-orange-100 rounded transition-colors"
+          title="Edit bahan"
+        >
+          <Eye className="h-4 w-4" style={{ color: "#E87835" }} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete?.(material.id);
+          }}
+          className="p-1 hover:bg-red-100 rounded transition-colors"
+          title="Hapus bahan"
+        >
+          <Trash2 className="h-4 w-4" style={{ color: "#DC2626" }} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface ModuleExercise {
+  id: string;
+  lesson_id: string;
+  title: string;
+  description: string;
+  exercise_type: "mcq" | "essay" | "puzzle";
   order_index: number;
   is_active: boolean;
   created_at: string;
@@ -112,13 +243,17 @@ function SortableLessonItem({
   isSelected,
   isLocked,
   onSelect,
+  onEdit,
+  onDelete,
   getLessonIcon,
 }: {
   lesson: ModuleLesson;
   index: number;
-  isSelected: boolean;
+  isSelected?: boolean;
   isLocked: boolean;
-  onSelect: (id: string) => void;
+  onSelect?: (id: string) => void;
+  onEdit?: (id: string) => void;
+  onDelete?: (id: string) => void;
   getLessonIcon: (type: string) => React.ReactElement;
 }) {
   const {
@@ -145,9 +280,8 @@ function SortableLessonItem({
         border: `1px solid ${isSelected ? "#D4A71F" : "#E5E5E5"}`,
         opacity: isLocked ? 0.6 : 1,
       }}
-      onClick={() => !isLocked && onSelect(lesson.id)}
       className={`rounded-lg p-3 transition-all flex items-start gap-2 ${
-        isLocked ? "cursor-not-allowed" : "cursor-pointer"
+        isLocked ? "" : "cursor-pointer"
       }`}
     >
       {!isLocked && (
@@ -202,129 +336,82 @@ function SortableLessonItem({
       </div>
 
       {!isLocked && (
-        <ChevronRight
-          className="h-4 w-4 flex-shrink-0 mt-1"
-          style={{
-            color: isSelected ? "#1A1A1A" : "#999999",
-          }}
-        />
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit?.(lesson.id);
+            }}
+            className="p-1 hover:bg-yellow-100 rounded transition-colors"
+            title="Edit pelajaran"
+          >
+            <Eye className="h-4 w-4" style={{ color: "#E8B824" }} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete?.(lesson.id);
+            }}
+            className="p-1 hover:bg-red-100 rounded transition-colors"
+            title="Hapus pelajaran"
+          >
+            <Trash2 className="h-4 w-4" style={{ color: "#DC2626" }} />
+          </button>
+        </div>
       )}
     </div>
   );
 }
 
-// Sortable Material Item Component
-function SortableMaterialItem({
-  material,
-  index,
-  isSelected,
-  onSelect,
-  getMaterialIcon,
-}: {
-  material: ModuleMaterial;
-  index: number;
-  isSelected: boolean;
-  onSelect: (id: string) => void;
-  getMaterialIcon: (type: string) => React.ReactElement;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: material.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        ...style,
-        backgroundColor: isSelected ? "#E87835" : "#F5F5F5",
-        border: `1px solid ${isSelected ? "#D45F3D" : "#E5E5E5"}`,
-      }}
-      onClick={() => onSelect(material.id)}
-      className="rounded-lg p-3 cursor-pointer transition-all flex items-start gap-2"
-    >
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing flex-shrink-0 mt-1 hover:opacity-70"
-      >
-        <GripVertical
-          className="h-4 w-4"
-          style={{
-            color: isSelected ? "#1A1A1A" : "#999999",
-          }}
-        />
-      </button>
-
-      <div className="flex items-start gap-2 flex-1 min-w-0">
-        <div className="flex-shrink-0 mt-1">
-          {getMaterialIcon(material.material_type)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div
-            className="text-xs font-bold uppercase tracking-wide"
-            style={{
-              color: isSelected ? "#1A1A1A" : "#999999",
-            }}
-          >
-            {material.material_type}
-          </div>
-          <p
-            className="text-sm font-semibold line-clamp-2"
-            style={{
-              color: isSelected ? "#1A1A1A" : "#1A1A1A",
-            }}
-          >
-            {material.title}
-          </p>
-        </div>
-      </div>
-
-      <ChevronRight
-        className="h-4 w-4 flex-shrink-0 mt-1"
-        style={{
-          color: isSelected ? "#1A1A1A" : "#999999",
-        }}
-      />
-    </div>
-  );
-}
-
-export default function ModuleEditorPage() {
+function ModuleEditorPage() {
   const router = useRouter();
   const params = useParams();
   const courseId = params.id as string;
   const moduleId = params.moduleId as string;
+  
+  // Modal management
+  const modal = useModal();
 
   const [course, setCourse] = useState<any>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [lessons, setLessons] = useState<ModuleLesson[]>([]);
   const [materials, setMaterials] = useState<ModuleMaterial[]>([]);
+  const [exercises, setExercises] = useState<any[]>([]);
   const [studentProgress, setStudentProgress] = useState<
     Record<string, StudentLessonProgress>
   >({});
 
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  
+  // Modal saving state
+  const [isSavingLesson, setIsSavingLesson] = useState(false);
+  const [isSavingExercise, setIsSavingExercise] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"lessons" | "materials">("lessons");
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
-  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [activeContentTab, setActiveContentTab] = useState<"modules" | "lessons" | "materials" | "exercises">("modules");
+  const [previewItem, setPreviewItem] = useState<{ item: any; type: "lesson" | "exercise" | "material" | "module" } | null>(null);
   const [showModuleModal, setShowModuleModal] = useState(false);
+  const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
+  
+  // Exercise builder modal states
+  const [showExerciseBuilder, setShowExerciseBuilder] = useState(false);
+  const [editingExercise, setEditingExercise] = useState<any>(null);
+  
+  // Dashboard modal states
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    type: "module" | "lesson" | "material" | "exercise";
+    mode: "create" | "edit";
+    initialData?: any;
+  }>({
+    isOpen: false,
+    type: "module",
+    mode: "create",
+  });
 
   // Module form state
   const [newModule, setNewModule] = useState({
@@ -332,22 +419,32 @@ export default function ModuleEditorPage() {
     description: "",
   });
 
-  // Lesson form state
+  // Lesson form state (used by modal system)
   const [newLesson, setNewLesson] = useState({
     title: "",
     description: "",
     content: "",
-    lesson_type: "explanation",
+    lesson_type: "explanation" as "explanation" | "vocabulary" | "dialogue" | "reading" | "listening",
   });
 
-  // Material form state
+  // Material form state (used by modal system)
   const [newMaterial, setNewMaterial] = useState({
     title: "",
     description: "",
-    material_type: "video",
-    source_type: "upload",
+    material_type: "video" as "video" | "audio" | "pdf" | "image" | "resource",
+    source_type: "upload" as "upload" | "youtube_link" | "external_link",
     file_url: "",
     external_url: "",
+  });
+
+  // STEP 4: Exercise form state (NEW MODAL-BASED)
+  const [newExercise, setNewExercise] = useState({
+    title: "",
+    description: "",
+    exercise_type: "mcq" as "mcq" | "essay" | "puzzle",
+    question_count: 0,
+    ai_feedback_enabled: false,
+    ai_feedback_type: "instant" as "instant" | "delayed" | "batch",
   });
 
   const sensors = useSensors(
@@ -416,12 +513,13 @@ export default function ModuleEditorPage() {
     }
   }, [user, courseId]);
 
-  // Fetch lessons and materials for selected module
+  // Fetch lessons, materials, and exercises for selected module
   useEffect(() => {
     const fetchModuleContent = async () => {
       if (!selectedModuleId) {
         setLessons([]);
         setMaterials([]);
+        setExercises([]);
         return;
       }
 
@@ -435,71 +533,166 @@ export default function ModuleEditorPage() {
         if (lessonsError) throw lessonsError;
         setLessons(lessonsData || []);
 
-        const { data: materialsData, error: materialsError } = await supabase
-          .from("module_materials")
-          .select("*")
-          .eq("module_id", selectedModuleId)
-          .order("order_index", { ascending: true });
+        // Fetch lesson-based materials for all lessons in this module
+        if (lessonsData && lessonsData.length > 0) {
+          const lessonIds = lessonsData.map(lesson => lesson.id);
+          
+          const { data: materialsData, error: materialsError } = await supabase
+            .from("course_materials")
+            .select("*")
+            .in("lesson_id", lessonIds)
+            .order("order_index", { ascending: true });
 
-        if (materialsError) throw materialsError;
-        setMaterials(materialsData || []);
+          if (materialsError) throw materialsError;
+          setMaterials(materialsData || []);
+        } else {
+          setMaterials([]);
+        }
+
+        // Fetch exercises for this course with lesson information (lesson-based)
+        const { data: exercises, error: exercisesError } = await supabase
+          .from("course_exercises")
+          .select(`
+            *,
+            module_lessons!inner (
+              id,
+              title,
+              module_id
+            ),
+            course_questions (
+              *,
+              course_options (*)
+            )
+          `)
+          .eq("course_id", courseId)
+          .order("created_at", { ascending: false });
+
+        if (exercisesError) throw exercisesError;
+        setExercises(exercises || []);
       } catch (err: any) {
         setError(err.message || "Gagal mengambil konten modul");
       }
     };
 
     fetchModuleContent();
-  }, [selectedModuleId]);
+  }, [selectedModuleId, courseId]);
 
-  // Auto-populate lesson form when a lesson is selected
+  // STEP 6 Part 2: Load lesson data when modal opens in edit mode
   useEffect(() => {
-    if (selectedLessonId && activeTab === "lessons") {
-      const selectedLesson = lessons.find((l) => l.id === selectedLessonId);
-      if (selectedLesson) {
-        setNewLesson({
-          title: selectedLesson.title,
-          description: selectedLesson.description,
-          content: selectedLesson.content,
-          lesson_type: selectedLesson.lesson_type,
-        });
+    const loadLessonForEdit = async () => {
+      if (modal.isOpen && modal.modalType === 'lesson' && modal.mode === 'edit' && modal.data?.id) {
+        try {
+          const { data, error } = await supabase
+            .from("module_lessons")
+            .select("*")
+            .eq("id", modal.data.id)
+            .single();
+
+          if (error) throw error;
+          if (data) {
+            setNewLesson({
+              title: data.title || "",
+              description: data.description || "",
+              content: data.content || "",
+              lesson_type: data.lesson_type as "explanation" | "vocabulary" | "dialogue" | "reading" | "listening",
+            });
+          }
+        } catch (err: any) {
+          console.error("Gagal memuat data pelajaran:", err.message);
+          setError("Gagal memuat data pelajaran");
+        }
       }
-    } else if (!selectedLessonId) {
-      // Reset form when deselected
+    };
+
+    loadLessonForEdit();
+  }, [modal.isOpen, modal.modalType, modal.mode, modal.data?.id]);
+
+  // STEP 6 Part 2: Load exercise data when modal opens in edit mode
+  useEffect(() => {
+    const loadExerciseForEdit = async () => {
+      if (modal.isOpen && modal.modalType === 'exercise' && modal.mode === 'edit' && modal.data?.id) {
+        try {
+          const { data, error } = await supabase
+            .from("exercise_sets")
+            .select("*")
+            .eq("id", modal.data.id)
+            .single();
+
+          if (error) throw error;
+          if (data) {
+            setNewExercise({
+              title: data.title || "",
+              description: data.description || "",
+              exercise_type: data.exercise_type as "mcq" | "essay" | "puzzle",
+              question_count: data.question_count || 0,
+              ai_feedback_enabled: data.ai_feedback_enabled || false,
+              ai_feedback_type: data.ai_feedback_type || "instant",
+            });
+          }
+        } catch (err: any) {
+          console.error("Gagal memuat data latihan:", err.message);
+          setError("Gagal memuat data latihan");
+        }
+      }
+    };
+
+    loadExerciseForEdit();
+  }, [modal.isOpen, modal.modalType, modal.mode, modal.data?.id]);
+
+  // STEP 6 Part 2: Track lesson dirty state when form changes
+  useEffect(() => {
+    if (modal.isOpen && modal.modalType === 'lesson') {
+      if (modal.mode === 'create') {
+        // In create mode, dirty if title has content
+        modal.setDirty(!!newLesson.title.trim());
+      } else if (modal.mode === 'edit' && modal.data?.id) {
+        // In edit mode, compare with original - if any field changed, mark as dirty
+        const isChanged = newLesson.title.trim() !== "" || newLesson.description !== "" || newLesson.content !== "";
+        modal.setDirty(isChanged);
+      }
+    }
+  }, [newLesson, modal, modal.isOpen, modal.modalType, modal.mode, modal.data?.id]);
+
+  // STEP 6 Part 2: Track exercise dirty state when form changes
+  useEffect(() => {
+    if (modal.isOpen && modal.modalType === 'exercise') {
+      if (modal.mode === 'create') {
+        // In create mode, dirty if title has content
+        modal.setDirty(!!newExercise.title.trim());
+      } else if (modal.mode === 'edit' && modal.data?.id) {
+        // In edit mode, compare with original - if any field changed, mark as dirty
+        const isChanged = newExercise.title.trim() !== "" || newExercise.description !== "";
+        modal.setDirty(isChanged);
+      }
+    }
+  }, [newExercise, modal, modal.isOpen, modal.modalType, modal.mode, modal.data?.id]);
+
+  // STEP 6 Part 2: Reset forms when modal closes
+  useEffect(() => {
+    if (!modal.isOpen) {
+      // Reset lesson form
       setNewLesson({
         title: "",
         description: "",
         content: "",
         lesson_type: "explanation",
       });
-    }
-  }, [selectedLessonId, activeTab, lessons]);
-
-  // Auto-populate material form when a material is selected
-  useEffect(() => {
-    if (selectedMaterialId && activeTab === "materials") {
-      const selectedMaterial = materials.find((m) => m.id === selectedMaterialId);
-      if (selectedMaterial) {
-        setNewMaterial({
-          title: selectedMaterial.title,
-          description: selectedMaterial.description,
-          material_type: selectedMaterial.material_type,
-          source_type: selectedMaterial.source_type,
-          file_url: selectedMaterial.file_url || "",
-          external_url: selectedMaterial.external_url || "",
-        });
-      }
-    } else if (!selectedMaterialId) {
-      // Reset form when deselected
-      setNewMaterial({
+      // Reset exercise form
+      setNewExercise({
         title: "",
         description: "",
-        material_type: "video",
-        source_type: "upload",
-        file_url: "",
-        external_url: "",
+        exercise_type: "mcq",
+        question_count: 0,
+        ai_feedback_enabled: false,
+        ai_feedback_type: "instant",
       });
+      setError("");
     }
-  }, [selectedMaterialId, activeTab, materials]);
+  }, [modal.isOpen]);
+
+
+
+
 
   // Handle module drag end
   const handleModuleDragEnd = async (event: DragEndEvent) => {
@@ -648,7 +841,6 @@ export default function ModuleEditorPage() {
     }
   };
 
-  // Handle add module
   const handleAddModule = async () => {
     if (!newModule.title.trim()) {
       setError("Judul modul diperlukan");
@@ -683,23 +875,67 @@ export default function ModuleEditorPage() {
     }
   };
 
-  // Handle add/update lesson
-  const handleAddLesson = async () => {
-    if (!newLesson.title.trim() || !selectedModuleId) {
-      setError(
-        !newLesson.title.trim()
-          ? "Judul pelajaran diperlukan"
-          : "Pilih modul terlebih dahulu"
-      );
+  // STEP 8: Edit module handler
+  const handleEditModule = async () => {
+    if (!newModule.title.trim()) {
+      setError("Judul modul diperlukan");
+      return;
+    }
+
+    if (!editingModuleId) {
+      setError("ID modul tidak ditemukan");
       return;
     }
 
     try {
       setError("");
-      const currentModuleId = selectedModuleId;
+      const { error: updateError } = await supabase
+        .from("course_modules")
+        .update({
+          title: newModule.title,
+          description: newModule.description,
+        })
+        .eq("id", editingModuleId);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      const updatedModules = modules.map((m) =>
+        m.id === editingModuleId
+          ? { ...m, title: newModule.title, description: newModule.description }
+          : m
+      );
+      setModules(updatedModules);
+      setNewModule({ title: "", description: "" });
+      setEditingModuleId(null);
+      setShowModuleModal(false);
+      setSuccess("Modul berhasil diperbarui!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: any) {
+      setError(err.message || "Gagal memperbarui modul");
+    }
+  };
+
+  // STEP 3: Modal handlers for lesson
+  const handleSaveLessonFromModal = async () => {
+    if (!newLesson.title.trim()) {
+      setError("Judul pelajaran diperlukan");
+      return;
+    }
+
+    // For create mode, need moduleId; for edit mode, already have lessonId
+    const moduleId = modal.mode === 'create' ? modal.data?.moduleId : undefined;
+    if (modal.mode === 'create' && !moduleId) {
+      setError("Modul harus dipilih untuk membuat pelajaran baru");
+      return;
+    }
+
+    try {
+      setIsSavingLesson(true);
+      setError("");
 
       // If editing an existing lesson
-      if (selectedLessonId) {
+      if (modal.mode === 'edit' && modal.data?.id) {
         const { error: updateError } = await supabase
           .from("module_lessons")
           .update({
@@ -708,13 +944,13 @@ export default function ModuleEditorPage() {
             content: newLesson.content,
             lesson_type: newLesson.lesson_type,
           })
-          .eq("id", selectedLessonId);
+          .eq("id", modal.data!.id);
 
         if (updateError) throw updateError;
 
         // Update local state
         const updatedLessons = lessons.map((l) =>
-          l.id === selectedLessonId
+          l.id === modal.data!.id
             ? {
                 ...l,
                 title: newLesson.title,
@@ -734,7 +970,7 @@ export default function ModuleEditorPage() {
         const { data, error: insertError } = await supabase
           .from("module_lessons")
           .insert({
-            module_id: currentModuleId,
+            module_id: moduleId,
             title: newLesson.title,
             description: newLesson.description,
             content: newLesson.content,
@@ -748,103 +984,76 @@ export default function ModuleEditorPage() {
         if (insertError) throw insertError;
 
         setLessons([...lessons, data]);
-        setNewLesson({
-          title: "",
-          description: "",
-          content: "",
-          lesson_type: "explanation",
-        });
-        setSelectedLessonId(null);
         setSuccess("Pelajaran berhasil ditambahkan!");
         setTimeout(() => setSuccess(""), 3000);
       }
+
+      // Reset form and close modal
+      setNewLesson({
+        title: "",
+        description: "",
+        content: "",
+        lesson_type: "explanation",
+      });
+      modal.setDirty(false);
+      modal.closeModal();
     } catch (err: any) {
       setError(err.message || "Gagal menyimpan pelajaran");
+    } finally {
+      setIsSavingLesson(false);
     }
   };
 
-  // Handle add/update material
-  const handleAddMaterial = async () => {
-    if (!newMaterial.title.trim() || !selectedModuleId) {
-      setError(
-        !newMaterial.title.trim()
-          ? "Judul bahan diperlukan"
-          : "Pilih modul terlebih dahulu"
-      );
+  // STEP 4: Modal handlers for exercise
+  const handleSaveExerciseFromModal = async () => {
+    if (!newExercise.title.trim()) {
+      setError("Judul latihan diperlukan");
+      return;
+    }
+
+    // For create mode, need lessonId; for edit mode, already have exerciseId
+    const lessonId = modal.mode === 'create' ? modal.data?.lessonId : undefined;
+    if (modal.mode === 'create' && !lessonId) {
+      setError("Pelajaran harus dipilih untuk membuat latihan baru");
       return;
     }
 
     try {
+      setIsSavingExercise(true);
       setError("");
-      const currentModuleId = selectedModuleId;
 
-      // If editing an existing material
-      if (selectedMaterialId) {
+      // If editing an existing exercise
+      if (modal.mode === 'edit' && modal.data?.id) {
         const { error: updateError } = await supabase
-          .from("module_materials")
+          .from("exercise_sets")
           .update({
-            title: newMaterial.title,
-            description: newMaterial.description,
-            material_type: newMaterial.material_type,
-            source_type: newMaterial.source_type,
-            file_url:
-              newMaterial.source_type === "upload"
-                ? newMaterial.file_url
-                : null,
-            external_url:
-              newMaterial.source_type !== "upload"
-                ? newMaterial.external_url
-                : null,
+            title: newExercise.title,
+            description: newExercise.description,
+            exercise_type: newExercise.exercise_type,
+            question_count: newExercise.question_count,
+            ai_feedback_enabled: newExercise.ai_feedback_enabled,
+            ai_feedback_type: newExercise.ai_feedback_type,
           })
-          .eq("id", selectedMaterialId);
+          .eq("id", modal.data!.id);
 
         if (updateError) throw updateError;
 
-        // Update local state
-        const updatedMaterials = materials.map((m) =>
-          m.id === selectedMaterialId
-            ? {
-                ...m,
-                title: newMaterial.title,
-                description: newMaterial.description,
-                material_type: newMaterial.material_type as "video" | "audio" | "pdf" | "image" | "resource",
-                source_type: newMaterial.source_type as "upload" | "youtube_link" | "external_link",
-                file_url:
-                  newMaterial.source_type === "upload"
-                    ? newMaterial.file_url
-                    : null,
-                external_url:
-                  newMaterial.source_type !== "upload"
-                    ? newMaterial.external_url
-                    : null,
-              }
-            : m
-        );
-        setMaterials(updatedMaterials);
-        setSuccess("Bahan berhasil diperbarui!");
+        setSuccess("Latihan berhasil diperbarui!");
         setTimeout(() => setSuccess(""), 3000);
       } else {
-        // Creating new material
-        const orderIndex = materials.length;
+        // Creating new exercise
+        const orderIndex = 0;
 
         const { data, error: insertError } = await supabase
-          .from("module_materials")
+          .from("exercise_sets")
           .insert({
-            module_id: currentModuleId,
-            title: newMaterial.title,
-            description: newMaterial.description,
-            material_type: newMaterial.material_type,
-            source_type: newMaterial.source_type,
-            file_url:
-              newMaterial.source_type === "upload"
-                ? newMaterial.file_url
-                : null,
-            external_url:
-              newMaterial.source_type !== "upload"
-                ? newMaterial.external_url
-                : null,
-            file_size_mb: null,
-            duration_seconds: null,
+            lesson_id: lessonId,
+            title: newExercise.title,
+            description: newExercise.description,
+            exercise_type: newExercise.exercise_type,
+            question_count: newExercise.question_count,
+            ai_feedback_enabled: newExercise.ai_feedback_enabled,
+            ai_feedback_type: newExercise.ai_feedback_type,
             order_index: orderIndex,
             is_active: true,
           })
@@ -853,29 +1062,36 @@ export default function ModuleEditorPage() {
 
         if (insertError) throw insertError;
 
-        setMaterials([...materials, data]);
-        setNewMaterial({
-          title: "",
-          description: "",
-          material_type: "video",
-          source_type: "upload",
-          file_url: "",
-          external_url: "",
-        });
-        setSelectedMaterialId(null);
-        setSuccess("Bahan berhasil ditambahkan!");
+        setSuccess("Latihan berhasil ditambahkan!");
         setTimeout(() => setSuccess(""), 3000);
       }
+
+      // Reset form and close modal
+      setNewExercise({
+        title: "",
+        description: "",
+        exercise_type: "mcq",
+        question_count: 0,
+        ai_feedback_enabled: false,
+        ai_feedback_type: "instant",
+      });
+      modal.setDirty(false);
+      modal.closeModal();
     } catch (err: any) {
-      setError(err.message || "Gagal menyimpan bahan");
+      setError(err.message || "Gagal menyimpan latihan");
+    } finally {
+      setIsSavingExercise(false);
     }
   };
 
-  // Handle delete lesson
-  const handleDeleteLesson = async (lessonId: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus pelajaran ini?")) return;
+  // STEP 6: Delete lesson with confirmation
+  const handleDeleteLessonFromTree = async (lessonId: string) => {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus pelajaran ini? Data tidak dapat dipulihkan.")) {
+      return;
+    }
 
     try {
+      setError("");
       const { error } = await supabase
         .from("module_lessons")
         .delete()
@@ -884,32 +1100,34 @@ export default function ModuleEditorPage() {
       if (error) throw error;
 
       setLessons(lessons.filter((l) => l.id !== lessonId));
-      setSelectedLessonId(null);
       setSuccess("Pelajaran berhasil dihapus!");
       setTimeout(() => setSuccess(""), 3000);
+      modal.closeModal();
     } catch (err: any) {
       setError(err.message || "Gagal menghapus pelajaran");
     }
   };
 
-  // Handle delete material
-  const handleDeleteMaterial = async (materialId: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus bahan ini?")) return;
+  // STEP 6: Delete exercise with confirmation
+  const handleDeleteExerciseFromTree = async (exerciseId: string) => {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus latihan ini? Data tidak dapat dipulihkan.")) {
+      return;
+    }
 
     try {
+      setError("");
       const { error } = await supabase
-        .from("module_materials")
+        .from("exercise_sets")
         .delete()
-        .eq("id", materialId);
+        .eq("id", exerciseId);
 
       if (error) throw error;
 
-      setMaterials(materials.filter((m) => m.id !== materialId));
-      setSelectedMaterialId(null);
-      setSuccess("Bahan berhasil dihapus!");
+      setSuccess("Latihan berhasil dihapus!");
       setTimeout(() => setSuccess(""), 3000);
+      modal.closeModal();
     } catch (err: any) {
-      setError(err.message || "Gagal menghapus bahan");
+      setError(err.message || "Gagal menghapus latihan");
     }
   };
 
@@ -935,1206 +1153,930 @@ export default function ModuleEditorPage() {
   const dndContextKey = activeTab === "lessons" ? "lessons" : "materials";
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#FFFFFC" }}>
-      {/* Header */}
-      <header
-        className="sticky top-0 z-50 border-b"
-        style={{
-          backgroundColor: "rgba(26, 26, 26, 0.95)",
-          borderBottomColor: "#333333",
-          backdropFilter: "blur(10px)",
+    <>
+      <CourseDashboard
+        course={course}
+        modules={modules}
+        lessons={lessons}
+        materials={materials}
+        exercises={exercises}
+        courseId={courseId}
+        user={user}
+        onCreateModule={() => {
+          setModalState({
+            isOpen: true,
+            type: "module",
+            mode: "create",
+          });
         }}
-      >
-        <div className="px-6 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold" style={{ color: "#E8B824" }}>
-            {course?.title}
-          </h1>
-          <Button
-            onClick={() => router.push(`/home/teacher?tab=open-courses`)}
-            className="font-semibold"
-            style={{
-              backgroundColor: "#E8B824",
-              color: "#1A1A1A",
-            }}
-          >
-            Back to Dashboard
-          </Button>
-        </div>
-      </header>
+        onEditModule={async (moduleData) => {
+          try {
+            const { error } = await supabase
+              .from("course_modules")
+              .update({
+                title: moduleData.title,
+                description: moduleData.description,
+                is_active: moduleData.is_active,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", moduleData.id);
 
-      {/* Main Content */}
-      <div className="flex flex-1 w-full">
-        {/* Left Sidebar - Modules */}
-        <div
-          className="w-80 border-r p-6 overflow-y-auto"
-          style={{
-            borderRightColor: "#E5E5E5",
-            backgroundColor: "#FFFFFC",
+            if (error) throw error;
+            setModules(modules.map(m => 
+              m.id === moduleData.id ? { ...m, ...moduleData, updated_at: new Date().toISOString() } : m
+            ));
+            setSuccess("Modul berhasil diperbarui!");
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            console.error("Module update error:", err);
+            setError(err.message || "Gagal memperbarui modul");
+          }
+        }}
+        onDeleteModule={async (moduleId) => {
+          if (!window.confirm("Apakah Anda yakin ingin menghapus modul ini? Semua konten di dalamnya akan dihapus.")) {
+            return;
+          }
+          try {
+            const { error } = await supabase
+              .from("course_modules")
+              .delete()
+              .eq("id", moduleId);
+
+            if (error) throw error;
+            setModules(modules.filter(m => m.id !== moduleId));
+            setSuccess("Modul berhasil dihapus!");
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            console.error("Module delete error:", err);
+            setError(err.message || "Gagal menghapus modul");
+          }
+        }}
+        onCreateLesson={(moduleId) => {
+          setModalState({
+            isOpen: true,
+            type: "lesson",
+            mode: "create",
+            initialData: { module_id: moduleId },
+          });
+        }}
+        onCreateMaterial={(moduleId) => {
+          setModalState({
+            isOpen: true,
+            type: "material",
+            mode: "create",
+            initialData: { module_id: moduleId },
+          });
+        }}
+        onCreateExercise={() => {}} // Disabled - exercises managed at lesson level
+        onEditLesson={async (lessonData) => {
+          try {
+            const { error } = await supabase
+              .from("module_lessons")
+              .update({
+                title: lessonData.title,
+                description: lessonData.description,
+                content: lessonData.content,
+                lesson_type: lessonData.lesson_type || "explanation",
+                is_active: lessonData.is_active,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", lessonData.id);
+
+            if (error) throw error;
+            setLessons(lessons.map(l => 
+              l.id === lessonData.id ? { ...l, ...lessonData, updated_at: new Date().toISOString() } : l
+            ));
+            setSuccess("Pelajaran berhasil diperbarui!");
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            console.error("Lesson update error:", err);
+            setError(err.message || "Gagal memperbarui pelajaran");
+          }
+        }}
+        onEditMaterial={async (materialData) => {
+          try {
+            const { error } = await supabase
+              .from("course_materials")
+              .update({
+                title: materialData.title,
+                description: materialData.description,
+                material_type: materialData.material_type,
+                material_url: materialData.file_url,
+                material_content: materialData.external_url,
+                is_active: materialData.is_active,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", materialData.id);
+
+            if (error) throw error;
+            setMaterials(materials.map(m => 
+              m.id === materialData.id ? { ...m, ...materialData, updated_at: new Date().toISOString() } : m
+            ));
+            setSuccess("Materi berhasil diperbarui!");
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            console.error("Material update error:", err);
+            setError(err.message || "Gagal memperbarui materi");
+          }
+        }}
+        onEditExercise={async (exerciseData) => {
+          try {
+            // Fetch complete course exercise data with questions and options
+            const { data: completeExercise, error: fetchError } = await supabase
+              .from("course_exercises")
+              .select(`
+                *,
+                course_questions (
+                  *,
+                  course_options (*)
+                )
+              `)
+              .eq("id", exerciseData.id)
+              .single();
+
+            if (fetchError) throw fetchError;
+
+            // Open ExerciseBuilderModal with complete data for editing
+            setEditingExercise(completeExercise);
+            setShowExerciseBuilder(true);
+          } catch (err: any) {
+            console.error("Exercise edit error:", err);
+            
+            // Better error handling for different error structures
+            let errorMessage = "Gagal memuat data latihan";
+            
+            if (err && typeof err === 'object') {
+              // Handle Supabase error structure
+              if (err.message) {
+                errorMessage = err.message;
+              } else if (err.error) {
+                errorMessage = err.error;
+              } else if (err.details) {
+                errorMessage = err.details;
+              } else {
+                // If error object is empty or has no message, try to stringify it
+                errorMessage = JSON.stringify(err);
+              }
+            } else if (typeof err === 'string') {
+              errorMessage = err;
+            }
+            
+            setError(errorMessage);
+          }
+        }}
+        onDeleteLesson={async (lessonId) => {
+          if (!window.confirm("Apakah Anda yakin ingin menghapus pelajaran ini?")) {
+            return;
+          }
+          try {
+            const { error } = await supabase
+              .from("module_lessons")
+              .delete()
+              .eq("id", lessonId);
+
+            if (error) throw error;
+            setLessons(lessons.filter(l => l.id !== lessonId));
+            setSuccess("Pelajaran berhasil dihapus!");
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            setError(err.message || "Gagal menghapus pelajaran");
+          }
+        }}
+        onDeleteMaterial={async (materialId) => {
+          if (!window.confirm("Apakah Anda yakin ingin menghapus materi ini?")) {
+            return;
+          }
+          try {
+            const { error } = await supabase
+              .from("course_materials")
+              .delete()
+              .eq("id", materialId);
+
+            if (error) throw error;
+            setMaterials(materials.filter(m => m.id !== materialId));
+            setSuccess("Materi berhasil dihapus!");
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            setError(err.message || "Gagal menghapus materi");
+          }
+        }}
+        onDeleteExercise={async (exerciseId) => {
+          if (!window.confirm("Apakah Anda yakin ingin menghapus latihan ini? Semua data terkait (pertanyaan, pilihan jawaban, dan jawaban siswa) akan dihapus juga.")) {
+            return;
+          }
+          try {
+            setError("");
+            
+            // Step 1: Delete student answers first
+            // Note: course_student_answers uses course_exercise_id, not question_id
+            const { error: studentAnswersError } = await supabase
+              .from("course_student_answers")
+              .delete()
+              .eq("course_exercise_id", exerciseId);
+            
+            if (studentAnswersError) {
+              console.warn("Warning: Failed to delete student answers:", studentAnswersError);
+              // Continue anyway, might not have student answers
+            }
+            
+            // Step 2: Delete course options
+            const questionsData = await supabase
+              .from("course_questions")
+              .select("id")
+              .eq("exercise_id", exerciseId);
+            
+            const { error: optionsError } = await supabase
+              .from("course_options")
+              .delete()
+              .in("question_id", 
+                questionsData.data?.map(q => q.id) || []
+              );
+            
+            if (optionsError) {
+              console.warn("Warning: Failed to delete options:", optionsError);
+              // Continue anyway, might not have options
+            }
+            
+            // Step 3: Delete course questions
+            const { error: questionsError } = await supabase
+              .from("course_questions")
+              .delete()
+              .eq("exercise_id", exerciseId);
+            
+            if (questionsError) {
+              console.warn("Warning: Failed to delete questions:", questionsError);
+              // Continue anyway, might not have questions
+            }
+            
+            // Step 4: Finally delete the exercise
+            const { error } = await supabase
+              .from("course_exercises")
+              .delete()
+              .eq("id", exerciseId);
+
+            if (error) throw error;
+            
+            setExercises(exercises.filter(e => e.id !== exerciseId));
+            setSuccess("Latihan berhasil dihapus!");
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            console.error("Delete exercise error:", err);
+            console.error("Error type:", typeof err);
+            console.error("Error keys:", err ? Object.keys(err) : 'null');
+            
+            // Enhanced error handling for different error structures
+            let errorMessage = "Gagal menghapus latihan";
+            
+            if (err) {
+              if (typeof err === 'object') {
+                // Handle Supabase error structure
+                if (err.message) {
+                  errorMessage = err.message;
+                } else if (err.error) {
+                  errorMessage = err.error;
+                } else if (err.details) {
+                  errorMessage = err.details;
+                } else if (err.error_description) {
+                  errorMessage = err.error_description;
+                } else {
+                  // If error object is empty or has no message, try to stringify it
+                  const errorStr = JSON.stringify(err, null, 2);
+                  errorMessage = errorStr !== '{}' ? errorStr : "Terjadi kesalahan tak terduga saat menghapus latihan";
+                }
+              } else if (typeof err === 'string') {
+                errorMessage = err;
+              } else {
+                errorMessage = `Terjadi kesalahan tak terduga: ${String(err)}`;
+              }
+            } else {
+              errorMessage = "Terjadi kesalahan tak terduga saat menghapus latihan";
+            }
+            
+            setError(errorMessage);
+          }
+        }}
+        onPreviewLesson={(lesson) => {
+          setPreviewItem({ item: lesson, type: "lesson" });
+        }}
+        onPreviewMaterial={(material) => {
+          setPreviewItem({ item: material, type: "material" });
+        }}
+        onPreviewExercise={(exercise) => {
+          setPreviewItem({ item: exercise, type: "exercise" });
+        }}
+        onAddModule={async (moduleData) => {
+          try {
+            const { data: result, error } = await supabase
+              .from("course_modules")
+              .insert({
+                title: moduleData.title,
+                description: moduleData.description,
+                course_id: courseId,
+                module_type: "module",
+                order_index: modules.length + 1,
+                is_active: moduleData.is_active,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .select()
+              .single();
+
+            if (error) throw error;
+            setModules([...modules, result]);
+            setSuccess("Modul berhasil dibuat!");
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            setError(err.message || "Gagal membuat modul");
+          }
+        }}
+        onAddLesson={async (lessonData) => {
+          try {
+            const { data: result, error } = await supabase
+              .from("module_lessons")
+              .insert({
+                title: lessonData.title,
+                description: lessonData.description,
+                content: lessonData.content,
+                lesson_type: lessonData.lesson_type || "explanation",
+                module_id: lessonData.module_id,
+                order_index: lessons.length + 1,
+                is_active: lessonData.is_active,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .select()
+              .single();
+
+            if (error) throw error;
+            setLessons([...lessons, result]);
+            setSuccess("Pelajaran berhasil dibuat!");
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            setError(err.message || "Gagal membuat pelajaran");
+          }
+        }}
+        onAddMaterial={async (materialData) => {
+          try {
+            // Get lesson-based materials count for order
+            const { data: existingMaterials } = await supabase
+              .from("course_materials")
+              .select("order_index")
+              .eq("lesson_id", materialData.lesson_id)
+              .order("order_index", { ascending: false })
+              .limit(1);
+            
+            const nextOrderIndex = existingMaterials && existingMaterials.length > 0 
+              ? existingMaterials[0].order_index + 1 
+              : 1;
+
+            const { data: result, error } = await supabase
+              .from("course_materials")
+              .insert({
+                title: materialData.title,
+                description: materialData.description,
+                material_type: materialData.material_type,
+                material_url: materialData.file_url,
+                material_content: materialData.external_url,
+                course_id: courseId,
+                lesson_id: materialData.lesson_id,
+                order_index: nextOrderIndex,
+                is_active: materialData.is_active,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .select()
+              .single();
+
+            if (error) throw error;
+            setMaterials([...materials, result]);
+            setSuccess("Materi berhasil dibuat!");
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            setError(err.message || "Gagal membuat materi");
+          }
+        }}
+        onAddExercise={async (exerciseData) => {
+          try {
+            // Create lesson-based exercise
+            const { data: courseExercise, error: exerciseError } = await supabase
+              .from("course_exercises")
+              .insert({
+                title: exerciseData.title,
+                description: exerciseData.description,
+                course_id: courseId,
+                lesson_id: exerciseData.lesson_id, // Lesson-based field
+                exercise_number: exerciseData.exercise_number || 1, // Exercise 1 or 2
+                exercise_type: exerciseData.exercise_type || 'multiple_choice', // Exercise type
+                is_active: exerciseData.is_active,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .select()
+              .single();
+
+            if (exerciseError) throw exerciseError;
+
+            // Create course questions if provided
+            if (exerciseData.course_questions && exerciseData.course_questions.length > 0) {
+              const questionsWithExerciseId = exerciseData.course_questions.map((q: any) =>({
+                exercise_id: courseExercise.id,
+                pertanyaan: q.pertanyaan, // Direct field mapping
+                perintah: q.perintah, // Direct field mapping
+                jawaban: q.jawaban, // Direct field mapping
+                jawaban_benar: q.jawaban_benar, // Direct field mapping
+                question_type: q.question_type,
+                points: q.points || 10,
+                order_index: q.order_index || 1,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }));
+
+              const { data: savedQuestions, error: questionsError } = await supabase
+                .from("course_questions")
+                .insert(questionsWithExerciseId)
+                .select();
+
+              if (questionsError) throw questionsError;
+
+              // Create course options for each question (only for multiple_choice)
+              for (let i = 0; i < exerciseData.course_questions.length; i++) {
+                const question = exerciseData.course_questions[i];
+                const savedQuestion = savedQuestions[i];
+
+                if (question.question_type === 'multiple_choice' && question.course_options && question.course_options.length > 0) {
+                  const optionsToCreate = question.course_options.map((opt: any) => ({
+                    question_id: savedQuestion.id,
+                    jawaban: opt.jawaban, // Direct field mapping
+                    is_correct: opt.is_correct,
+                    order_index: opt.order_index || 1,
+                    created_at: new Date().toISOString(),
+                  }));
+
+                  const { error: optionsError } = await supabase
+                    .from("course_options")
+                    .insert(optionsToCreate);
+
+                  if (optionsError) throw optionsError;
+                }
+              }
+            }
+
+            // Refresh exercises list with complete data
+            const { data: refreshedExercises, error: refreshError } = await supabase
+              .from("course_exercises")
+              .select(`
+                *,
+                course_questions (
+                  *,
+                  course_options (*)
+                )
+              `)
+              .eq("course_id", courseId)
+              .order("created_at", { ascending: false });
+
+            if (refreshError) throw refreshError;
+            setExercises(refreshedExercises || []);
+
+            setSuccess("Latihan berhasil dibuat!");
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            setError(err.message || "Gagal membuat latihan");
+          }
+        }}
+      />
+
+      {/* Dashboard CRUD Modal */}
+      <DashboardModals
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
+        type={modalState.type}
+        mode={modalState.mode}
+        initialData={modalState.initialData}
+        onSave={async (data) => {
+          try {
+            if (modalState.type === "module") {
+              if (modalState.mode === "edit") {
+                // Update existing module
+                const { error } = await supabase
+                  .from("course_modules")
+                  .update({
+                    title: data.title,
+                    description: data.description,
+                    is_active: data.is_active,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", data.id);
+
+                if (error) throw error;
+                setModules(modules.map(m => 
+                  m.id === data.id ? { ...m, ...data, updated_at: new Date().toISOString() } : m
+                ));
+                setSuccess("Modul berhasil diperbarui!");
+              } else {
+                // Create new module
+                const { data: result, error } = await supabase
+                  .from("course_modules")
+                  .insert({
+                    course_id: courseId,
+                    title: data.title,
+                    description: data.description,
+                    order_index: modules.length,
+                    is_active: data.is_active,
+                    module_type: "module",
+                  })
+                  .select()
+                  .single();
+
+                if (error) throw error;
+                setModules([...modules, result]);
+                setSuccess("Modul berhasil dibuat!");
+              }
+            } else if (modalState.type === "lesson") {
+              if (modalState.mode === "edit") {
+                // Update existing lesson
+                const { error } = await supabase
+                  .from("module_lessons")
+                  .update({
+                    title: data.title,
+                    description: data.description,
+                    content: data.content,
+                    lesson_type: data.lesson_type || "explanation",
+                    is_active: data.is_active,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", data.id);
+
+                if (error) throw error;
+                setLessons(lessons.map(l => 
+                  l.id === data.id ? { ...l, ...data, updated_at: new Date().toISOString() } : l
+                ));
+                setSuccess("Pelajaran berhasil diperbarui!");
+              } else {
+                // Create new lesson
+                const { data: result, error } = await supabase
+                  .from("module_lessons")
+                  .insert({
+                    module_id: data.module_id,
+                    title: data.title,
+                    description: data.description,
+                    content: data.content,
+                    lesson_type: data.lesson_type || "explanation",
+                    order_index: lessons.length,
+                    is_active: data.is_active,
+                  })
+                  .select()
+                  .single();
+
+                if (error) throw error;
+                setLessons([...lessons, result]);
+                setSuccess("Pelajaran berhasil dibuat!");
+              }
+            } else if (modalState.type === "material") {
+              if (modalState.mode === "edit") {
+                // Update existing material
+                const { error } = await supabase
+                  .from("module_materials")
+                  .update({
+                    title: data.title,
+                    description: data.description,
+                    material_type: data.material_type,
+                    source_type: data.source_type,
+                    file_url: data.file_url,
+                    external_url: data.external_url,
+                    is_active: data.is_active,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", data.id);
+
+                if (error) throw error;
+                setMaterials(materials.map(m => 
+                  m.id === data.id ? { ...m, ...data, updated_at: new Date().toISOString() } : m
+                ));
+                setSuccess("Materi berhasil diperbarui!");
+              } else {
+                // Create new material
+                const { data: result, error } = await supabase
+                  .from("module_materials")
+                  .insert({
+                    module_id: data.module_id,
+                    title: data.title,
+                    description: data.description,
+                    material_type: data.material_type,
+                    source_type: data.source_type,
+                    file_url: data.file_url,
+                    external_url: data.external_url,
+                    order_index: materials.length,
+                    is_active: data.is_active,
+                  })
+                  .select()
+                  .single();
+
+                if (error) throw error;
+                setMaterials([...materials, result]);
+                setSuccess("Materi berhasil dibuat!");
+              }
+            } else if (modalState.type === "exercise") {
+              if (modalState.mode === "edit") {
+                // Update existing exercise - use correct field names from SQL schema
+                const { error } = await supabase
+                  .from("exercise_sets")
+                  .update({
+                    judul_latihan: data.title,
+                    deskripsi: data.description,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", data.id);
+
+                if (error) throw error;
+                setExercises(exercises.map(e => 
+                  e.id === data.id ? { 
+                    ...e, 
+                    judul_latihan: data.title, 
+                    deskripsi: data.description,
+                    updated_at: new Date().toISOString() 
+                  } : e
+                ));
+                setSuccess("Latihan berhasil diperbarui!");
+              } else {
+                // Create new exercise - use correct field names from SQL schema
+                const { data: result, error } = await supabase
+                  .from("exercise_sets")
+                  .insert({
+                    judul_latihan: data.title,
+                    deskripsi: data.description,
+                    kelas_id: courseId, // Using course_id as kelas_id for now
+                    pembuat_id: user?.id,
+                    is_active: true,
+                    pertemuan: 1,
+                  })
+                  .select()
+                  .single();
+
+                if (error) throw error;
+                setExercises([...exercises, result]);
+                setSuccess("Latihan berhasil dibuat!");
+              }
+            }
+
+            setTimeout(() => setSuccess(""), 3000);
+          } catch (err: any) {
+            setError(err.message || "Gagal menyimpan data");
+          }
+        }}
+        moduleId={selectedModuleId || undefined}
+        courseId={courseId}
+      />
+
+      {/* Exercise Builder Modal */}
+      {showExerciseBuilder && (
+        <ExerciseBuilderModal
+          isOpen={showExerciseBuilder}
+          onClose={() => {
+            setShowExerciseBuilder(false);
+            setEditingExercise(null);
           }}
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold" style={{ color: "#1A1A1A" }}>
-                Modul
-              </h2>
-              {modules.length > 0 && (
-                <button
-                  onClick={() => setShowModuleModal(true)}
-                  className="py-2 px-4 rounded-lg font-semibold text-sm transition-all flex items-center gap-2"
-                  style={{
-                    backgroundColor: "#E8B824",
-                    color: "#1A1A1A",
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                  Modul Baru
-                </button>
-              )}
-            </div>
+          onSave={async (data: any) => {
+            if (editingExercise) {
+              // Update existing course exercise with questions and options
+              try {
+                // Update exercise basic info
+                const { error: exerciseError } = await supabase
+                  .from("course_exercises")
+                  .update({
+                    title: data.title,
+                    description: data.description,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", editingExercise.id);
 
-            {modules.length === 0 ? (
-              <p className="text-sm" style={{ color: "#999999" }}>
-                Belum ada modul. Buat satu di bawah.
-              </p>
-            ) : (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleModuleDragEnd}
-              >
-                <SortableContext
-                  items={modules.map((m) => m.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-2">
-                    {modules.map((module, index) => (
-                      <div
-                        key={module.id}
-                        onClick={() => setSelectedModuleId(module.id)}
-                        className="rounded-lg p-3 cursor-pointer transition-all flex items-start gap-2"
-                        style={{
-                          backgroundColor: selectedModuleId === module.id ? "#E8B824" : "#F5F5F5",
-                          border: `1px solid ${selectedModuleId === module.id ? "#D4A71F" : "#E5E5E5"}`,
-                        }}
-                      >
-                        <GripVertical
-                          className="h-4 w-4 flex-shrink-0 mt-1"
-                          style={{
-                            color: selectedModuleId === module.id ? "#1A1A1A" : "#999999",
-                          }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div
-                            className="text-xs font-bold uppercase tracking-wide"
-                            style={{
-                              color: selectedModuleId === module.id ? "#1A1A1A" : "#999999",
-                            }}
-                          >
-                            Module {index + 1}
-                          </div>
-                          <p
-                            className="text-sm font-semibold line-clamp-2"
-                            style={{
-                              color: selectedModuleId === module.id ? "#1A1A1A" : "#1A1A1A",
-                            }}
-                          >
-                            {module.title}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            )}
+                if (exerciseError) throw exerciseError;
 
-            <div
-              className="p-3 rounded-lg mt-4"
-              style={{
-                backgroundColor: "#F5F5F5",
-                border: "1px solid #E5E5E5",
-              }}
-            >
-              <p className="text-xs font-semibold" style={{ color: "#999999" }}>
-                Total Modul: {modules.length}
-              </p>
-            </div>
+                // Delete existing questions and options
+                const { error: deleteQuestionsError } = await supabase
+                  .from("course_questions")
+                  .delete()
+                  .eq("exercise_id", editingExercise.id);
 
-            {/* Create First Module Button - Show only if no modules */}
-            {modules.length === 0 && (
-              <button
-                onClick={() => setShowModuleModal(true)}
-                className="w-full mt-6 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
-                style={{
-                  backgroundColor: "#E8B824",
-                  color: "#1A1A1A",
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                Buat Modul Pertama
-              </button>
-            )}
+                if (deleteQuestionsError) throw deleteQuestionsError;
 
-            {/* Tab Selector - Only show if module selected */}
-            {selectedModuleId && (
-              <div className="flex gap-2 mt-6">
-                <button
-                  onClick={() => setActiveTab("lessons")}
-                  className="flex-1 py-2 px-3 rounded-lg font-semibold text-sm transition-all"
-                  style={{
-                    backgroundColor: activeTab === "lessons" ? "#E8B824" : "#F5F5F5",
-                    color: activeTab === "lessons" ? "#1A1A1A" : "#999999",
-                  }}
-                >
-                  Pelajaran
-                </button>
-                <button
-                  onClick={() => setActiveTab("materials")}
-                  className="flex-1 py-2 px-3 rounded-lg font-semibold text-sm transition-all"
-                  style={{
-                    backgroundColor: activeTab === "materials" ? "#E87835" : "#F5F5F5",
-                    color: activeTab === "materials" ? "#1A1A1A" : "#999999",
-                  }}
-                >
-                  Bahan
-                </button>
-              </div>
-            )}
+                // Then insert new questions and options (direct field mapping)
+                const questionsWithExerciseId = data.course_questions.map((q: any) => ({
+                  exercise_id: editingExercise.id,
+                  pertanyaan: q.pertanyaan, // Direct field mapping
+                  perintah: q.perintah, // Direct field mapping
+                  jawaban: q.jawaban, // Direct field mapping
+                  jawaban_benar: q.jawaban_benar, // Direct field mapping
+                  question_type: q.question_type,
+                  points: q.points || 10,
+                  order_index: q.order_index || 1,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                }));
 
-            {/* Content List - Only show if module selected */}
-            {selectedModuleId && (
-              <div className="space-y-4 mt-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold" style={{ color: "#1A1A1A" }}>
-                    {activeTab === "lessons" ? "Pelajaran" : "Bahan"}
-                  </h3>
-                  <button
-                    onClick={() => {
-                      if (activeTab === "lessons") {
-                        setSelectedLessonId(null);
-                      } else {
-                        setSelectedMaterialId(null);
-                      }
-                    }}
-                    className="p-2 rounded-lg transition-all flex items-center gap-1"
-                    style={{
-                      backgroundColor: activeTab === "lessons" ? "#E8B824" : "#E87835",
-                      color: "#1A1A1A",
-                    }}
-                    title={activeTab === "lessons" ? "Tambah Pelajaran Baru" : "Tambah Bahan Baru"}
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span className="text-xs font-semibold">
-                      {activeTab === "lessons" ? "Pelajaran" : "Bahan"}
-                    </span>
-                  </button>
-                </div>
+                const { data: savedQuestions, error: questionsError } = await supabase
+                  .from("course_questions")
+                  .insert(questionsWithExerciseId)
+                  .select();
 
-                {activeTab === "lessons" ? (
-                  <>
-                    {lessons.length === 0 ? (
-                      <p className="text-xs" style={{ color: "#999999" }}>
-                        Belum ada pelajaran
-                      </p>
-                    ) : (
-                      <DndContext
-                        key="lessons"
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleLessonDragEnd}
-                      >
-                        <SortableContext
-                          items={lessons.map((l) => l.id)}
-                          strategy={verticalListSortingStrategy}
-                        >
-                          <div className="space-y-2">
-                            {lessons.map((lesson, index) => (
-                              <div key={lesson.id}>
-                                <SortableLessonItem
-                                  lesson={lesson}
-                                  index={index}
-                                  isSelected={selectedLessonId === lesson.id}
-                                  isLocked={isLessonLocked(index)}
-                                  onSelect={(id) => {
-                                    setSelectedLessonId(id);
-                                    setSelectedMaterialId(null);
-                                  }}
-                                  getLessonIcon={getLessonIcon}
-                                />
-                                {selectedLessonId === lesson.id && (
-                                  <>
-                                    <div className="flex gap-2 mt-2">
-                                      <button
-                                        onClick={() => handleDeleteLesson(lesson.id)}
-                                        className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
-                                        style={{
-                                          backgroundColor: "#DC2626",
-                                          color: "#FFFFFF",
-                                        }}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                        Delete
-                                      </button>
-                                      <button
-                                        onClick={() => setShowPreviewModal(true)}
-                                        className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
-                                        style={{
-                                          backgroundColor: "#1A1A1A",
-                                          color: "#FFFFFF",
-                                        }}
-                                      >
-                                        <Eye className="h-4 w-4" />
-                                        Preview
-                                      </button>
-                                    </div>
-                                    <div
-                                      className="mt-3"
-                                      style={{
-                                        height: "1px",
-                                        backgroundColor: "#E5E5E5",
-                                      }}
-                                    ></div>
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </SortableContext>
-                      </DndContext>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {materials.length === 0 ? (
-                      <p className="text-xs" style={{ color: "#999999" }}>
-                        Belum ada bahan
-                      </p>
-                    ) : (
-                      <DndContext
-                        key="materials"
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleMaterialDragEnd}
-                      >
-                        <SortableContext
-                          items={materials.map((m) => m.id)}
-                          strategy={verticalListSortingStrategy}
-                        >
-                          <div className="space-y-2">
-                            {materials.map((material, index) => (
-                              <div key={material.id}>
-                                <SortableMaterialItem
-                                  material={material}
-                                  index={index}
-                                  isSelected={selectedMaterialId === material.id}
-                                  onSelect={(id) => {
-                                    setSelectedMaterialId(id);
-                                    setSelectedLessonId(null);
-                                  }}
-                                  getMaterialIcon={getMaterialIcon}
-                                />
-                                {selectedMaterialId === material.id && (
-                                  <>
-                                    <div className="flex gap-2 mt-2">
-                                      <button
-                                        onClick={() => handleDeleteMaterial(material.id)}
-                                        className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
-                                        style={{
-                                          backgroundColor: "#DC2626",
-                                          color: "#FFFFFF",
-                                        }}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                        Hapus
-                                      </button>
-                                      <button
-                                        onClick={() => setShowPreviewModal(true)}
-                                        className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
-                                        style={{
-                                          backgroundColor: "#1A1A1A",
-                                          color: "#FFFFFF",
-                                        }}
-                                      >
-                                        <Eye className="h-4 w-4" />
-                                        Pratinjau
-                                      </button>
-                                    </div>
-                                    <div
-                                      className="mt-3"
-                                      style={{
-                                        height: "1px",
-                                        backgroundColor: "#E5E5E5",
-                                      }}
-                                    ></div>
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </SortableContext>
-                      </DndContext>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+                if (questionsError) throw questionsError;
 
-        {/* Center Content Area - Forms */}
-        <div
-          className="flex-1 p-8 overflow-y-auto"
-          style={{
-            backgroundColor: "#FFFFFC",
+                // Create options for each question (only for multiple_choice)
+                for (let i = 0; i < data.course_questions.length; i++) {
+                  const question = data.course_questions[i];
+                  const savedQuestion = savedQuestions[i];
+
+                  if (question.question_type === 'multiple_choice' && question.course_options && question.course_options.length > 0) {
+                    const optionsToCreate = question.course_options.map((opt: any) => ({
+                      question_id: savedQuestion.id,
+                      jawaban: opt.jawaban, // Direct field mapping
+                      is_correct: opt.is_correct,
+                      order_index: opt.order_index || 1,
+                      created_at: new Date().toISOString(),
+                    }));
+
+                    const { error: optionsError } = await supabase
+                      .from("course_options")
+                      .insert(optionsToCreate);
+
+                    if (optionsError) throw optionsError;
+                  }
+                }
+
+                // Refresh exercises list with complete data
+                const { data: refreshedExercises, error: refreshError } = await supabase
+                  .from("course_exercises")
+                  .select(`
+                    *,
+                    course_questions (
+                      *,
+                      course_options (*)
+                    )
+                  `)
+                  .eq("course_id", courseId)
+                  .order("created_at", { ascending: false });
+
+                if (refreshError) throw refreshError;
+                setExercises(refreshedExercises || []);
+                
+                setSuccess("Latihan berhasil diperbarui!");
+                setTimeout(() => setSuccess(""), 3000);
+              } catch (err: any) {
+                setError(err.message || "Gagal memperbarui latihan");
+              }
+            } else {
+              // Create new course exercise (use custom course tables)
+              // Create course exercise first
+              const { data: courseExercise, error: exerciseError } = await supabase
+                .from("course_exercises")
+                .insert({
+                  title: data.title,
+                  description: data.description,
+                  course_id: courseId,
+                  is_active: data.is_active,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .select()
+                .single();
+
+              if (exerciseError) throw exerciseError;
+
+              // Create course questions if provided
+              if (data.course_questions && data.course_questions.length > 0) {
+                const questionsWithExerciseId = data.course_questions.map((q: any) =>({
+                  exercise_id: courseExercise.id,
+                  pertanyaan: q.pertanyaan, // Direct field mapping
+                  perintah: q.perintah, // Direct field mapping
+                  jawaban: q.jawaban, // Direct field mapping
+                  jawaban_benar: q.jawaban_benar, // Direct field mapping
+                  question_type: q.question_type,
+                  points: q.points || 10,
+                  order_index: q.order_index || 1,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                }));
+
+                const { data: savedQuestions, error: questionsError } = await supabase
+                  .from("course_questions")
+                  .insert(questionsWithExerciseId)
+                  .select();
+
+                if (questionsError) throw questionsError;
+
+                // Create course options for each question (only for multiple_choice)
+                for (let i = 0; i < data.course_questions.length; i++) {
+                  const question = data.course_questions[i];
+                  const savedQuestion = savedQuestions[i];
+
+                  if (question.question_type === 'multiple_choice' && question.course_options && question.course_options.length > 0) {
+                    const optionsToCreate = question.course_options.map((opt: any) => ({
+                      question_id: savedQuestion.id,
+                      jawaban: opt.jawaban, // Direct field mapping
+                      is_correct: opt.is_correct,
+                      order_index: opt.order_index || 1,
+                      created_at: new Date().toISOString(),
+                    }));
+
+                    const { error: optionsError } = await supabase
+                      .from("course_options")
+                      .insert(optionsToCreate);
+
+                    if (optionsError) throw optionsError;
+                  }
+                }
+              }
+
+              // Refresh exercises list with complete data
+              const { data: refreshedExercises, error: refreshError } = await supabase
+                .from("course_exercises")
+                .select(`
+                  *,
+                  course_questions (
+                    *,
+                    course_options (*)
+                  )
+                `)
+                .eq("course_id", courseId)
+                .order("created_at", { ascending: false });
+
+              if (refreshError) throw refreshError;
+              setExercises(refreshedExercises || []);
+              
+              setSuccess("Latihan berhasil dibuat!");
+              setTimeout(() => setSuccess(""), 3000);
+            }
           }}
-        >
-          {!selectedModuleId ? (
-            <div
-              className="rounded-lg p-12 text-center"
-              style={{
-                backgroundColor: "#FFFFFC",
-                border: "2px dashed #E5E5E5",
-              }}
-            >
-              <Layers
-                className="h-16 w-16 mx-auto mb-4"
-                style={{ color: "#D4D4D4" }}
-              />
-              <p className="text-lg font-semibold" style={{ color: "#1A1A1A" }}>
-                Pilih atau Buat Modul
-              </p>
-              <p className="text-sm mt-2" style={{ color: "#999999" }}>
-                Pilih modul yang ada dari daftar atau buat yang baru untuk mulai menambahkan pelajaran dan bahan.
-              </p>
-            </div>
-          ) : (
-            <>
-            {/* Success Alert */}
-            {success && (
-              <div className="p-4 rounded-lg border border-green-200 bg-green-50 flex items-center gap-3 mb-6">
-                <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
-                <p className="text-sm text-green-700">{success}</p>
-              </div>
-            )}
-
-            {/* Error Alert */}
-            {error && (
-              <div className="p-4 rounded-lg border border-red-200 bg-red-50 flex items-center gap-3 mb-6">
-                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            )}
-
-            {activeTab === "lessons" ? (
-              // Lesson Form
-              <div
-                className="rounded-lg p-6 shadow-md"
-                style={{
-                  backgroundColor: "#FFFFFC",
-                  border: "1px solid #E5E5E5",
-                }}
-              >
-                <div className="flex items-center gap-3 mb-6">
-                  <Lightbulb
-                    className="h-6 w-6"
-                    style={{ color: "#E8B824" }}
-                  />
-                  <h2 className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>
-                    {selectedLessonId ? "Edit Pelajaran" : "Tambah Pelajaran Baru"}
-                  </h2>
-                </div>
-
-                <div className="space-y-4">
-                  {/* Lesson Type */}
-                  <div>
-                    <Label
-                      htmlFor="lesson_type"
-                      className="text-sm font-semibold"
-                      style={{ color: "#1A1A1A" }}
-                    >
-                      Jenis Pelajaran
-                    </Label>
-                    <select
-                      id="lesson_type"
-                      value={newLesson.lesson_type}
-                      onChange={(e) =>
-                        setNewLesson({
-                          ...newLesson,
-                          lesson_type: e.target.value as any,
-                        })
-                      }
-                      className="w-full h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 px-3 mt-1"
-                      style={{ backgroundColor: "#FFFFFC", color: "#1A1A1A" }}
-                    >
-                      <option value="explanation">Penjelasan</option>
-                      <option value="vocabulary">Kosakata</option>
-                      <option value="dialogue">Dialog</option>
-                      <option value="reading">Membaca</option>
-                      <option value="listening">Mendengarkan</option>
-                    </select>
-                  </div>
-
-                  {/* Title */}
-                  <div>
-                    <Label
-                      htmlFor="lesson_title"
-                      className="text-sm font-semibold"
-                      style={{ color: "#1A1A1A" }}
-                    >
-                      Judul *
-                    </Label>
-                    <Input
-                      id="lesson_title"
-                      placeholder="cth: Dasar-Dasar Alfabet Jerman"
-                      value={newLesson.title}
-                      onChange={(e) =>
-                        setNewLesson({ ...newLesson, title: e.target.value })
-                      }
-                      className="h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 mt-1"
-                      style={{ backgroundColor: "#FFFFFC" }}
-                    />
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <Label
-                      htmlFor="lesson_description"
-                      className="text-sm font-semibold"
-                      style={{ color: "#1A1A1A" }}
-                    >
-                      Deskripsi
-                    </Label>
-                    <Input
-                      id="lesson_description"
-                      placeholder="Deskripsi singkat pelajaran ini"
-                      value={newLesson.description}
-                      onChange={(e) =>
-                        setNewLesson({
-                          ...newLesson,
-                          description: e.target.value,
-                        })
-                      }
-                      className="h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 mt-1"
-                      style={{ backgroundColor: "#FFFFFC" }}
-                    />
-                  </div>
-
-                  {/* Content - Rich Editor */}
-                  <div>
-                    <Label
-                      htmlFor="lesson_content"
-                      className="text-sm font-semibold"
-                      style={{ color: "#1A1A1A" }}
-                    >
-                      Konten dengan Dukungan Media
-                    </Label>
-                    <LessonContentEditor
-                      content={newLesson.content}
-                      onChange={(content) =>
-                        setNewLesson({ ...newLesson, content })
-                      }
-                    />
-                  </div>
-
-                  {/* Add/Update Button */}
-                  <div className="flex gap-3">
-                    {selectedLessonId && (
-                      <Button
-                        onClick={() => {
-                          setSelectedLessonId(null);
-                          setNewLesson({
-                            title: "",
-                            description: "",
-                            content: "",
-                            lesson_type: "explanation",
-                          });
-                        }}
-                        className="flex-1 h-11 font-semibold"
-                        style={{
-                          backgroundColor: "#F5F5F5",
-                          color: "#1A1A1A",
-                          border: "1px solid #E5E5E5",
-                        }}
-                      >
-                        Batal
-                      </Button>
-                    )}
-                    <Button
-                      onClick={handleAddLesson}
-                      className="flex-1 h-11 font-semibold flex items-center justify-center gap-2"
-                      style={{
-                        backgroundColor: "#E8B824",
-                        color: "#1A1A1A",
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                      {selectedLessonId ? "Perbarui Pelajaran" : "Tambah Pelajaran"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              // Material Form
-              <div
-                className="rounded-lg p-6 shadow-md"
-                style={{
-                  backgroundColor: "#FFFFFC",
-                  border: "1px solid #E5E5E5",
-                }}
-              >
-                <div className="flex items-center gap-3 mb-6">
-                  <Upload
-                    className="h-6 w-6"
-                    style={{ color: "#E87835" }}
-                  />
-                  <h2 className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>
-                    {selectedMaterialId ? "Edit Bahan" : "Tambah Bahan Baru"}
-                  </h2>
-                </div>
-
-                <div className="space-y-4">
-                  {/* Material Type */}
-                  <div>
-                    <Label
-                      htmlFor="material_type"
-                      className="text-sm font-semibold"
-                      style={{ color: "#1A1A1A" }}
-                    >
-                      Jenis Bahan
-                    </Label>
-                    <select
-                      id="material_type"
-                      value={newMaterial.material_type}
-                      onChange={(e) =>
-                        setNewMaterial({
-                          ...newMaterial,
-                          material_type: e.target.value as any,
-                        })
-                      }
-                      className="w-full h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 px-3 mt-1"
-                      style={{ backgroundColor: "#FFFFFC", color: "#1A1A1A" }}
-                    >
-                      <option value="video">Video</option>
-                      <option value="audio">Audio</option>
-                      <option value="pdf">PDF</option>
-                      <option value="image">Gambar</option>
-                      <option value="resource">Sumber Daya</option>
-                    </select>
-                  </div>
-
-                  {/* Source Type */}
-                  <div>
-                    <Label
-                      htmlFor="source_type"
-                      className="text-sm font-semibold"
-                      style={{ color: "#1A1A1A" }}
-                    >
-                      Jenis Sumber
-                    </Label>
-                    <select
-                      id="source_type"
-                      value={newMaterial.source_type}
-                      onChange={(e) =>
-                        setNewMaterial({
-                          ...newMaterial,
-                          source_type: e.target.value as any,
-                        })
-                      }
-                      className="w-full h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 px-3 mt-1"
-                      style={{ backgroundColor: "#FFFFFC", color: "#1A1A1A" }}
-                    >
-                      <option value="upload">Unggah File</option>
-                      <option value="youtube_link">Tautan YouTube</option>
-                      <option value="external_link">Tautan Eksternal</option>
-                    </select>
-                  </div>
-
-                  {/* Title */}
-                  <div>
-                    <Label
-                      htmlFor="material_title"
-                      className="text-sm font-semibold"
-                      style={{ color: "#1A1A1A" }}
-                    >
-                      Judul *
-                    </Label>
-                    <Input
-                      id="material_title"
-                      placeholder="cth: Video Alfabet Jerman"
-                      value={newMaterial.title}
-                      onChange={(e) =>
-                        setNewMaterial({ ...newMaterial, title: e.target.value })
-                      }
-                      className="h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 mt-1"
-                      style={{ backgroundColor: "#FFFFFC" }}
-                    />
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <Label
-                      htmlFor="material_description"
-                      className="text-sm font-semibold"
-                      style={{ color: "#1A1A1A" }}
-                    >
-                      Deskripsi
-                    </Label>
-                    <Input
-                      id="material_description"
-                      placeholder="Deskripsi singkat bahan ini"
-                      value={newMaterial.description}
-                      onChange={(e) =>
-                        setNewMaterial({
-                          ...newMaterial,
-                          description: e.target.value,
-                        })
-                      }
-                      className="h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 mt-1"
-                      style={{ backgroundColor: "#FFFFFC" }}
-                    />
-                  </div>
-
-                  {/* Source Input */}
-                  {newMaterial.source_type === "upload" ? (
-                    <div>
-                      <Label
-                        htmlFor="file_input"
-                        className="text-sm font-semibold"
-                        style={{ color: "#1A1A1A" }}
-                      >
-                        Unggah File (Maks 50MB)
-                      </Label>
-                      <Input
-                        id="file_input"
-                        type="file"
-                        onChange={(e) => {
-                          // To be implemented with Supabase storage
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setNewMaterial({
-                              ...newMaterial,
-                              file_url: file.name,
-                            });
-                          }
-                        }}
-                        className="h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 mt-1 file:bg-gray-100 file:border-0 file:rounded file:px-3 file:py-1"
-                        style={{ backgroundColor: "#FFFFFC" }}
-                      />
-                      <p className="text-xs mt-1" style={{ color: "#999999" }}>
-                        Didukung: MP4, WebM, MP3, WAV, PDF, JPG, PNG
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <Label
-                        htmlFor="external_url"
-                        className="text-sm font-semibold"
-                        style={{ color: "#1A1A1A" }}
-                      >
-                        {newMaterial.source_type === "youtube_link"
-                          ? "URL YouTube"
-                          : "URL Eksternal"}
-                      </Label>
-                      <Input
-                        id="external_url"
-                        placeholder="Tempel URL di sini"
-                        value={newMaterial.external_url}
-                        onChange={(e) =>
-                          setNewMaterial({
-                            ...newMaterial,
-                            external_url: e.target.value,
-                          })
-                        }
-                        className="h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 mt-1"
-                        style={{ backgroundColor: "#FFFFFC" }}
-                      />
-                    </div>
-                  )}
-
-                  {/* Form Buttons */}
-                  <div className="flex gap-3">
-                    {selectedMaterialId && (
-                      <Button onClick={() => setSelectedMaterialId(null)} className="flex-1 h-11 font-semibold"
-                        style={{
-                          backgroundColor: "#F5F5F5",
-                          color: "#1A1A1A",
-                          border: "1px solid #E5E5E5",
-                        }}
-                      >
-                        Batal
-                      </Button>
-                    )}
-                    <Button
-                      onClick={handleAddMaterial}
-                      className="flex-1 h-11 font-semibold flex items-center justify-center gap-2"
-                      style={{
-                        backgroundColor: "#E87835",
-                        color: "#1A1A1A",
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                      {selectedMaterialId ? "Perbarui Bahan" : "Tambah Bahan"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Create Module Modal */}
-      {showModuleModal && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div
-            className="rounded-lg max-w-md w-full p-6"
-            style={{ backgroundColor: "#FFFFFC" }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>
-                Create New Module
-              </h2>
-              <button
-                onClick={() => setShowModuleModal(false)}
-                className="p-1 hover:bg-gray-100 rounded-lg"
-              >
-                <X className="h-5 w-5" style={{ color: "#1A1A1A" }} />
-              </button>
-            </div>
-
-            {/* Form */}
-            <div className="space-y-4">
-              <div>
-                <Label
-                  htmlFor="modal_title"
-                  className="text-sm font-semibold"
-                  style={{ color: "#1A1A1A" }}
-                >
-                  Module Title *
-                </Label>
-                <Input
-                  id="modal_title"
-                  placeholder="e.g., German A1 Basics"
-                  value={newModule.title}
-                  onChange={(e) =>
-                    setNewModule({ ...newModule, title: e.target.value })
-                  }
-                  className="h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 mt-1"
-                  style={{ backgroundColor: "#FFFFFC" }}
-                />
-              </div>
-
-              <div>
-                <Label
-                  htmlFor="modal_description"
-                  className="text-sm font-semibold"
-                  style={{ color: "#1A1A1A" }}
-                >
-                  Description (Optional)
-                </Label>
-                <Input
-                  id="modal_description"
-                  placeholder="Brief description of this module"
-                  value={newModule.description}
-                  onChange={(e) =>
-                    setNewModule({ ...newModule, description: e.target.value })
-                  }
-                  className="h-10 rounded-lg border-2 border-gray-200 focus:border-yellow-400 mt-1"
-                  style={{ backgroundColor: "#FFFFFC" }}
-                />
-              </div>
-
-              {/* Buttons */}
-              <div className="flex gap-3 pt-4">
-                <Button
-                  onClick={() => setShowModuleModal(false)}
-                  className="flex-1 h-10 font-semibold"
-                  style={{
-                    backgroundColor: "#F5F5F5",
-                    color: "#1A1A1A",
-                    border: "1px solid #E5E5E5",
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    handleAddModule();
-                    setShowModuleModal(false);
-                  }}
-                  className="flex-1 h-10 font-semibold flex items-center justify-center gap-2"
-                  style={{
-                    backgroundColor: "#E8B824",
-                    color: "#1A1A1A",
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                  Create
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+          initialData={editingExercise}
+          mode={editingExercise ? "edit" : "create"}
+        />
       )}
 
-      {/* Preview Modal - Slides from Right */}
-      {showPreviewModal && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex">
-          {/* Modal Content */}
-          <div
-            className="ml-auto w-full max-w-3xl h-full bg-white overflow-y-auto animate-in slide-in-from-right-96"
-            style={{ backgroundColor: "#FFFFFC" }}
-          >
-            <div className="p-8">
-              {/* Close Button */}
-              <button
-                onClick={() => setShowPreviewModal(false)}
-                className="mb-6 text-sm font-semibold px-4 py-2 rounded-lg"
-                style={{
-                  backgroundColor: "#E87835",
-                  color: "#FFFFFF",
-                }}
-              >
-                ← Tutup Pratinjau
-              </button>
-
-              {/* Lesson Preview */}
-              {activeTab === "lessons" && selectedLessonId && (
-                <>
-                  {lessons
-                    .filter((l) => l.id === selectedLessonId)
-                    .map((lesson) => (
-                      <div key={lesson.id} className="space-y-6">
-                        {/* Header */}
-                        <div>
-                          <p
-                            className="text-xs font-bold uppercase tracking-wide"
-                            style={{ color: "#999999" }}
-                          >
-                            {lesson.lesson_type}
-                          </p>
-                          <h2
-                            className="text-4xl font-bold mt-2"
-                            style={{ color: "#1A1A1A" }}
-                          >
-                            {lesson.title}
-                          </h2>
-                          {lesson.description && (
-                            <p
-                              className="text-lg mt-4"
-                              style={{ color: "#4A4A4A" }}
-                            >
-                              {lesson.description}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Content Rendered */}
-                        {lesson.content && (
-                          <div
-                            className="prose prose-sm max-w-none"
-                            style={{
-                              color: "#1A1A1A",
-                            }}
-                          >
-                            <div
-                              className="space-y-4"
-                              dangerouslySetInnerHTML={{
-                                __html: lesson.content,
-                              }}
-                              style={{
-                                lineHeight: "1.8",
-                              }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                </>
-              )}
-
-              {/* Material Preview */}
-              {activeTab === "materials" && selectedMaterialId && (
-                <>
-                  {materials
-                    .filter((m) => m.id === selectedMaterialId)
-                    .map((material) => (
-                      <div key={material.id} className="space-y-6">
-                        {/* Header */}
-                        <div>
-                          <p
-                            className="text-xs font-bold uppercase tracking-wide"
-                            style={{ color: "#999999" }}
-                          >
-                            {material.material_type}
-                          </p>
-                          <h2
-                            className="text-4xl font-bold mt-2"
-                            style={{ color: "#1A1A1A" }}
-                          >
-                            {material.title}
-                          </h2>
-                          {material.description && (
-                            <p
-                              className="text-lg mt-4"
-                              style={{ color: "#4A4A4A" }}
-                            >
-                              {material.description}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Material Content */}
-                        <div
-                          className="rounded-lg p-6"
-                          style={{
-                            backgroundColor: "#F5F5F5",
-                            border: "1px solid #E5E5E5",
-                          }}
-                        >
-                          {material.material_type === "video" && (
-                            <div>
-                              <p
-                                className="text-sm font-semibold mb-3"
-                                style={{ color: "#1A1A1A" }}
-                              >
-                                Video:
-                              </p>
-                              {material.source_type === "youtube_link" &&
-                              material.external_url ? (
-                                <div
-                                  style={{
-                                    aspectRatio: "16/9",
-                                    borderRadius: "8px",
-                                    overflow: "hidden",
-                                  }}
-                                >
-                                  <iframe
-                                    width="100%"
-                                    height="100%"
-                                    src={`https://www.youtube.com/embed/${extractYouTubeId(
-                                      material.external_url
-                                    )}`}
-                                    frameBorder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
-                                  ></iframe>
-                                </div>
-                              ) : material.file_url ? (
-                                <video
-                                  controls
-                                  style={{
-                                    width: "100%",
-                                    borderRadius: "8px",
-                                    backgroundColor: "#000",
-                                  }}
-                                >
-                                  <source src={material.file_url} />
-                                </video>
-                              ) : (
-                                <p style={{ color: "#999999" }}>
-                                  Tidak ada sumber video
-                                </p>
-                              )}
-                            </div>
-                          )}
-
-                          {material.material_type === "audio" && (
-                            <div>
-                              <p
-                                className="text-sm font-semibold mb-3"
-                                style={{ color: "#1A1A1A" }}
-                              >
-                                Audio:
-                              </p>
-                              {material.file_url || material.external_url ? (
-                                <audio
-                                  controls
-                                  style={{
-                                    width: "100%",
-                                  }}
-                                >
-                                  <source
-                                    src={material.file_url || material.external_url || ""}
-                                  />
-                                </audio>
-                              ) : (
-                                <p style={{ color: "#999999" }}>
-                                  Tidak ada sumber audio
-                                </p>
-                              )}
-                            </div>
-                          )}
-
-                          {material.material_type === "image" && (
-                            <div>
-                              <p
-                                className="text-sm font-semibold mb-3"
-                                style={{ color: "#1A1A1A" }}
-                              >
-                                Gambar:
-                              </p>
-                              {material.file_url || material.external_url ? (
-                                <img
-                                  src={material.file_url || material.external_url || ""}
-                                  alt={material.title}
-                                  style={{
-                                    maxWidth: "100%",
-                                    height: "auto",
-                                    borderRadius: "8px",
-                                    maxHeight: "500px",
-                                  }}
-                                />
-                              ) : (
-                                <p style={{ color: "#999999" }}>
-                                  Tidak ada sumber gambar
-                                </p>
-                              )}
-                            </div>
-                          )}
-
-                          {material.material_type === "pdf" && (
-                            <div>
-                              <p
-                                className="text-sm font-semibold mb-3"
-                                style={{ color: "#1A1A1A" }}
-                              >
-                                File PDF:
-                              </p>
-                              {material.file_url || material.external_url ? (
-                                <a
-                                  href={material.file_url || material.external_url || ""}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 underline font-semibold"
-                                >
-                                  Buka PDF →
-                                </a>
-                              ) : (
-                                <p style={{ color: "#999999" }}>
-                                  Tidak ada sumber PDF
-                                </p>
-                              )}
-                            </div>
-                          )}
-
-                          {material.material_type === "resource" && (
-                            <div>
-                              <p
-                                className="text-sm font-semibold mb-3"
-                                style={{ color: "#1A1A1A" }}
-                              >
-                                Tautan Sumber Daya:
-                              </p>
-                              {material.external_url ? (
-                                <a
-                                  href={material.external_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="font-semibold"
-                                  style={{ color: "#E87835", textDecoration: "underline" }}
-                                >
-                                  {material.external_url}
-                                </a>
-                              ) : (
-                                <p style={{ color: "#999999" }}>
-                                  Tidak ada tautan sumber daya
-                                </p>
-                              )}
-                            </div>
-            )}
-          </div>
-                        {/* File Info */}
-                        <div
-                          className="rounded-lg p-4"
-                          style={{
-                            backgroundColor: "#F5F5F5",
-                            border: "1px solid #E5E5E5",
-                          }}
-                        >
-                          <p
-                            className="text-xs font-semibold"
-                            style={{ color: "#999999" }}
-                          >
-                            Source: {material.source_type.toUpperCase()}
-                          </p>
-                          {material.file_size_mb && (
-                            <p
-                              className="text-xs mt-1"
-                              style={{ color: "#999999" }}
-                            >
-                              Size: {material.file_size_mb} MB
-                            </p>
-                          )}
-                          {material.duration_seconds && (
-                            <p
-                              className="text-xs mt-1"
-                              style={{ color: "#999999" }}
-                            >
-                              Duration: {Math.floor(material.duration_seconds / 60)}m{" "}
-                              {material.duration_seconds % 60}s
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+      {/* Preview Modal */}
+      {previewItem && (
+        <SimplePreview
+          item={previewItem.item}
+          itemType={previewItem.type}
+          onClose={() => setPreviewItem(null)}
+        />
       )}
-    </div>
+    </>
   );
+}
 
-  // Helper functions
-  function getLessonIcon(type: string): React.ReactElement {
-    const iconProps = { className: "h-4 w-4", style: { color: "#E8B824" } };
-    switch (type) {
-      case "explanation":
-        return <Lightbulb {...iconProps} />;
-      case "vocabulary":
-        return <BookMarked {...iconProps} />;
-      case "dialogue":
-        return <MessageCircle {...iconProps} />;
-      case "reading":
-        return <FileText {...iconProps} />;
-      case "listening":
-        return <Headphones {...iconProps} />;
-      default:
-        return <BookOpen {...iconProps} />;
-    }
+// Helper functions
+function getLessonIcon(type: string): React.ReactElement {
+  const iconProps = { className: "h-4 w-4", style: { color: "#E8B824" } };
+  switch (type) {
+    case "explanation":
+      return <Lightbulb {...iconProps} />;
+    case "vocabulary":
+      return <BookMarked {...iconProps} />;
+    case "dialogue":
+      return <MessageCircle {...iconProps} />;
+    case "reading":
+      return <FileText {...iconProps} />;
+    case "listening":
+      return <Headphones {...iconProps} />;
+    default:
+      return <BookOpen {...iconProps} />;
   }
+}
 
-  function getMaterialIcon(type: string): React.ReactElement {
-    const iconProps = { className: "h-4 w-4", style: { color: "#E87835" } };
-    switch (type) {
-      case "video":
-        return <Video {...iconProps} />;
-      case "audio":
-        return <Music {...iconProps} />;
-      case "pdf":
-        return <FileText {...iconProps} />;
-      case "image":
-        return <Image {...iconProps} />;
-      case "resource":
-        return <Link2 {...iconProps} />;
-      default:
-        return <Upload {...iconProps} />;
-    }
+function getMaterialIcon(type: string): React.ReactElement {
+  const iconProps = { className: "h-4 w-4", style: { color: "#E87835" } };
+  switch (type) {
+    case "video":
+      return <Video {...iconProps} />;
+    case "audio":
+      return <Music {...iconProps} />;
+    case "pdf":
+      return <FileText {...iconProps} />;
+    case "image":
+      return <Image {...iconProps} />;
+    case "resource":
+      return <Link2 {...iconProps} />;
+    default:
+      return <Upload {...iconProps} />;
   }
+}
 
   // Extract YouTube ID from URL
-  function extractYouTubeId(url: string): string | null {
-    const regExp =
-      /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
+function extractYouTubeId(url: string): string | null {
+  const regExp =
+    /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
 
-    if (match && match[2].length === 11) {
-      return match[2];
-    }
-    return null;
+  if (match && match[2].length === 11) {
+    return match[2];
   }
+  return null;
+}
+
+// Main export with ModalProvider wrapper
+export default function ModuleEditorPageWrapper() {
+  return (
+    <ModalProvider>
+      <ModuleEditorPage />
+    </ModalProvider>
+  );
 }
