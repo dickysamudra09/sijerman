@@ -125,11 +125,11 @@ export function buildCourseTree(
       title: material.title,
       order_index: material.order_index,
       data: {
-        description: material.description,
+        description: material.description ?? undefined,
         material_type: material.material_type,
         source_type: material.source_type,
-        duration_seconds: material.duration_seconds,
-        file_size_mb: material.file_size_mb,
+        duration_seconds: material.duration_seconds ?? undefined,
+        file_size_mb: material.file_size_mb ?? undefined,
       },
     }));
 
