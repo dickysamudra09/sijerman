@@ -126,7 +126,7 @@ export default function ExerciseInline({
             setFetchedLessonContent(lessonData.content);
           }
         } else {
-          setFetchedLessonContent(lessonContent);
+          setFetchedLessonContent(lessonContent || '');
         }
 
         // 2. Fetch semua exercises untuk lesson ini
