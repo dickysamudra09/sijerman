@@ -71,12 +71,8 @@ interface TeacherModeProps {
     onBack: () => void;
 }
 
-interface TeacherModeProps {
-    onBack: () => void;
-}
-
 // Profile Dropdown Component
-const ProfileDropdown = ({ userName, onLogout }: { userName: string; onLogout: () => void }) => {
+const ProfileDropdown = ({ userName, onLogout, setActiveTab }: { userName: string; onLogout: () => void; setActiveTab: (tab: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -140,7 +136,7 @@ const ProfileDropdown = ({ userName, onLogout }: { userName: string; onLogout: (
 
           <button
             onClick={() => {
-              router.push("/home");
+              setActiveTab("classes");
               setIsOpen(false);
             }}
             className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2"
@@ -630,6 +626,7 @@ function TeacherMode({ onBack }: TeacherModeProps) {
                             <ProfileDropdown
                               userName={userName}
                               onLogout={handleLogout}
+                              setActiveTab={setActiveTab}
                             />
                         </div>
                     </div>
