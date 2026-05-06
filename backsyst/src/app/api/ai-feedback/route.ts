@@ -139,10 +139,6 @@ async function callGroqAPI(config: GroqAPIConfig): Promise<string> {
   }
 }
 
-// ============================================================================
-// GROQ API WITH VALIDATION & RETRY
-// ============================================================================
-
 interface ValidationAndRetryResult {
   content: string;
   validated: boolean;
@@ -173,7 +169,6 @@ async function callGroqAPIWithValidationAndRetry(
   while (currentAttempt <= maxAttempts) {
     console.log(`\n=== Attempt ${currentAttempt}/${maxAttempts} ===`);
 
-    // Get Groq response
     const response = await callGroqAPI({
       systemMessage: basePromptConfig.systemMessage,
       userMessage: basePromptConfig.userMessage,
@@ -188,7 +183,6 @@ async function callGroqAPIWithValidationAndRetry(
       continue;
     }
 
-    // Parse JSON response
     let feedbackText = '';
     try {
       let cleanContent = response.trim();
@@ -211,7 +205,6 @@ async function callGroqAPIWithValidationAndRetry(
       continue;
     }
 
-    // VALIDATE response
     const validation = validateFeedback(
       feedbackText,
       studentAnswer,
@@ -227,7 +220,6 @@ async function callGroqAPIWithValidationAndRetry(
     bestResponse = feedbackText;
     allIssues = validation.issues.map(i => i.message);
 
-    // Check if we should retry
     const { shouldRetry: retryNeeded, reason } = shouldRetry(
       validation,
       maxAttempts,
@@ -248,7 +240,6 @@ async function callGroqAPIWithValidationAndRetry(
     console.log(`✗ Validation failed: ${reason}`);
     console.log(`Quality score: ${validation.score}/100 (target: ${VALIDATION_CONFIG.recommendedScore})`);
 
-    // Generate retry strategy
     if (currentAttempt < maxAttempts) {
       const retryStrategy = generateRetryStrategy(
         validation,
@@ -259,14 +250,12 @@ async function callGroqAPIWithValidationAndRetry(
       console.log(`Retry strategy: ${retryStrategy.reason}`);
       console.log(`Modifications: ${retryStrategy.modifications.join('; ')}`);
 
-      // Update user message untuk retry
       basePromptConfig.userMessage = retryStrategy.modifiedPrompt;
     }
 
     currentAttempt++;
   }
 
-  // Return best response even if not fully valid
   console.log(`\nFinal result after ${currentAttempt - 1} attempts:`);
   console.log(`Score: ${lastValidationScore}/100`);
   console.log(`Issues found: ${allIssues.length}`);
@@ -290,8 +279,8 @@ function countSentences(text: string): number {
 
 function validateFeedbackLength(text: string): { valid: boolean; count: number; message: string } {
   const count = countSentences(text);
-  const MIN_SENTENCES = 12;  // Lowered for 6-step structured format
-  const MAX_SENTENCES = 100; // Reasonable upper limit
+  const MIN_SENTENCES = 12;  
+  const MAX_SENTENCES = 100; 
   
   if (count < MIN_SENTENCES) {
     return {
@@ -529,32 +518,31 @@ async function generateAIFeedbackWithGroq(
   question: Question,
   studentAnswerText: string,
   correctAnswerText: string,
-  isCorrect: boolean
+  isCorrect: boolean,
+  lessonContent?: string
 ): Promise<AIFeedbackResponse> {
   const startTime = Date.now();
 
   try {
 
-    // Use semantic reference selection for smart matching
     const referenceMatches = selectSmartReferences(
       studentAnswerText,
       correctAnswerText,
       question.question_text,
-      3 // Return top 3 references
+      3 
     );
     const relevantReferences = convertToReferenceMaterials(referenceMatches);
 
-    // Build structured prompt based on question type
     const promptConfig = buildOptimizedPrompt(
       question.question_type,
       question.question_text,
       studentAnswerText,
       correctAnswerText,
       isCorrect,
-      undefined // TODO: add allOptions if available
+      undefined,
+      lessonContent
     );
 
-    // Validate prompt before sending
     const validation = validatePromptConfig(promptConfig);
     if (!validation.valid) {
       console.warn('Prompt validation warnings:', validation.errors);
@@ -568,7 +556,6 @@ async function generateAIFeedbackWithGroq(
       topP: promptConfig.topP
     });
 
-    // Call Groq API dengan validation & retry untuk ensure quality
     const validationResult = await callGroqAPIWithValidationAndRetry(
       {
         systemMessage: promptConfig.systemMessage,
@@ -581,7 +568,7 @@ async function generateAIFeedbackWithGroq(
       correctAnswerText,
       question.question_text,
       isCorrect,
-      2 // Max 2 attempts (original + 1 retry)
+      2 
     );
 
     if (!validationResult.content) {
@@ -610,7 +597,6 @@ async function generateAIFeedbackWithGroq(
           feedback_text: feedbackMatch[1]
         };
       } else {
-        // Use fallback analyzer as last resort
         console.log('Using fallback analyzer due to parsing failure');
         const fallbackFeedback = generateContextualFallback(
           studentAnswerText,
@@ -717,32 +703,33 @@ async function generateAIFeedback(
   question: Question,
   studentAnswerText: string,
   correctAnswerText: string,
-  isCorrect: boolean
+  isCorrect: boolean,
+  lessonContent?: string
 ): Promise<AIFeedbackResponse> {
   const startTime = Date.now();
 
   try {
-    // Use semantic reference selection for smart matching
+    
     const referenceMatches = selectSmartReferences(
       studentAnswerText,
       correctAnswerText,
       question.question_text,
-      3 // Return top 3 references
+      3
     );
     const relevantReferences = convertToReferenceMaterials(referenceMatches);
 
-    // Use new structured prompt system
     const promptConfig = buildOptimizedPrompt(
       question.question_type,
       question.question_text,
       studentAnswerText,
       correctAnswerText,
-      isCorrect
+      isCorrect,
+      undefined,
+      lessonContent
     );
 
     console.log('Using structured prompt for:', question.question_type);
 
-    // Call Groq API dengan validation & retry
     const validationResult = await callGroqAPIWithValidationAndRetry(
       {
         systemMessage: promptConfig.systemMessage,
@@ -755,7 +742,7 @@ async function generateAIFeedback(
       correctAnswerText,
       question.question_text,
       isCorrect,
-      2 // Max 2 attempts
+      2 
     );
 
     if (!validationResult.content) {
@@ -815,7 +802,6 @@ async function generateAIFeedback(
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('Error Stack:', error instanceof Error ? error.stack : 'No stack trace');
 
-    // Use fallback analyzer
     const fallbackFeedback = generateContextualFallback(
       studentAnswerText,
       correctAnswerText,
@@ -830,7 +816,6 @@ async function generateAIFeedback(
       GERMAN_REFERENCES.conjugation[0]
     ].map(({ title, url, description }) => ({ title, url, description }));
 
-    // For essay/arrangement, do more detailed analysis
     if (question.question_type === 'essay' || question.question_type === 'sentence_arrangement') {
       if (!isCorrect) {
         const analysis = analyzeGermanGrammar(studentAnswerText, question.question_text);
@@ -851,18 +836,12 @@ async function generateAIFeedback(
   }
 }
 
-/**
- * GET handler - Fetch cached statistics or question details
- */
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const action = url.searchParams.get('action');
   const questionId = url.searchParams.get('questionId');
   const hoursBack = parseInt(url.searchParams.get('hoursBack') || '24');
 
-  // ===== MONITORING ENDPOINTS =====
-
-  // Get error metrics
   if (action === 'error-metrics') {
     const metrics = await getErrorMetrics(hoursBack);
     return Response.json({
@@ -872,7 +851,6 @@ export async function GET(request: Request) {
     });
   }
 
-  // Get quality metrics
   if (action === 'quality-metrics') {
     const metrics = await getQualityMetrics(hoursBack);
     return Response.json({
@@ -882,7 +860,6 @@ export async function GET(request: Request) {
     });
   }
 
-  // Get performance metrics
   if (action === 'performance-metrics') {
     const metrics = await getPerformanceMetrics(hoursBack);
     return Response.json({
@@ -892,7 +869,6 @@ export async function GET(request: Request) {
     });
   }
 
-  // Get active alerts
   if (action === 'alerts') {
     const alerts = await getActiveAlerts();
     return Response.json({
@@ -905,7 +881,6 @@ export async function GET(request: Request) {
     });
   }
 
-  // Get comprehensive dashboard data
   if (action === 'dashboard') {
     const errorMetrics = await getErrorMetrics(1); // Last 1 hour
     const qualityMetrics = await getQualityMetrics(1);
@@ -932,7 +907,6 @@ export async function GET(request: Request) {
     });
   }
 
-  // Get cache statistics
   if (action === 'stats') {
     const stats = await getCacheStats();
     return Response.json({
@@ -944,7 +918,6 @@ export async function GET(request: Request) {
     });
   }
 
-  // Get question details with cache info
   if (questionId) {
     try {
       const { data: questionData, error } = await supabaseAdmin
@@ -960,7 +933,6 @@ export async function GET(request: Request) {
         );
       }
 
-      // Check if cached
       const cachedCorrect = await getCachedFeedback(questionId, true);
       const cachedIncorrect = await getCachedFeedback(questionId, false);
 
@@ -993,7 +965,6 @@ export async function POST(request: Request): Promise<Response> {
   let studentAnswerId = '';
 
   try {
-    // Parse request body
     const requestBody = await request.json();
     const {
       studentAnswerId: studentIdFromBody,
@@ -1002,7 +973,10 @@ export async function POST(request: Request): Promise<Response> {
       selectedOptionId,
       textAnswer,
       selectedOptionsArray,
-      isCorrect
+      isCorrect,
+      lessonContent,
+      questionType,
+      pointsEarned
     }: {
       studentAnswerId: string;
       questionId: string;
@@ -1011,26 +985,29 @@ export async function POST(request: Request): Promise<Response> {
       textAnswer: string | null;
       selectedOptionsArray: string[] | null;
       isCorrect: boolean;
+      lessonContent?: string;
+      questionType?: string;
+      pointsEarned?: number;
     } = requestBody;
 
-    // Assign to outer scope for error handling
     questionId = questionIdFromBody;
     studentAnswerId = studentIdFromBody;
 
-    // Log request received
     await logEvent({
       level: LogLevel.INFO,
-      message: `Request received`,
+      message: `Request received with lesson content`,
       request_id: requestId,
       question_id: questionId,
       context: {
         studentAnswerId,
         isCorrect,
-        hasTextAnswer: !!textAnswer
+        hasTextAnswer: !!textAnswer,
+        hasLessonContent: !!lessonContent,
+        questionType,
+        pointsEarned
       }
     });
 
-    // Validate required fields
     if (!studentAnswerId || !questionId || !attemptId) {
       return Response.json(
         { error: 'Missing required fields' },
@@ -1061,7 +1038,7 @@ export async function POST(request: Request): Promise<Response> {
           feedback_text: exactCache.feedback_text,
           explanation: exactCache.explanation,
           reference_materials: JSON.parse(exactCache.reference_materials),
-          processing_time_ms: Date.now() - startTime, // Include cache retrieval time
+          processing_time_ms: Date.now() - startTime, 
           ai_model: exactCache.ai_model
         },
         cache: {
@@ -1077,7 +1054,7 @@ export async function POST(request: Request): Promise<Response> {
       const similarCache = await findSimilarCachedFeedback(
         'Select question text from database', // Would get this from question fetch
         isCorrect,
-        0.70 // 70% similarity threshold
+        0.70 
       );
 
       if (similarCache) {
@@ -1117,18 +1094,44 @@ export async function POST(request: Request): Promise<Response> {
 
     console.log('[CACHE MISS] Generating new feedback...');
 
-    // Fetch question data
-    const { data: rawQuestionData, error: questionError } = await supabaseAdmin
-      .from('questions')
+    let rawQuestionData, questionError;
+    
+    const courseQuestionResult = await supabaseAdmin
+      .from('course_questions')
       .select(`
         id,
-        question_text,
+        question_text:pertanyaan,
         question_type,
-        sentence_arrangement_config,
-        options (id, option_text, is_correct, order_index, sentence_fragment, is_blank_position)
+        points,
+        instruction:perintah,
+        course_options (id, option_text:jawaban, is_correct, order_index)
       `)
       .eq('id', questionId)
       .single();
+    
+    if (courseQuestionResult.data && !courseQuestionResult.error) {
+      rawQuestionData = courseQuestionResult.data;
+      questionError = null;
+      
+      if ((rawQuestionData as any).question_type === 'true_false' && !(rawQuestionData as any).question_text && (rawQuestionData as any).instruction) {
+        (rawQuestionData as any).question_text = (rawQuestionData as any).instruction;
+      }
+    } else {
+      const regularQuestionResult = await supabaseAdmin
+        .from('questions')
+        .select(`
+          id,
+          question_text,
+          question_type,
+          sentence_arrangement_config,
+          options (id, option_text, is_correct, order_index, sentence_fragment, is_blank_position)
+        `)
+        .eq('id', questionId)
+        .single();
+      
+      rawQuestionData = regularQuestionResult.data;
+      questionError = regularQuestionResult.error;
+    }
 
     if (questionError || !rawQuestionData) {
       return Response.json(
@@ -1143,7 +1146,6 @@ export async function POST(request: Request): Promise<Response> {
 
     const questionData = rawQuestionData as unknown as Question;
 
-    // Prepare answer texts based on question type
     let studentAnswerText = '';
     let correctAnswerText = '';
     let finalIsCorrect = isCorrect;
@@ -1153,16 +1155,27 @@ export async function POST(request: Request): Promise<Response> {
       questionData.question_type === 'multiple_choice' ||
       questionData.question_type === 'true_false'
     ) {
-      const selectedOption = questionData.options.find(opt => opt.id === selectedOptionId);
-      const correctOption = questionData.options.find(opt => opt.is_correct);
-      studentAnswerText = selectedOption?.option_text || 'Tidak ada jawaban';
+      const options = (questionData as any).course_options || questionData.options || [];
+      const selectedOption = options.find((opt: any) => opt.id === selectedOptionId);
+      const correctOption = options.find((opt: any) => opt.is_correct);
+      
+      if (questionData.question_type === 'true_false' && !selectedOption && textAnswer) {
+        studentAnswerText = textAnswer === 'true' ? 'Benar (R)' : 'Salah (F)';
+      } else {
+        studentAnswerText = selectedOption?.option_text || 'Tidak ada jawaban';
+      }
+      
       correctAnswerText = correctOption?.option_text || 'Tidak diketahui';
+      
+      console.log('[AI-FEEDBACK] Lesson content:', lessonContent ? `${lessonContent.length} chars` : 'None');
+      console.log('[AI-FEEDBACK] Question type:', questionType);
 
       aiResponse = await generateAIFeedback(
         questionData,
         studentAnswerText,
         correctAnswerText,
-        finalIsCorrect
+        finalIsCorrect,
+        lessonContent
       );
     } else if (questionData.question_type === 'sentence_arrangement') {
       studentAnswerText = textAnswer || 'Tidak ada jawaban';
@@ -1187,7 +1200,8 @@ export async function POST(request: Request): Promise<Response> {
         questionData,
         studentAnswerText,
         correctAnswerText,
-        finalIsCorrect
+        finalIsCorrect,
+        lessonContent
       );
     } else if (questionData.question_type === 'essay') {
       studentAnswerText = textAnswer || 'Tidak ada jawaban';
@@ -1197,33 +1211,48 @@ export async function POST(request: Request): Promise<Response> {
         questionData,
         studentAnswerText,
         correctAnswerText,
-        finalIsCorrect
+        finalIsCorrect,
+        lessonContent
       );
     } else {
       return Response.json({ error: 'Unsupported question type' }, { status: 400 });
     }
 
-    // ============ SAVE TO DATABASE ============
-    const { data: feedback, error: saveError } = await supabaseAdmin
-      .from('ai_feedback')
-      .insert([
-        {
-          student_answer_id: studentAnswerId,
-          question_id: questionId,
-          attempt_id: attemptId,
-          feedback_type: finalIsCorrect ? 'correct' : 'incorrect',
-          feedback_text: aiResponse.data.feedback_text,
-          explanation: aiResponse.data.explanation,
-          reference_materials: aiResponse.data.reference_materials,
-          ai_model: aiResponse.data.ai_model,
-          processing_time_ms: aiResponse.data.processing_time_ms
-        }
-      ])
-      .select()
-      .single();
+    let feedback: any = null;
+    try {
+      const { data: attemptExists } = await supabaseAdmin
+        .from('exercise_attempts')
+        .select('id')
+        .eq('id', attemptId)
+        .maybeSingle();
 
-    if (saveError) {
-      console.error('Error saving feedback:', saveError);
+      if (attemptExists) {
+        const { data: savedFeedback, error: saveError } = await supabaseAdmin
+          .from('ai_feedback')
+          .insert([{
+            student_answer_id: studentAnswerId,
+            question_id: questionId,
+            attempt_id: attemptId,
+            feedback_type: finalIsCorrect ? 'correct' : 'incorrect',
+            feedback_text: aiResponse.data.feedback_text,
+            explanation: aiResponse.data.explanation,
+            reference_materials: aiResponse.data.reference_materials,
+            ai_model: aiResponse.data.ai_model,
+            processing_time_ms: aiResponse.data.processing_time_ms
+          }])
+          .select()
+          .single();
+
+        if (saveError) {
+          console.error('Error saving feedback to ai_feedback:', saveError);
+        } else {
+          feedback = savedFeedback;
+        }
+      } else {
+        console.log('[OPEN-COURSE] Skipping ai_feedback insert — attemptId is not a valid exercise_attempts row.');
+      }
+    } catch (dbErr) {
+      console.error('Error checking attempt existence:', dbErr);
     }
 
     const referenceString =
@@ -1244,7 +1273,6 @@ export async function POST(request: Request): Promise<Response> {
 
     const totalTime = Date.now() - startTime;
 
-    // Log success
     await logSuccess(requestId, questionId, totalTime, {
       cacheStatus: 'miss_generated',
       cacheSaved: cacheSuccess,
@@ -1268,7 +1296,6 @@ export async function POST(request: Request): Promise<Response> {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     const errorStack = error instanceof Error ? error.stack : undefined;
 
-    // Log error with full context
     await logApiError(
       requestId,
       error,
@@ -1276,7 +1303,6 @@ export async function POST(request: Request): Promise<Response> {
       'Fallback system engaged'
     );
 
-    // Determine error category
     let errorCategory = ErrorCategory.UNKNOWN_ERROR;
     if (errorMessage.includes('rate limit')) {
       errorCategory = ErrorCategory.API_ERROR;
@@ -1286,7 +1312,6 @@ export async function POST(request: Request): Promise<Response> {
       errorCategory = ErrorCategory.PARSING_ERROR;
     }
 
-    // Create alert if critical error
     if (errorMessage.includes('critical') || errorMessage.includes('fatal')) {
       await checkAndCreateAlerts();
     }
