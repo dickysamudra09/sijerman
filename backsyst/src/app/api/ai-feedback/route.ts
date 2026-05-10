@@ -54,10 +54,13 @@ import {
   type PerformanceMetrics
 } from './error-handler-logging';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialization to avoid build-time errors
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -892,6 +895,7 @@ async function generateAIFeedback(
 }
 
 export async function GET(request: Request) {
+  const supabaseAdmin = getSupabaseAdmin();
   const url = new URL(request.url);
   const action = url.searchParams.get('action');
   const questionId = url.searchParams.get('questionId');
@@ -1014,6 +1018,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const supabaseAdmin = getSupabaseAdmin();
   const startTime = Date.now();
   const requestId = generateRequestId();
   let questionId = '';

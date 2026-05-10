@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialization to avoid build-time errors
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -69,6 +72,7 @@ interface PreGenerateRequest {
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     const body: PreGenerateRequest = await request.json();
     const { exerciseSetId, limit = 10, forceRefresh = false } = body;
 

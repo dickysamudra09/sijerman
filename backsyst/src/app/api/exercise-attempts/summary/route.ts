@@ -1,14 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest } from 'next/server';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialization to avoid build-time errors
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // GET /api/exercise-attempts/summary?exerciseId=xxx&userId=xxx - Get exercise summary for history card
 export async function GET(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     const { searchParams } = new URL(request.url);
     const exerciseId = searchParams.get('exerciseId');
     const userId = searchParams.get('userId');
