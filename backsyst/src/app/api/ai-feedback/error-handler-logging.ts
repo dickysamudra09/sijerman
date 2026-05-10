@@ -1,10 +1,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+// Lazy initialization to avoid build-time errors
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  );
+}
 
 export enum LogLevel {
   DEBUG = 'DEBUG',
@@ -89,6 +92,7 @@ export function generateRequestId(): string {
 }
 
 export async function logEvent(entry: LogEntry): Promise<boolean> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const logEntry = {
       timestamp: entry.timestamp || new Date().toISOString(),
@@ -287,6 +291,7 @@ export async function logFallbackUsage(
 export async function getErrorMetrics(
   hoursBack: number = 24
 ): Promise<ErrorMetrics | null> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const cutoffTime = new Date();
     cutoffTime.setHours(cutoffTime.getHours() - hoursBack);
@@ -338,6 +343,7 @@ export async function getErrorMetrics(
 export async function getQualityMetrics(
   hoursBack: number = 24
 ): Promise<QualityMetrics | null> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const cutoffTime = new Date();
     cutoffTime.setHours(cutoffTime.getHours() - hoursBack);
@@ -392,6 +398,7 @@ export async function getQualityMetrics(
 export async function getPerformanceMetrics(
   hoursBack: number = 24
 ): Promise<PerformanceMetrics | null> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const cutoffTime = new Date();
     cutoffTime.setHours(cutoffTime.getHours() - hoursBack);
@@ -437,6 +444,7 @@ export async function getPerformanceMetrics(
 }
 
 export async function checkAndCreateAlerts(): Promise<Alert[]> {
+  const supabaseAdmin = getSupabaseAdmin();
   const alerts: Alert[] = [];
 
   try {
@@ -543,6 +551,7 @@ export async function checkAndCreateAlerts(): Promise<Alert[]> {
 }
 
 export async function getActiveAlerts(): Promise<Alert[]> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const { data: alerts, error } = await supabaseAdmin
       .from('ai_feedback_alerts')
@@ -564,6 +573,7 @@ export async function getActiveAlerts(): Promise<Alert[]> {
 }
 
 export async function resolveAlert(alertId: string, actionTaken?: string): Promise<boolean> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const { error } = await supabaseAdmin
       .from('ai_feedback_alerts')

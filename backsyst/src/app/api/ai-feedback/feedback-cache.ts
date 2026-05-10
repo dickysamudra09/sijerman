@@ -1,11 +1,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client with service role for admin-level access
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+// Lazy initialization to avoid build-time errors
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  );
+}
 
 // Cache configuration
 export interface CacheConfig {
@@ -92,6 +94,7 @@ export async function getCachedFeedback(
   questionId: string,
   isCorrect: boolean
 ): Promise<CacheEntry | null> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const { data, error } = await supabaseAdmin
       .from('ai_feedback_cache')
@@ -130,6 +133,7 @@ export async function findSimilarCachedFeedback(
   isCorrect: boolean,
   threshold: number = DEFAULT_CACHE_CONFIG.maxSimilarity
 ): Promise<SimilarityResult | null> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     // Get all cache entries for this correctness state
     const { data: allCached, error } = await supabaseAdmin
@@ -187,6 +191,7 @@ export async function findSimilarCachedFeedback(
 export async function saveFeedbackToCache(
   entry: Omit<CacheEntry, 'id' | 'created_at' | 'hit_count' | 'last_hit'>
 ): Promise<boolean> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const { error } = await supabaseAdmin
       .from('ai_feedback_cache')
@@ -224,6 +229,7 @@ export async function saveFeedbackToCache(
 }
 
 export async function updateCacheHitCount(cacheId: string): Promise<void> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const { error } = await supabaseAdmin
       .from('ai_feedback_cache')
@@ -239,6 +245,7 @@ export async function updateCacheHitCount(cacheId: string): Promise<void> {
 }
 
 export async function getCacheStats(): Promise<CacheStats | null> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const { data: stats, error } = await supabaseAdmin
       .from('ai_feedback_cache')
@@ -267,6 +274,7 @@ export async function getCacheStats(): Promise<CacheStats | null> {
 }
 
 export async function clearExpiredCache(ttlMinutes: number = DEFAULT_CACHE_CONFIG.ttlMinutes): Promise<number> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const expiryDate = new Date();
     expiryDate.setMinutes(expiryDate.getMinutes() - ttlMinutes);
@@ -291,6 +299,7 @@ export async function clearExpiredCache(ttlMinutes: number = DEFAULT_CACHE_CONFI
 }
 
 export async function clearQuestionCache(questionId: string): Promise<boolean> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const { error } = await supabaseAdmin
       .from('ai_feedback_cache')
@@ -311,6 +320,7 @@ export async function clearQuestionCache(questionId: string): Promise<boolean> {
 }
 
 export async function clearAllCache(): Promise<boolean> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const { error } = await supabaseAdmin
       .from('ai_feedback_cache')
@@ -337,6 +347,7 @@ export async function getCacheHealth(): Promise<{
   newestEntry: string | null;
   avgHitCount: number;
 }> {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const { data, error } = await supabaseAdmin
       .from('ai_feedback_cache')
