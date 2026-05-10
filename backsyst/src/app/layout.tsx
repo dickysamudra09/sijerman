@@ -2,7 +2,7 @@
 import '../styles/globals.css';
 import { cookies } from 'next/headers';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -16,6 +16,14 @@ export const metadata: Metadata = {
   title: 'Si Jerman - Platform Pembelajaran Online Bahasa Jerman',
   description: 'Platform pembelajaran online terbaik untuk siswa Indonesia. Belajar dengan mudah dan menyenangkan.',
   keywords: ['pembelajaran online', 'course', 'pendidikan', 'siswa'],
+};
+
+// Disable zoom on mobile for professional look
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default async function RootLayout({

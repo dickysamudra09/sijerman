@@ -13,6 +13,8 @@ import { ModuleTimeline, type ModuleItem } from "@/components/ModuleTimeline";
 import { WarmProgressBar } from "@/components/WarmProgressBar";
 import ExerciseInline from "@/components/ExerciseInline";
 import AIFeedbackInline from "@/components/AIFeedbackInline";
+import { useIsMobile } from "@/hooks/useMediaQuery";
+import { ImmersiveCourseView } from "@/components/ImmersiveCourseView";
 import {
   BookOpen,
   Lock,
@@ -126,6 +128,7 @@ export default function CourseDetailPage() {
   const router = useRouter();
   const params = useParams();
   const courseId = params.id as string;
+  const isMobile = useIsMobile(); // ✨ NEW: Mobile detection
 
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
@@ -154,6 +157,10 @@ export default function CourseDetailPage() {
   
   // ✨ NEW: Feedback state management untuk persist feedback per exercise
   const [feedbackMap, setFeedbackMap] = useState<Record<string, any>>({});
+  
+  // ✨ NEW: Track exercise completion state for mobile navigation lock
+  const [allExercisesCompleted, setAllExercisesCompleted] = useState(false);
+  const [hasExercises, setHasExercises] = useState(false); // Default: unlocked (no exercises assumed)
 
   // Debug: Log feedbackMap changes
   useEffect(() => {
@@ -853,1069 +860,131 @@ export default function CourseDetailPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen" style={{ backgroundColor: "#FFFFFC" }}>
-      {/* Header */}
-      <header
-        className="fixed top-0 left-0 right-0 z-40 border-b overflow-visible w-full"
-        style={{
-          backgroundColor: "rgba(13, 13, 13, 0.95)",
-          backdropFilter: "blur(12px)",
-          borderBottomColor: "#333333",
-          overflow: "visible"
-        }}
+  // ✨ IMMERSIVE VIEW: For all devices (Mobile, Tablet, Desktop)
+  if (activeTab === "lessons" && currentLesson) {
+    const handleNext = () => {
+      // Mark current lesson as completed before moving to next
+      if (currentLesson) {
+        markLessonAsCompleted(currentLesson.id);
+      }
+      
+      if (selectedLessonIndex < lessons.length - 1) {
+        setSelectedLessonIndex(selectedLessonIndex + 1);
+        setAllExercisesCompleted(false); // Reset for next lesson
+        setHasExercises(false); // Reset to unlocked, will be locked if exercises exist
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
+    const handlePrevious = () => {
+      if (selectedLessonIndex > 0) {
+        setSelectedLessonIndex(selectedLessonIndex - 1);
+        setAllExercisesCompleted(false); // Reset for previous lesson
+        setHasExercises(false); // Reset to unlocked, will be locked if exercises exist
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
+    const handleSelectLesson = (index: number) => {
+      setSelectedLessonIndex(index);
+      setAllExercisesCompleted(false); // Reset when switching lessons
+      setHasExercises(false); // Reset to unlocked, will be locked if exercises exist
+    };
+
+    const handleComplete = () => {
+      // Mark last lesson as completed before exiting
+      if (currentLesson) {
+        markLessonAsCompleted(currentLesson.id);
+      }
+    };
+
+    // Map lessons to include completion status and lock status
+    const lessonsWithStatus = lessons.map((lesson, index) => {
+      const isCompleted = !!lessonProgress[lesson.id]?.completed_at;
+      
+      // Lock logic: lesson is locked if previous lesson is not completed
+      const isLocked = index > 0 && !lessonProgress[lessons[index - 1].id]?.completed_at;
+      
+      return {
+        id: lesson.id,
+        title: lesson.title,
+        isCompleted,
+        isLocked,
+      };
+    });
+
+    return (
+      <ImmersiveCourseView
+        courseId={courseId}
+        lessonTitle={currentLesson.title}
+        lessonContent={currentLesson.content || ''}
+        currentQuestionNumber={selectedLessonIndex + 1}
+        totalQuestions={lessons.length}
+        overallProgress={overallProgress}
+        lessons={lessonsWithStatus}
+        currentLessonIndex={selectedLessonIndex}
+        onSelectLesson={handleSelectLesson}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+        onComplete={handleComplete}
+        hasNext={selectedLessonIndex < lessons.length - 1}
+        hasPrevious={selectedLessonIndex > 0}
+        allExercisesCompleted={allExercisesCompleted}
+        hasExercises={hasExercises}
       >
-        <div className="container mx-auto px-4 py-3 overflow-visible" style={{ overflow: 'visible' }}>
-          <div className="flex items-center justify-between gap-4">
-            {/* Left: Course Info */}
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#EFF6FF" }}>
-                <BookOpen className="h-5 w-5" style={{ color: "#0F766E" }} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-base font-bold truncate" style={{ color: "#FFFFFF" }}>
-                  {course?.title || "Loading..."}
-                </h1>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs" style={{ color: "#9CA3AF" }}>
-                    {overallProgress}% Complete
-                  </span>
-                  <div className="h-1.5 w-24 rounded-full overflow-hidden" style={{ backgroundColor: "#374151" }}>
-                    <div 
-                      className="h-full transition-all duration-500 rounded-full"
-                      style={{ 
-                        width: `${overallProgress}%`,
-                        backgroundColor: overallProgress === 100 ? "#16A34A" : "#E8B824"
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Actions */}
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <UserMenuDropdown
-                user={user}
-                onLogout={async () => {
-                  await supabase.auth.signOut();
-                  router.push("/auth/login");
-                }}
-                onNavigate={router.push}
-              />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Layout - Hybrid: 20% FIXED sidebar (desktop) + 80% content | Full width (mobile with hamburger) */}
-      <div className="flex w-full relative min-h-[calc(100vh-80px)]">
-        {/* Mobile Overlay - Show when sidebar is open on mobile */}
-        {showSidebar && (
-          <div
-            className="fixed inset-0 bg-black/30 z-20 md:hidden"
-            onClick={() => setShowSidebar(false)}
-            style={{ top: '80px', height: 'calc(100vh - 80px)' }}
-          />
-        )}
-
-        {/* Sidebar - Collapsible on desktop / Overlay on mobile */}
-        <aside
-          className={`${
-            showSidebar ? 'translate-x-0' : '-translate-x-full md:-translate-x-full'
-          } fixed w-3/4 md:w-80 bg-white border-r overflow-y-auto transition-all duration-300 ease-out z-30`}
-          style={{
-            backgroundColor: '#FFFFFF',
-            borderColor: '#E0E0E0',
-            top: '0',
-            left: 0,
-            height: '100vh',
-            paddingTop: '80px',
+        <ExerciseInline
+          lessonId={currentLesson.id}
+          courseId={courseId}
+          userId={user.id}
+          lessonContent={currentLesson.content}
+          feedbackMap={feedbackMap}
+          onFeedbackGenerated={(exerciseId: string, feedback: any) => {
+            setFeedbackMap(prev => ({
+              ...prev,
+              [exerciseId]: feedback
+            }));
           }}
-        >
-          <div className="p-6 md:p-8 space-y-6">
-            {/* Hide Menu Button - Mobile Only */}
-            <Button
-              onClick={() => setShowSidebar(false)}
-              variant="ghost"
-              className="md:hidden w-full justify-start gap-2"
-              style={{ color: "#6B7280" }}
-            >
-              <X className="h-4 w-4" />
-              Sembunyikan Menu
-            </Button>
-            {/* Progress Summary */}
-            <div
-              className="rounded-xl p-5 border-2"
-              style={{
-                backgroundColor: "#FFFBEB",
-                borderColor: "#FDE68A",
-                boxShadow: "0 2px 8px rgba(232, 184, 36, 0.1)",
-              }}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#E8B824" }}>
-                    <Trophy className="h-4 w-4" style={{ color: "#1A1A1A" }} />
-                  </div>
-                  <h4 className="font-bold text-base" style={{ color: "#1A1A1A" }}>
-                    Progress Kamu
-                  </h4>
-                </div>
-                <span className="text-2xl font-bold" style={{ color: "#E8B824" }}>
-                  {overallProgress}%
-                </span>
-              </div>
-              <WarmProgressBar
-                percentage={overallProgress}
-                showPercentage={false}
-                height="md"
-              />
-              <p className="text-xs mt-3" style={{ color: "#92400E" }}>
-                {overallProgress === 100 
-                  ? "🎉 Selamat! Kamu sudah menyelesaikan semua materi!" 
-                  : overallProgress >= 75 
-                  ? "💪 Hampir selesai! Terus semangat!"
-                  : overallProgress >= 50
-                  ? "🚀 Kamu sudah setengah jalan! Keep going!"
-                  : overallProgress >= 25
-                  ? "✨ Awal yang bagus! Lanjutkan belajarnya!"
-                  : "🌟 Yuk mulai perjalanan belajarmu!"}
-              </p>
-            </div>
+          onAllExercisesCompleted={(completed) => {
+            setAllExercisesCompleted(completed);
+          }}
+          onHasExercises={(hasEx) => {
+            setHasExercises(hasEx);
+          }}
+        />
+      </ImmersiveCourseView>
+    );
+  }
 
-            {/* Modules & Lessons & Materials List */}
-            <div className="space-y-3">
-                {modules.map((module, moduleIndex) => {
-                  const isModuleSelected = moduleIndex === selectedModuleIndex;
-                  const isModuleUnlocked = unlockedModules.has(moduleIndex);
-                  const isModuleCompleted = moduleIndex < selectedModuleIndex;
-                  const isModuleExpanded = expandedModules.has(moduleIndex);
-
-                  return (
-                    <div key={module.id} className="mb-3">
-                      {/* Module Header */}
-                      <button
-                        onClick={() => {
-                          if (isModuleUnlocked) {
-                            toggleModuleExpand(moduleIndex);
-                          }
-                        }}
-                        disabled={!isModuleUnlocked}
-                        className="w-full text-left px-5 py-4 rounded-xl transition-all duration-200 ease-out flex items-center justify-between group"
-                        style={{
-                          backgroundColor: isModuleSelected 
-                            ? "#E8B824"
-                            : isModuleCompleted
-                            ? "#F0FDF4"
-                            : "#FAFAFA",
-                          color: isModuleSelected ? "#1A1A1A" : "#333333",
-                          opacity: !isModuleUnlocked ? 0.6 : 1,
-                          cursor: isModuleUnlocked ? "pointer" : "not-allowed",
-                          border: `2px solid ${
-                            isModuleSelected 
-                              ? "#E8B824" 
-                              : isModuleCompleted 
-                              ? "#BBF7D0" 
-                              : "#E5E7EB"
-                          }`,
-                          boxShadow: isModuleSelected 
-                            ? "0 4px 12px rgba(232, 184, 36, 0.2)" 
-                            : "0 1px 3px rgba(0, 0, 0, 0.05)",
-                        }}
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          {isModuleCompleted ? (
-                            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#D1FAE5" }}>
-                              <CheckCircle className="h-5 w-5" strokeWidth={2.5} style={{ color: "#059669" }} />
-                            </div>
-                          ) : isModuleUnlocked ? (
-                            <div 
-                              className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-all" 
-                              style={{ 
-                                backgroundColor: isModuleSelected ? "#1A1A1A" : "#FEF3C7",
-                                border: `2px solid ${isModuleSelected ? "#1A1A1A" : "#E8B824"}`
-                              }} 
-                            >
-                              <span className="text-sm font-bold" style={{ color: isModuleSelected ? "#E8B824" : "#92400E" }}>
-                                {moduleIndex + 1}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#F3F4F6" }}>
-                              <Lock className="h-5 w-5" strokeWidth={2} style={{ color: "#9CA3AF" }} />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <span className="text-xs font-bold uppercase tracking-wider block mb-0.5" style={{ color: isModuleSelected ? "#1A1A1A" : "#6B7280" }}>
-                              Module {moduleIndex + 1}
-                            </span>
-                            <span className="font-bold text-base truncate block" style={{ color: isModuleSelected ? "#1A1A1A" : "#1F2937" }}>
-                              {module.title}
-                            </span>
-                          </div>
-                        </div>
-                        {isModuleUnlocked && (
-                          <div className="flex-shrink-0 ml-2">
-                            {isModuleExpanded ? (
-                              <ChevronUp className="h-5 w-5 transition-transform duration-200" strokeWidth={2} style={{ color: isModuleSelected ? "#1A1A1A" : "#6B7280" }} />
-                            ) : (
-                              <ChevronDown className="h-5 w-5 transition-transform duration-200" strokeWidth={2} style={{ color: isModuleSelected ? "#1A1A1A" : "#6B7280" }} />
-                            )}
-                          </div>
-                        )}
-                      </button>
-
-                      {/* Module Content - Lessons & Materials with smooth animation */}
-                      <div
-                        className={`overflow-hidden transition-all ease-out ${
-                          isModuleExpanded 
-                            ? "duration-500 max-h-[2000px] opacity-100 mt-2" 
-                            : "duration-600 max-h-0 opacity-0"
-                        }`}
-                      >
-                        {(lessons.length > 0 || materials.length > 0) && (
-                          <div className="space-y-2 pl-2">
-                          {/* Lessons */}
-                          {lessons.map((lesson, lessonIndex) => {
-                            const progress = lessonProgress[lesson.id];
-                            const isLessonSelected = lessonIndex === selectedLessonIndex && isModuleSelected && activeTab === "lessons";
-                            const isCompleted = !!progress?.completed_at;
-
-                            return (
-                              <button
-                                key={lesson.id}
-                                onClick={() => {
-                                  setSelectedModuleIndex(moduleIndex);
-                                  setSelectedLessonIndex(lessonIndex);
-                                  setSelectedMaterialId(null);
-                                  setActiveTab("lessons");
-                                  setExpandedModules(new Set([moduleIndex])); // Close other modules
-                                  markLessonAsViewed(lesson.id);
-                                }}
-                                className="w-full text-left px-4 py-3.5 rounded-lg transition-all duration-200 ease-out flex items-center justify-between hover:shadow-md hover:scale-[1.02] group"
-                                style={{
-                                  backgroundColor: isLessonSelected ? "#FFF9E6" : isCompleted ? "#F0FDF4" : "#FFFFFF",
-                                  border: `2px solid ${
-                                    isLessonSelected ? "#E8B824" : isCompleted ? "#BBF7D0" : "#E5E7EB"
-                                  }`,
-                                  boxShadow: isLessonSelected 
-                                    ? "0 2px 8px rgba(232, 184, 36, 0.15)" 
-                                    : "0 1px 2px rgba(0, 0, 0, 0.05)",
-                                }}
-                              >
-                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  <div className="flex-shrink-0">
-                                    {isCompleted ? (
-                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#D1FAE5" }}>
-                                        <CheckCircle className="h-4 w-4" strokeWidth={2.5} style={{ color: "#059669" }} />
-                                      </div>
-                                    ) : isLessonSelected ? (
-                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#FEF3C7" }}>
-                                        <Play className="h-4 w-4" strokeWidth={2.5} style={{ color: "#E8B824" }} fill="#E8B824" />
-                                      </div>
-                                    ) : (
-                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center group-hover:bg-gray-100 transition-colors" style={{ backgroundColor: "#F9FAFB" }}>
-                                        <Play className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-semibold truncate" style={{ 
-                                      color: isLessonSelected ? "#92400E" : isCompleted ? "#047857" : "#374151" 
-                                    }}>
-                                      {lesson.title}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                                  {isCompleted && (
-                                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ color: "#065F46", backgroundColor: "#D1FAE5", whiteSpace: "nowrap" }}>
-                                      ✓
-                                    </span>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          })}
-
-                          {/* Materials */}
-                          {materials.map((material) => {
-                            const isMaterialSelected = selectedMaterialId === material.id && isModuleSelected && activeTab === "materials";
-                            const progress = materialProgress[material.id];
-                            const isCompleted = !!progress?.completed_at;
-                            const durationMinutes = material.duration_seconds ? Math.round(material.duration_seconds / 60) : null;
-
-                            return (
-                              <button
-                                key={material.id}
-                                onClick={() => {
-                                  setSelectedModuleIndex(moduleIndex);
-                                  setSelectedMaterialId(material.id);
-                                  setActiveTab("materials");
-                                  setExpandedModules(new Set([moduleIndex])); // Close other modules
-                                  markMaterialAsViewed(material.id);
-                                }}
-                                className="w-full text-left px-4 py-3.5 rounded-lg transition-all duration-200 ease-out flex items-center justify-between hover:shadow-md hover:scale-[1.02] group"
-                                style={{
-                                  backgroundColor: isMaterialSelected ? "#FFF4E6" : isCompleted ? "#F0FDF4" : "#FFFFFF",
-                                  border: `2px solid ${
-                                    isMaterialSelected ? "#F97316" : isCompleted ? "#BBF7D0" : "#E5E7EB"
-                                  }`,
-                                  boxShadow: isMaterialSelected 
-                                    ? "0 2px 8px rgba(249, 115, 22, 0.15)" 
-                                    : "0 1px 2px rgba(0, 0, 0, 0.05)",
-                                }}
-                              >
-                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  <div className="flex-shrink-0">
-                                    {isCompleted ? (
-                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#D1FAE5" }}>
-                                        <CheckCircle className="h-4 w-4" strokeWidth={2.5} style={{ color: "#059669" }} />
-                                      </div>
-                                    ) : isMaterialSelected ? (
-                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#FFF4E6" }}>
-                                        {material.material_type === "video" && <Video className="h-4 w-4" strokeWidth={2.5} style={{ color: "#F97316" }} />}
-                                        {material.material_type === "audio" && <Headphones className="h-4 w-4" strokeWidth={2.5} style={{ color: "#F97316" }} />}
-                                        {material.material_type === "pdf" && <FileText className="h-4 w-4" strokeWidth={2.5} style={{ color: "#F97316" }} />}
-                                        {material.material_type === "image" && <Image className="h-4 w-4" strokeWidth={2.5} style={{ color: "#F97316" }} />}
-                                        {material.material_type === "resource" && <Link2 className="h-4 w-4" strokeWidth={2.5} style={{ color: "#F97316" }} />}
-                                      </div>
-                                    ) : (
-                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center group-hover:bg-gray-100 transition-colors" style={{ backgroundColor: "#F9FAFB" }}>
-                                        {material.material_type === "video" && <Video className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />}
-                                        {material.material_type === "audio" && <Headphones className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />}
-                                        {material.material_type === "pdf" && <FileText className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />}
-                                        {material.material_type === "image" && <Image className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />}
-                                        {material.material_type === "resource" && <Link2 className="h-4 w-4 group-hover:scale-110 transition-transform" strokeWidth={2} style={{ color: "#9CA3AF" }} />}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-semibold truncate" style={{ 
-                                      color: isMaterialSelected ? "#C2410C" : isCompleted ? "#047857" : "#374151" 
-                                    }}>
-                                      {material.title}
-                                    </div>
-                                    {durationMinutes && (
-                                      <div className="text-xs mt-0.5" style={{ color: "#9CA3AF" }}>
-                                        ⏱ {durationMinutes} menit
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                                  {isCompleted && (
-                                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ color: "#065F46", backgroundColor: "#D1FAE5", whiteSpace: "nowrap" }}>
-                                      ✓
-                                    </span>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-
-            {/* Access Badge - TODO: Enable when AI feedback is ready */}
-            {false && access.access === "limited" && (
-              <div
-                className="rounded-lg p-3 border-2"
-                style={{
-                  backgroundColor: "#FFFBF0",
-                  borderColor: "#F5C518",
-                }}
-              >
-                <div className="flex items-start gap-2">
-                  <Zap className="h-4 w-4 flex-shrink-0 flex-shrink-0 mt-0.5" style={{ color: "#F5C518" }} />
-                  <div>
-                    <p
-                      className="font-bold text-xs mb-1"
-                      style={{ color: "#F5C518" }}
-                    >
-                      Akses Gratis
-                    </p>
-                    <p className="text-xs" style={{ color: "#4A4A4A" }}>
-                      2 AI Feedback Gratis
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </aside>
-
-        {/* Floating Sidebar Toggle Button - All Devices */}
-        <button
-          onClick={() => setShowSidebar(!showSidebar)}
-          className="flex fixed z-40 items-center justify-center transition-all duration-300 ease-out hover:brightness-110 active:scale-95"
+  // ✨ FALLBACK: Show message if no lesson selected or not in lessons tab
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FAFAF8" }}>
+      <div className="text-center px-4">
+        <BookOpen className="h-16 w-16 mx-auto mb-4" style={{ color: "#E8B824" }} />
+        <h2 className="text-2xl font-bold mb-2" style={{ color: "#1A1A1A" }}>
+          Pilih Pelajaran untuk Memulai
+        </h2>
+        <p className="text-gray-600 mb-6">
+          Klik tombol di bawah untuk melihat daftar pelajaran
+        </p>
+        <Button
+          onClick={() => {
+            // Navigate to first lesson if available
+            if (lessons.length > 0) {
+              setActiveTab("lessons");
+              setSelectedLessonIndex(0);
+            } else {
+              router.push('/open-courses');
+            }
+          }}
+          className="px-6 py-3"
           style={{
-            backgroundColor: '#E8B824',
+            background: 'linear-gradient(135deg, #E8B824 0%, #F5C518 100%)',
             color: '#1A1A1A',
-            top: '50%',
-            // Mobile: 75vw - 20px (sidebar is w-3/4), Desktop: 300px (sidebar is 320px - 20px)
-            left: showSidebar ? 'calc(min(75vw, 320px) - 20px)' : '-20px',
-            transform: 'translateY(-50%)',
-            width: '40px',
-            height: '80px',
-            borderRadius: '0 12px 12px 0',
-            boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
-            borderLeft: 'none',
-            borderTop: '1px solid rgba(0,0,0,0.1)',
-            borderRight: '1px solid rgba(0,0,0,0.1)',
-            borderBottom: '1px solid rgba(0,0,0,0.1)',
           }}
-          title={showSidebar ? "Sembunyikan Menu" : "Tampilkan Menu"}
         >
-          {showSidebar ? (
-            <ChevronLeft className="h-6 w-6" />
-          ) : (
-            <ChevronRight className="h-6 w-6" />
-          )}
-        </button>
-
-        {/* Main Content - Responsive width based on sidebar state */}
-        <main 
-          className={`flex-1 w-full overflow-y-auto transition-all duration-300 ease-out pb-2 pt-24 ${
-            showSidebar ? 'md:ml-80' : 'md:ml-0'
-          }`}
-          style={{ backgroundColor: '#FAFAF8' }}
-        >
-          <div className="w-full py-6 md:py-8 space-y-6">
-            <div className="w-full px-4 md:px-8">
-              {/* Course Syllabus */}
-              {course && (
-                <CourseSyllabus
-                    courseTitle={course.title}
-                    courseDescription={course.description}
-                    learningOutcomes={
-                      // Aggregate unique learning outcomes from all modules
-                      modules
-                        .flatMap((m) => m.learning_outcomes?.split("|").map((o) => o.trim()) || [])
-                        .filter((o) => o.length > 0)
-                        .filter((o, i, arr) => arr.indexOf(o) === i) // Remove duplicates
-                        .join("|")
-                    }
-                    totalModules={modules.length}
-                    estimatedHours={modules.length * 2} // Estimate 2 hours per module
-                    progressPercentage={overallProgress}
-                    teacherName={course.teacher?.name || "Instruktur"}
-                    courseId={courseId}
-                  />
-              )}
-
-              {/* Lesson Content Card */}
-              {activeTab === "lessons" && currentLesson ? (
-                <div
-                    className="rounded-lg p-6 md:p-8 shadow-md"
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      border: "1px solid #F0E9D2",
-                    }}
-                  >
-                    <div className="mb-6 pb-6 border-b border-gray-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span
-                          className="text-xs uppercase tracking-wider font-bold px-2 py-1 rounded-lg"
-                          style={{
-                            color: "#E8B824",
-                            backgroundColor: "#FFF9E6",
-                          }}
-                        >
-                          {currentLesson.lesson_type}
-                        </span>
-                        {lessonProgress[currentLesson.id]?.completed_at && (
-                          <span
-                            className="text-xs uppercase tracking-wider font-bold px-2 py-1 rounded-lg"
-                            style={{
-                              color: "#2E7D32",
-                              backgroundColor: "#E8F5E9",
-                            }}
-                          >
-                            Selesai
-                          </span>
-                        )}
-                      </div>
-                      <h2
-                        className="text-3xl font-bold mt-2 mb-2"
-                        style={{ color: "#1A1A1A" }}
-                      >
-                        {currentLesson.title}
-                      </h2>
-                      <p style={{ color: "#4A4A4A" }}>
-                        {currentLesson.description}
-                      </p>
-                    </div>
-
-                    <div
-                      style={{ color: "#374151", lineHeight: "1.8" }}
-                      className="leading-relaxed mb-8 prose prose-lg max-w-none"
-                    >
-                      {currentLesson.content ? (
-                        <div
-                          dangerouslySetInnerHTML={{
-                            __html: currentLesson.content,
-                          }}
-                          style={{
-                            wordWrap: "break-word",
-                            overflowWrap: "break-word",
-                            fontSize: "1.0625rem", // 17px for better readability
-                          }}
-                        />
-                      ) : (
-                        <p className="text-gray-400">
-                          Konten tidak tersedia untuk pelajaran ini.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Exercise Inline Component */}
-                    {currentLesson && user && (
-                      <ExerciseInline
-                        lessonId={currentLesson.id}
-                        courseId={courseId}
-                        userId={user.id}
-                        lessonContent={currentLesson.content}
-                        feedbackMap={feedbackMap}
-                        onFeedbackGenerated={(exerciseId: string, feedback: any) => {
-                          setFeedbackMap(prev => ({
-                            ...prev,
-                            [exerciseId]: feedback
-                          }));
-                        }}
-                      />
-                    )}
-
-                  </div>
-              ) : (
-                <div
-                    className="rounded-lg p-6 md:p-8 shadow-md text-center"
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      border: "1px solid #F0E9D2",
-                    }}
-                  >
-                    <p style={{ color: "#4A4A4A" }}>
-                      Pilih pelajaran untuk memulai.
-                    </p>
-                  </div>
-              )}
-
-              {/* Materials Content */}
-              {activeTab === "materials" && (
-                <>
-                  {/* Check if all lessons are completed to show materials */}
-                  {lessons.length > 0 && 
-                   Object.keys(lessonProgress).length === lessons.length && 
-                   lessons.every(l => lessonProgress[l.id]?.completed_at) ? (
-                    <>
-                      {currentMaterial ? (
-                        <div
-                            className="rounded-lg p-6 md:p-8 shadow-md"
-                            style={{
-                              backgroundColor: "#FFFFFF",
-                              border: "1px solid #F0E9D2",
-                            }}
-                          >
-                            <div className="mb-6 pb-6 border-b border-gray-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span
-                                  className="text-xs uppercase tracking-wider font-bold px-2 py-1 rounded-lg"
-                                  style={{
-                                    color: "#E87835",
-                                    backgroundColor: "#FFF4E6",
-                                  }}
-                                >
-                                  {currentMaterial.material_type}
-                                </span>
-                                {materialProgress[currentMaterial.id]?.completed_at && (
-                                  <span
-                                    className="text-xs uppercase tracking-wider font-bold px-2 py-1 rounded-lg"
-                                    style={{
-                                      color: "#2E7D32",
-                                      backgroundColor: "#E8F5E9",
-                                    }}
-                                  >
-                                    Selesai
-                                  </span>
-                                )}
-                              </div>
-                              <h2
-                                className="text-3xl font-bold mt-2 mb-2"
-                                style={{ color: "#1A1A1A" }}
-                              >
-                                {currentMaterial.title}
-                              </h2>
-                              <p style={{ color: "#4A4A4A" }}>
-                                {currentMaterial.description || "Tidak ada deskripsi yang diberikan"}
-                              </p>
-                            </div>
-
-                            {/* Material Content Preview based on type */}
-                            <div className="mb-8">
-                              {currentMaterial.material_type === "video" && (
-                                <>
-                                  {currentMaterial.source_type === "youtube_link" && currentMaterial.external_url && (
-                                    <div className="aspect-video rounded-lg overflow-hidden bg-black mb-4">
-                                      <iframe
-                                        width="100%"
-                                        height="100%"
-                                        src={currentMaterial.external_url.replace("watch?v=", "embed/")}
-                                        title={currentMaterial.title}
-                                        frameBorder="0"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                        allowFullScreen
-                                      />
-                                    </div>
-                                  )}
-                                  {currentMaterial.source_type === "upload" && currentMaterial.file_url && (
-                                    <div className="aspect-video rounded-lg overflow-hidden bg-black mb-4">
-                                      <video
-                                        controls
-                                        style={{ width: "100%", height: "100%" }}
-                                        src={currentMaterial.file_url}
-                                      />
-                                    </div>
-                                  )}
-                                  {currentMaterial.source_type === "external_link" && currentMaterial.external_url && (
-                                    <a
-                                      href={currentMaterial.external_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg"
-                                      style={{
-                                        backgroundColor: "#E87835",
-                                        color: "#FFFFFC",
-                                      }}
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                      Tonton Video
-                                    </a>
-                                  )}
-                                </>
-                              )}
-
-                              {currentMaterial.material_type === "audio" && (
-                                <>
-                                  {currentMaterial.file_url && (
-                                    <audio
-                                      controls
-                                      style={{ width: "100%" }}
-                                      src={currentMaterial.file_url}
-                                    />
-                                  )}
-                                  {currentMaterial.external_url && !currentMaterial.file_url && (
-                                    <a
-                                      href={currentMaterial.external_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg"
-                                      style={{
-                                        backgroundColor: "#E87835",
-                                        color: "#FFFFFC",
-                                      }}
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                      Buka Audio
-                                    </a>
-                                  )}
-                                </>
-                              )}
-
-                              {currentMaterial.material_type === "image" && (
-                                <>
-                                  {currentMaterial.file_url && (
-                                    <img
-                                      src={currentMaterial.file_url}
-                                      alt={currentMaterial.title}
-                                      className="max-w-full h-auto rounded-lg mb-4"
-                                    />
-                                  )}
-                                  {currentMaterial.external_url && !currentMaterial.file_url && (
-                                    <a
-                                      href={currentMaterial.external_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg"
-                                      style={{
-                                        backgroundColor: "#E87835",
-                                        color: "#FFFFFC",
-                                      }}
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                      Lihat Gambar
-                                    </a>
-                                  )}
-                                </>
-                              )}
-
-                              {currentMaterial.material_type === "pdf" && (
-                                <>
-                                  {currentMaterial.file_url && (
-                                    <a
-                                      href={currentMaterial.file_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg"
-                                      style={{
-                                        backgroundColor: "#E87835",
-                                        color: "#FFFFFC",
-                                      }}
-                                    >
-                                      <Download className="h-4 w-4" />
-                                      Unduh PDF
-                                    </a>
-                                  )}
-                                  {currentMaterial.external_url && !currentMaterial.file_url && (
-                                    <a
-                                      href={currentMaterial.external_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg"
-                                      style={{
-                                        backgroundColor: "#E87835",
-                                        color: "#FFFFFC",
-                                      }}
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                      Buka PDF
-                                    </a>
-                                  )}
-                                </>
-                              )}
-
-                              {currentMaterial.material_type === "resource" && (
-                                <>
-                                  {currentMaterial.file_url && (
-                                    <a
-                                      href={currentMaterial.file_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg"
-                                      style={{
-                                        backgroundColor: "#E87835",
-                                        color: "#FFFFFC",
-                                      }}
-                                    >
-                                      <Download className="h-4 w-4" />
-                                      Unduh Sumber Daya
-                                    </a>
-                                  )}
-                                  {currentMaterial.external_url && (
-                                    <a
-                                      href={currentMaterial.external_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg"
-                                      style={{
-                                        backgroundColor: "#E87835",
-                                        color: "#FFFFFC",
-                                      }}
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                      Buka Sumber Daya
-                                    </a>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </div>
-                      ) : (
-                        <div
-                            className="rounded-lg p-6 md:p-8 shadow-md text-center"
-                            style={{
-                              backgroundColor: "#FFFFFF",
-                              border: "1px solid #F0E9D2",
-                            }}
-                          >
-                            <p style={{ color: "#4A4A4A" }}>
-                              Pilih materi dari sidebar untuk memulai.
-                            </p>
-                          </div>
-                      )}
-                    </>
-                  ) : (
-                    <div
-                        className="rounded-lg p-6 md:p-8 shadow-md text-center"
-                        style={{
-                          backgroundColor: "#FFFFFF",
-                          border: "2px solid #F5C518",
-                        }}
-                      >
-                        <Lock className="h-8 w-8 mx-auto mb-2" strokeWidth={1.5} style={{ color: "#9CA3AF" }} />
-                        <p
-                          className="font-bold mb-1"
-                          style={{ color: "#F5C518" }}
-                        >
-                          Materi Terkunci
-                        </p>
-                        <p style={{ color: "#4A4A4A" }}>
-                          Selesaikan semua pelajaran untuk mengakses materi.
-                        </p>
-                      </div>
-                  )}
-                </>
-              )}
-
-              {/* AI Feedback Button - TODO: Enable when AI feedback is ready */}
-              {false && access.access === "limited" && (
-                  <div
-                    className="p-4 rounded-lg mb-6 border-2"
-                    style={{
-                      backgroundColor: "#FFFBF0",
-                      borderColor: "#F5C518",
-                    }}
-                  >
-                    <div className="flex items-start gap-3">
-                      <Zap
-                        className="h-5 w-5 flex-shrink-0 mt-0.5"
-                        style={{ color: "#F5C518" }}
-                      />
-                      <div className="flex-1">
-                        <p
-                          className="font-bold text-sm mb-1"
-                          style={{ color: "#F5C518" }}
-                        >
-                          Umpan Balik AI Gratis (1-2 Upaya)
-                        </p>
-                        <p className="text-xs mb-3" style={{ color: "#4A4A4A" }}>
-                          Anda memiliki upaya umpan balik AI terbatas. Tingkatkan ke berbayar
-                          untuk akses tanpa batas.
-                        </p>
-                        <Button
-                          onClick={handleAIFeedback}
-                          size="sm"
-                          className="h-8"
-                          style={{
-                            backgroundColor: "#F5C518",
-                            color: "#1A1A1A",
-                          }}
-                        >
-                          Gunakan Umpan Balik AI ({2 - aiAttempts} Tersisa)
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Analytics (only if full access) */}
-                {access.canViewAnalytics && (
-                  <div
-                    className="p-4 rounded-lg mb-6 flex items-center gap-2"
-                    style={{
-                      backgroundColor: "#E8F5E9",
-                      border: "1px solid #C8E6C9",
-                    }}
-                  >
-                    <CheckCircle className="h-4 w-4" strokeWidth={1.5} style={{ color: "#6B7280" }} />
-                    <p
-                      className="text-sm font-semibold"
-                      style={{ color: "#2E7D32" }}
-                    >
-                      Akses analitik penuh tersedia
-                    </p>
-                  </div>
-                )}
-            </div>
-          </div>
-        </main>
+          {lessons.length > 0 ? 'Mulai Belajar' : 'Kembali ke Daftar Kursus'}
+        </Button>
       </div>
-
-      {/* Fixed Navigation Footer */}
-      <div className={`fixed bottom-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-2xl z-20 transition-all duration-300 ease-out ${
-        showSidebar ? 'left-0 md:left-80' : 'left-0'
-      }`}>
-        <div className="px-6 md:px-8 py-3 flex items-center justify-between">
-          <div className="flex-1"></div>
-          
-          <div className="flex items-center w-full justify-between gap-4">
-            <Button
-              onClick={() => {
-                // Handle Sebelumnya with unified lesson/material logic
-                if (activeTab === "lessons") {
-                  if (selectedLessonIndex > 0) {
-                    // Go to previous lesson
-                    setSelectedLessonIndex(selectedLessonIndex - 1);
-                  } else if (selectedModuleIndex > 0) {
-                    // Go to previous module - use marker to go to last item after fetch
-                    const newModuleIndex = selectedModuleIndex - 1;
-                    setExpandedModules(new Set([newModuleIndex]));
-                    setSelectedModuleIndex(newModuleIndex);
-                    setSelectedLessonIndex(Number.MAX_SAFE_INTEGER); // Marker for "go to last item"
-                    setSelectedMaterialId(null);
-                    setLessons([]);
-                    setMaterials([]);
-                    setLessonProgress({});
-                    setMaterialProgress({});
-                  }
-                } else if (activeTab === "materials") {
-                  const currentIndex = materials.findIndex(m => m.id === selectedMaterialId);
-                  if (currentIndex > 0) {
-                    // Go to previous material
-                    setSelectedMaterialId(materials[currentIndex - 1].id);
-                  } else if (lessons.length > 0) {
-                    // Go to last lesson
-                    setSelectedLessonIndex(lessons.length - 1);
-                    setActiveTab("lessons");
-                  } else if (selectedModuleIndex > 0) {
-                    // Go to previous module - use marker to go to last item after fetch
-                    const newModuleIndex = selectedModuleIndex - 1;
-                    setExpandedModules(new Set([newModuleIndex]));
-                    setSelectedModuleIndex(newModuleIndex);
-                    setSelectedMaterialId(null);
-                    setSelectedLessonIndex(Number.MAX_SAFE_INTEGER); // Marker for "go to last item"
-                    setActiveTab("lessons"); // Switch to lessons when going back to previous module
-                    setLessons([]);
-                    setMaterials([]);
-                    setLessonProgress({});
-                    setMaterialProgress({});
-                  }
-                }
-              }}
-              disabled={
-                selectedLessonIndex === 0 && 
-                selectedModuleIndex === 0 && 
-                (activeTab === "lessons" || (activeTab === "materials" && materials.findIndex(m => m.id === selectedMaterialId) === 0))
-              }
-              variant="outline"
-              className="h-9 px-4 font-semibold border-2 hover:bg-gray-50 transition-all flex-1 text-sm"
-              style={{
-                color:
-                  selectedLessonIndex === 0 && selectedModuleIndex === 0 ? "#999999" : "#1A1A1A",
-              }}
-            >
-               Sebelumnya
-            </Button>
-            
-            {selectedModuleIndex < modules.length - 1 || activeTab === "lessons" || activeTab === "materials" ? (
-              <Button
-                onClick={() => {
-                  // Handle Lanjutkan with unified lesson/material logic
-                  if (activeTab === "lessons") {
-                    // Mark current lesson as completed before moving
-                    if (currentLesson) {
-                      markLessonAsCompleted(currentLesson.id);
-                    }
-                    
-                    if (selectedLessonIndex < lessons.length - 1) {
-                      // Go to next lesson
-                      setSelectedLessonIndex(selectedLessonIndex + 1);
-                    } else if (materials.length > 0) {
-                      // Go to first material when lessons exhausted
-                      setSelectedMaterialId(materials[0].id);
-                      setActiveTab("materials");
-                    } else if (selectedModuleIndex < modules.length - 1) {
-                      // Go to next module
-                      const newModuleIndex = selectedModuleIndex + 1;
-                      const newUnlockedModules = new Set(unlockedModules);
-                      newUnlockedModules.add(newModuleIndex);
-                      setUnlockedModules(newUnlockedModules);
-                      // Expand the new module and clear old data
-                      setExpandedModules(new Set([newModuleIndex]));
-                      setSelectedModuleIndex(newModuleIndex);
-                      setSelectedLessonIndex(0);
-                      setSelectedMaterialId(null);
-                      setLessons([]);
-                      setMaterials([]);
-                      setLessonProgress({});
-                      setMaterialProgress({});
-                    }
-                  } else if (activeTab === "materials") {
-                    // Mark current material as completed before moving
-                    if (currentMaterial) {
-                      markMaterialAsCompleted(currentMaterial.id);
-                    }
-                    
-                    const currentIndex = materials.findIndex(m => m.id === selectedMaterialId);
-                    if (currentIndex < materials.length - 1) {
-                      // Go to next material
-                      setSelectedMaterialId(materials[currentIndex + 1].id);
-                    } else if (selectedModuleIndex < modules.length - 1) {
-                      // Go to next module
-                      const newModuleIndex = selectedModuleIndex + 1;
-                      const newUnlockedModules = new Set(unlockedModules);
-                      newUnlockedModules.add(newModuleIndex);
-                      setUnlockedModules(newUnlockedModules);
-                      // Expand the new module and clear old data
-                      setExpandedModules(new Set([newModuleIndex]));
-                      setSelectedModuleIndex(newModuleIndex);
-                      setSelectedLessonIndex(0);
-                      setSelectedMaterialId(null);
-                      setLessons([]);
-                      setMaterials([]);
-                      setLessonProgress({});
-                      setMaterialProgress({});
-                    }
-                  }
-                }}
-                className="h-9 px-4 font-bold rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex-1 text-sm"
-                style={{
-                  background: 'linear-gradient(135deg, #F5C518 0%, #F59E0B 100%)',
-                  color: '#1A1A1A',
-                }}
-              >
-                Lanjutkan 
-              </Button>
-            ) : (
-              <Button
-                disabled
-                className="h-9 px-4 font-bold rounded-lg transition-all shadow-lg flex-1 text-sm flex items-center justify-center gap-2"
-                style={{
-                  backgroundColor: "#10B981",
-                  color: "#FFFFFF",
-                }}
-              >
-                <CheckCircle className="h-4 w-4" strokeWidth={1.5} style={{ color: "#FFFFFF" }} />
-                Selesai
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Spacing for fixed footer */}
-      <div className="h-24"></div>
-
-      {/* Upgrade Modal */}
-      {showAIUpgrade && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div
-            className="rounded-lg max-w-md w-full p-6"
-            style={{ backgroundColor: "#FFFFFC" }}
-          >
-            <h3 className="text-2xl font-bold mb-2" style={{ color: "#1A1A1A" }}>
-              Tingkatkan ke Premium
-            </h3>
-            <p style={{ color: "#4A4A4A" }} className="mb-4">
-              Anda telah menggunakan upaya umpan balik AI gratis Anda. Tingkatkan ke premium untuk akses tanpa batas ke umpan balik AI dan analitik.
-            </p>
-            <div className="space-y-3">
-              <Button
-                className="w-full h-12"
-                style={{
-                  backgroundColor: "#F5C518",
-                  color: "#1A1A1A",
-                }}
-              >
-                Tingkatkan Sekarang
-              </Button>
-              <Button
-                onClick={() => setShowAIUpgrade(false)}
-                variant="outline"
-                className="w-full h-12"
-                style={{ color: "#1A1A1A" }}
-              >
-                Batal
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
-}
+}

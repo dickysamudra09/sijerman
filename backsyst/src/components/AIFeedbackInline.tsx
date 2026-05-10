@@ -502,27 +502,24 @@ export default function AIFeedbackInline({
   // ── Render feedback yang sudah di-generate ───────────────────────────────
 
   return (
-    <div
-      className="mt-4 rounded-xl overflow-hidden"
-      style={{
-        border: "1px solid #E5E7EB",
-        backgroundColor: "#FFFFFF",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-      }}
-    >
+    <div className="mt-6 max-w-4xl mx-auto">
       {/* Header toggle */}
       <button
         onClick={() => setState((prev) => ({ ...prev, isExpanded: !prev.isExpanded }))}
-        className="w-full flex items-center justify-between px-4 py-3 transition-colors duration-150 hover:bg-gray-50"
-        style={{ borderBottom: state.isExpanded ? "1px solid #E5E7EB" : "none" }}
+        className="w-full flex items-center justify-between px-5 sm:px-6 py-4 transition-colors duration-150 hover:bg-gray-50"
+        style={{ 
+          backgroundColor: "#F9FAFB",
+          borderRadius: "16px",
+          border: "1px solid #E5E7EB",
+        }}
       >
-        <div className="flex items-center gap-2">
-          <Brain className="h-4 w-4" style={{ color: "#E8B824" }} />
-          <span className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>
+        <div className="flex items-center gap-3">
+          <Brain className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" style={{ color: "#E8B824" }} />
+          <span className="text-sm sm:text-base font-bold" style={{ color: "#1A1A1A" }}>
             Analisis AI
           </span>
           <span
-            className="text-xs px-2 py-0.5 rounded-full font-medium"
+            className="text-xs sm:text-sm px-2.5 py-1 rounded-full font-bold"
             style={{
               backgroundColor: isCorrect ? "#D1FAE5" : "#FEF3C7",
               color: isCorrect ? "#065F46" : "#92400E",
@@ -532,51 +529,50 @@ export default function AIFeedbackInline({
           </span>
         </div>
         {state.isExpanded ? (
-          <ChevronUp className="h-4 w-4" style={{ color: "#9CA3AF" }} />
+          <ChevronUp className="h-5 w-5 flex-shrink-0" style={{ color: "#9CA3AF" }} />
         ) : (
-          <ChevronDown className="h-4 w-4" style={{ color: "#9CA3AF" }} />
+          <ChevronDown className="h-5 w-5 flex-shrink-0" style={{ color: "#9CA3AF" }} />
         )}
       </button>
 
       {/* Content */}
       {state.isExpanded && (
-        <div className="p-4">
+        <div className="mt-4 space-y-4">
           {isSimpleFeedback ? (
             /* Simple feedback without sections */
-            <div className="space-y-3">
-              <div
-                className="pl-4 py-3"
-                style={{
-                  borderLeft: `3px solid ${isCorrect ? "#16A34A" : "#E8B824"}`,
-                }}
-              >
-                <div className="text-sm leading-relaxed space-y-2" style={{ color: "#374151" }}>
-                  {parseContentWithBullets(sections[0].content).map((block, blockIdx) => {
-                    if (block.type === 'text') {
-                      return (
-                        <p key={blockIdx}>
-                          {block.items[0]}
-                        </p>
-                      );
-                    } else {
-                      return (
-                        <ul key={blockIdx} className="space-y-1.5 ml-4 mt-2">
-                          {block.items.map((item, itemIdx) => (
-                            <li key={itemIdx} className="flex items-start gap-2">
-                              <span className="text-purple-600 font-bold mt-0.5 flex-shrink-0">•</span>
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      );
-                    }
-                  })}
-                </div>
+            <div 
+              className="px-5 sm:px-7 py-5 sm:py-6 rounded-2xl"
+              style={{
+                backgroundColor: isCorrect ? "#F0FDF4" : "#FFFBEB",
+                border: "1px solid #E5E7EB",
+              }}
+            >
+              <div className="text-sm sm:text-base leading-relaxed space-y-4" style={{ color: "#374151" }}>
+                {parseContentWithBullets(sections[0].content).map((block, blockIdx) => {
+                  if (block.type === 'text') {
+                    return (
+                      <p key={blockIdx}>
+                        {block.items[0]}
+                      </p>
+                    );
+                  } else {
+                    return (
+                      <ul key={blockIdx} className="space-y-2.5 ml-1">
+                        {block.items.map((item, itemIdx) => (
+                          <li key={itemIdx} className="flex items-start gap-3">
+                            <span className="font-bold mt-1 flex-shrink-0" style={{ color: "#E8B824" }}>•</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    );
+                  }
+                })}
               </div>
             </div>
           ) : (
-            /* Structured feedback with sections - Flat with Accent Bars */
-            <div className="space-y-0">
+            /* Structured feedback with sections */
+            <div className="space-y-4">
               {sections.map((section, idx) => {
                 const config = getSectionConfig(section.label, isCorrect);
                 if (!config.show) return null;
@@ -584,52 +580,46 @@ export default function AIFeedbackInline({
                 const IconComp = config.icon;
                 const friendlyLabel = getFriendlyLabel(section.label);
                 const parsedContent = parseContentWithBullets(section.content);
-                const isLastSection = idx === sections.filter(s => getSectionConfig(s.label, isCorrect).show).length - 1;
 
                 return (
-                  <div key={idx}>
-                    <div
-                      className="pl-4 py-3"
-                      style={{
-                        borderLeft: `3px solid ${config.iconColor}`,
-                      }}
-                    >
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <IconComp className="h-4 w-4 flex-shrink-0" style={{ color: config.iconColor }} />
-                        <span className="text-sm font-bold" style={{ color: config.labelColor }}>
-                          {friendlyLabel}
-                        </span>
-                      </div>
-                      
-                      {/* Render parsed content with bullets */}
-                      <div className="text-sm leading-relaxed space-y-2" style={{ color: "#374151" }}>
-                        {parsedContent.map((block, blockIdx) => {
-                          if (block.type === 'text') {
-                            return (
-                              <p key={blockIdx}>
-                                {block.items[0]}
-                              </p>
-                            );
-                          } else {
-                            return (
-                              <ul key={blockIdx} className="space-y-1.5 ml-4">
-                                {block.items.map((item, itemIdx) => (
-                                  <li key={itemIdx} className="flex items-start gap-2">
-                                    <span className="font-bold mt-0.5 flex-shrink-0" style={{ color: config.iconColor }}>•</span>
-                                    <span>{item}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            );
-                          }
-                        })}
-                      </div>
+                  <div 
+                    key={idx}
+                    className="px-5 sm:px-7 py-5 sm:py-6 rounded-2xl"
+                    style={{
+                      backgroundColor: config.bgColor,
+                      border: "1px solid #E5E7EB",
+                    }}
+                  >
+                    <div className="flex items-center gap-2.5 mb-4">
+                      <IconComp className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" style={{ color: config.iconColor }} />
+                      <span className="text-sm sm:text-base font-bold" style={{ color: config.labelColor }}>
+                        {friendlyLabel}
+                      </span>
                     </div>
                     
-                    {/* Divider between sections */}
-                    {!isLastSection && (
-                      <div className="border-t" style={{ borderColor: "#F3F4F6" }} />
-                    )}
+                    {/* Render parsed content with bullets */}
+                    <div className="text-sm sm:text-base leading-relaxed space-y-4" style={{ color: "#374151" }}>
+                      {parsedContent.map((block, blockIdx) => {
+                        if (block.type === 'text') {
+                          return (
+                            <p key={blockIdx}>
+                              {block.items[0]}
+                            </p>
+                          );
+                        } else {
+                          return (
+                            <ul key={blockIdx} className="space-y-2.5 ml-1">
+                              {block.items.map((item, itemIdx) => (
+                                <li key={itemIdx} className="flex items-start gap-3">
+                                  <span className="font-bold mt-1 flex-shrink-0" style={{ color: config.iconColor }}>•</span>
+                                  <span>{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          );
+                        }
+                      })}
+                    </div>
                   </div>
                 );
               })}
@@ -637,15 +627,15 @@ export default function AIFeedbackInline({
           )}
 
           {/* Footer info */}
-          <div className="flex items-center justify-between pt-3 mt-3 border-t" style={{ borderColor: "#F3F4F6" }}>
-            <div className="flex items-center gap-1.5">
-              <ThumbsUp className="h-3 w-3" style={{ color: "#D1D5DB" }} />
-              <span className="text-xs" style={{ color: "#9CA3AF" }}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-5 sm:px-6 py-4 rounded-2xl" style={{ backgroundColor: "#F9FAFB", border: "1px solid #E5E7EB" }}>
+            <div className="flex items-center gap-2">
+              <ThumbsUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: "#D1D5DB" }} />
+              <span className="text-xs sm:text-sm" style={{ color: "#9CA3AF" }}>
                 Dibuat oleh AI · {state.feedback.ai_model || "Llama 4 Scout"}
               </span>
             </div>
             {state.feedback.processing_time_ms && (
-              <span className="text-xs" style={{ color: "#D1D5DB" }}>
+              <span className="text-xs sm:text-sm" style={{ color: "#D1D5DB" }}>
                 {(state.feedback.processing_time_ms / 1000).toFixed(1)}s
               </span>
             )}

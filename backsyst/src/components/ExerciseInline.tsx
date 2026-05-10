@@ -58,6 +58,8 @@ interface ExerciseInlineProps {
   lessonContent?: string;
   feedbackMap: Record<string, any>;
   onFeedbackGenerated: (exerciseId: string, feedback: any) => void;
+  onAllExercisesCompleted?: (completed: boolean) => void;
+  onHasExercises?: (hasExercises: boolean) => void; // NEW: Notify if lesson has exercises
 }
 
 const defaultQuestionState = (): QuestionState => ({
@@ -79,6 +81,8 @@ export default function ExerciseInline({
   lessonContent,
   feedbackMap,
   onFeedbackGenerated,
+  onAllExercisesCompleted,
+  onHasExercises,
 }: ExerciseInlineProps) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [questionStates, setQuestionStates] = useState<Record<string, QuestionState>>({});
@@ -229,6 +233,11 @@ export default function ExerciseInline({
         console.log(`[ExerciseInline] Setting ${allExercises.length} exercises for lesson ${lessonId}`);
         setExercises(allExercises);
         setQuestionStates(initialStates);
+        
+        // NEW: Notify parent if this lesson has exercises
+        if (onHasExercises) {
+          onHasExercises(allExercises.length > 0);
+        }
       } catch (err: unknown) {
         if (!isMounted) return; // Don't set error if unmounted
         
@@ -355,6 +364,13 @@ export default function ExerciseInline({
   const correctCount = exercises.filter((ex) => questionStates[ex.id]?.isCorrect === true).length;
   const allDone = answeredCount === totalQuestions && totalQuestions > 0;
 
+  // NEW: Notify parent when all exercises are completed
+  useEffect(() => {
+    if (onAllExercisesCompleted) {
+      onAllExercisesCompleted(allDone);
+    }
+  }, [allDone, onAllExercisesCompleted]);
+
   const canGoNext =
     currentState?.isSubmitted && currentQuestionIndex < totalQuestions - 1;
   const canGoPrev = currentQuestionIndex > 0;
@@ -400,18 +416,21 @@ export default function ExerciseInline({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mt-8 space-y-6 rounded-xl p-6" style={{ backgroundColor: "#FFF9E6", border: "1px solid #FDE68A" }}>
+    <div className="mt-6 space-y-5 max-w-4xl mx-auto px-4 sm:px-6">
       {/* ── Header: judul + dot breadcrumb ── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Brain className="h-5 w-5" style={{ color: "#E8B824" }} />
-          <span className="font-bold text-base" style={{ color: "#1A1A1A" }}>
+      <div 
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 rounded-2xl" 
+        style={{ backgroundColor: "#FFF9E6" }}
+      >
+        <div className="flex items-center gap-2.5">
+          <Brain className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" style={{ color: "#E8B824" }} />
+          <span className="font-bold text-base sm:text-lg" style={{ color: "#1A1A1A" }}>
             Latihan Soal
           </span>
         </div>
 
         {/* Dot navigator */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {exercises.map((ex, idx) => {
             const st = questionStates[ex.id];
             const isActive = idx === currentQuestionIndex;
@@ -421,12 +440,12 @@ export default function ExerciseInline({
             return (
               <button
                 key={ex.id}
-                disabled={true} // Linear Strict: tidak bisa loncat
+                disabled={true}
                 title={`Soal ${idx + 1}${isDone ? (isRight ? " ✓" : " ✗") : ""}`}
                 className="rounded-full transition-all duration-200"
                 style={{
-                  width: isActive ? "24px" : "10px",
-                  height: "10px",
+                  width: isActive ? "28px" : "12px",
+                  height: "12px",
                   backgroundColor: isDone
                     ? isRight
                       ? "#16A34A"
@@ -439,7 +458,7 @@ export default function ExerciseInline({
               />
             );
           })}
-          <span className="ml-2 text-xs font-medium" style={{ color: "#6B7280" }}>
+          <span className="ml-2 text-sm font-semibold" style={{ color: "#6B7280" }}>
             {currentQuestionIndex + 1}/{totalQuestions}
           </span>
         </div>
@@ -447,25 +466,18 @@ export default function ExerciseInline({
 
       {/* ── Soal aktif ── */}
       {currentExercise && currentState && (
-        <div
-          className="rounded-xl overflow-hidden"
-          style={{
-            border: "1px solid #FDE68A",
-            backgroundColor: "#FFFFFF",
-            boxShadow: "0 2px 12px rgba(232,184,36,0.08)",
-          }}
-        >
+        <div className="space-y-5">
           {/* Soal header */}
           <div
-            className="px-5 py-4 border-b"
-            style={{ borderColor: "#FEF3C7", backgroundColor: "#FFFBEB" }}
+            className="px-5 sm:px-7 py-5 rounded-2xl"
+            style={{ backgroundColor: "#FFFBEB" }}
           >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#6B7280" }}>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+              <span className="text-xs sm:text-sm font-bold uppercase tracking-wider" style={{ color: "#6B7280" }}>
                 Soal {currentQuestionIndex + 1} dari {totalQuestions}
               </span>
               <span
-                className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                className="text-xs sm:text-sm px-3 py-1.5 rounded-full font-bold inline-block w-fit"
                 style={{ backgroundColor: "#FFF9E6", color: "#E8B824" }}
               >
                 {currentExercise.points} poin
@@ -474,22 +486,22 @@ export default function ExerciseInline({
             
             {/* For true_false: show perintah (instruction) first */}
             {currentExercise.question_type === "true_false" && currentExercise.perintah && (
-              <p className="text-sm font-medium leading-snug mb-3" style={{ color: "#6B7280" }}>
+              <p className="text-sm sm:text-base font-medium leading-relaxed mb-4" style={{ color: "#6B7280" }}>
                 {currentExercise.perintah}
               </p>
             )}
             
             {/* Main question text */}
-            <p className="text-base font-semibold leading-snug" style={{ color: "#1A1A1A" }}>
+            <p className="text-lg sm:text-xl font-bold leading-relaxed" style={{ color: "#1A1A1A" }}>
               {currentExercise.question_text}
             </p>
           </div>
 
           {/* Soal body */}
-          <div className="px-5 py-4">
+          <div className="space-y-5">
             {/* ── Sebelum submit: input jawaban ── */}
             {!currentState.isSubmitted ? (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {/* Multiple choice */}
                 {currentExercise.question_type === "multiple_choice" && (
                   <RadioGroup
@@ -497,19 +509,19 @@ export default function ExerciseInline({
                     onValueChange={(v) =>
                       updateQuestion(currentExercise.id, { selectedOptionId: v })
                     }
-                    className="space-y-2"
+                    className="space-y-3"
                   >
                     {currentExercise.options?.map((option) => (
                       <label
                         key={option.id}
                         htmlFor={`${currentExercise.id}_${option.id}`}
-                        className="flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-150"
+                        className="flex items-center gap-4 px-5 sm:px-6 py-4 sm:py-5 rounded-2xl cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
                         style={{
                           border: `2px solid ${
                             currentState.selectedOptionId === option.id ? "#E8B824" : "#E5E7EB"
                           }`,
                           backgroundColor:
-                            currentState.selectedOptionId === option.id ? "#FFFBEB" : "#FAFAFA",
+                            currentState.selectedOptionId === option.id ? "#FFFBEB" : "#FFFFFF",
                         }}
                       >
                         <RadioGroupItem
@@ -517,7 +529,7 @@ export default function ExerciseInline({
                           id={`${currentExercise.id}_${option.id}`}
                           className="flex-shrink-0"
                         />
-                        <span className="text-sm" style={{ color: "#374151" }}>
+                        <span className="text-sm sm:text-base leading-relaxed" style={{ color: "#374151" }}>
                           {option.jawaban}
                         </span>
                       </label>
@@ -532,7 +544,7 @@ export default function ExerciseInline({
                     onValueChange={(v) =>
                       updateQuestion(currentExercise.id, { selectedOptionId: v })
                     }
-                    className="flex gap-3"
+                    className="flex flex-col sm:flex-row gap-3 sm:gap-4"
                   >
                     {[
                       { value: "true", label: "Richtig (R)" },
@@ -541,13 +553,13 @@ export default function ExerciseInline({
                       <label
                         key={opt.value}
                         htmlFor={`${currentExercise.id}_${opt.value}`}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg cursor-pointer transition-all duration-150 font-semibold text-sm"
+                        className="flex-1 flex items-center justify-center gap-3 px-6 py-5 rounded-2xl cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] font-bold text-base sm:text-lg"
                         style={{
-                          border: `2px solid ${
+                          border: `3px solid ${
                             currentState.selectedOptionId === opt.value ? "#E8B824" : "#E5E7EB"
                           }`,
                           backgroundColor:
-                            currentState.selectedOptionId === opt.value ? "#FFFBEB" : "#FAFAFA",
+                            currentState.selectedOptionId === opt.value ? "#FFFBEB" : "#FFFFFF",
                           color: "#374151",
                         }}
                       >
@@ -569,7 +581,7 @@ export default function ExerciseInline({
                     onChange={(e) =>
                       updateQuestion(currentExercise.id, { essayAnswer: e.target.value })
                     }
-                    className="min-h-[100px] resize-none text-sm"
+                    className="min-h-[120px] sm:min-h-[150px] resize-none text-sm sm:text-base rounded-2xl px-5 py-4"
                     style={{ color: "#1A1A1A", borderColor: "#E5E7EB" }}
                   />
                 )}
@@ -577,12 +589,12 @@ export default function ExerciseInline({
                 <Button
                   onClick={() => handleSubmit(currentExercise)}
                   disabled={currentState.isLoading}
-                  className="w-full font-semibold transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                  className="w-full font-bold text-base sm:text-lg py-6 sm:py-7 rounded-2xl transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] shadow-lg"
                   style={{ backgroundColor: "#E8B824", color: "#1A1A1A" }}
                 >
                   {currentState.isLoading ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                       Mengirim…
                     </>
                   ) : (
@@ -592,30 +604,30 @@ export default function ExerciseInline({
               </div>
             ) : (
               /* ── Setelah submit: hasil ── */
-              <div className="space-y-3">
+              <div className="space-y-5">
                 {/* Status jawaban */}
                 <div
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg"
+                  className="flex items-center gap-4 px-5 sm:px-7 py-5 sm:py-6 rounded-2xl"
                   style={{
                     backgroundColor: currentState.isCorrect ? "#F0FDF4" : "#FFFBEB",
-                    border: `1px solid ${currentState.isCorrect ? "#BBF7D0" : "#FDE68A"}`,
+                    border: "1px solid #E5E7EB",
                   }}
                 >
                   {currentState.isCorrect ? (
-                    <CheckCircle className="h-5 w-5 flex-shrink-0" style={{ color: "#16A34A" }} />
+                    <CheckCircle className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0" style={{ color: "#16A34A" }} />
                   ) : (
-                    <AlertCircle className="h-5 w-5 flex-shrink-0" style={{ color: "#D97706" }} />
+                    <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0" style={{ color: "#D97706" }} />
                   )}
                   <div>
                     <p
-                      className="font-semibold text-sm"
+                      className="font-bold text-base sm:text-lg"
                       style={{ color: currentState.isCorrect ? "#15803D" : "#B45309" }}
                     >
                       {currentState.isCorrect
                         ? "Tepat sekali! 🎉"
                         : "Hampir! Jangan menyerah 💪"}
                     </p>
-                    <p className="text-xs mt-0.5" style={{ color: "#6B7280" }}>
+                    <p className="text-sm sm:text-base mt-1" style={{ color: "#6B7280" }}>
                       +{currentState.pointsEarned} dari {currentExercise.points} poin
                     </p>
                   </div>
@@ -623,48 +635,51 @@ export default function ExerciseInline({
 
                 {/* Tampilkan pilihan jawaban dengan warna (Multiple Choice) */}
                 {currentExercise.question_type === "multiple_choice" && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {currentExercise.options?.map((option) => {
                       const isUserAnswer = option.id === currentState.selectedOptionId;
                       const isCorrectOption = option.is_correct;
                       
-                      let borderColor = "#E5E7EB";
                       let bgColor = "#FAFAFA";
                       let textColor = "#374151";
+                      let iconColor = "#9CA3AF";
+                      let borderColor = "#E5E7EB";
                       
                       if (isCorrectOption) {
-                        borderColor = "#86EFAC";
                         bgColor = "#F0FDF4";
                         textColor = "#15803D";
+                        iconColor = "#16A34A";
+                        borderColor = "#BBF7D0";
                       } else if (isUserAnswer && !isCorrectOption) {
-                        borderColor = "#FCA5A5";
                         bgColor = "#FEF2F2";
                         textColor = "#DC2626";
+                        iconColor = "#DC2626";
+                        borderColor = "#FECACA";
                       }
 
                       return (
                         <div
                           key={option.id}
-                          className="flex items-center gap-3 px-4 py-3 rounded-lg"
+                          className="flex items-center gap-3 sm:gap-4 px-5 sm:px-6 py-4 sm:py-5 rounded-2xl"
                           style={{
-                            border: `2px solid ${borderColor}`,
                             backgroundColor: bgColor,
+                            border: `1px solid ${borderColor}`,
                           }}
                         >
-                          <div className="flex items-center gap-2 flex-1">
+                          <div className="flex items-center gap-3 flex-1">
                             {isCorrectOption && (
-                              <CheckCircle className="h-4 w-4 flex-shrink-0" style={{ color: "#16A34A" }} />
+                              <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" style={{ color: iconColor }} />
                             )}
                             {isUserAnswer && !isCorrectOption && (
-                              <AlertCircle className="h-4 w-4 flex-shrink-0" style={{ color: "#DC2626" }} />
+                              <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" style={{ color: iconColor }} />
                             )}
-                            <span className="text-sm font-medium" style={{ color: textColor }}>
+                            <span className="text-sm sm:text-base font-medium leading-relaxed" style={{ color: textColor }}>
                               {option.jawaban}
                             </span>
                           </div>
                           {isUserAnswer && (
                             <span
-                              className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                              className="text-xs sm:text-sm px-2.5 py-1 rounded-full font-bold flex-shrink-0"
                               style={{
                                 backgroundColor: isCorrectOption ? "#D1FAE5" : "#FEE2E2",
                                 color: isCorrectOption ? "#065F46" : "#991B1B",
@@ -681,7 +696,7 @@ export default function ExerciseInline({
 
                 {/* Tampilkan pilihan jawaban dengan warna (True/False) */}
                 {currentExercise.question_type === "true_false" && (
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                     {[
                       { value: "true", label: "Richtig (R)" },
                       { value: "false", label: "Falsch (F)" },
@@ -689,43 +704,46 @@ export default function ExerciseInline({
                       const isUserAnswer = currentState.selectedOptionId === opt.value;
                       const isCorrectOption = currentState.correctAnswer === opt.value;
                       
-                      let borderColor = "#E5E7EB";
                       let bgColor = "#FAFAFA";
                       let textColor = "#374151";
+                      let iconColor = "#9CA3AF";
+                      let borderColor = "#E5E7EB";
                       
                       if (isCorrectOption) {
-                        borderColor = "#86EFAC";
                         bgColor = "#F0FDF4";
                         textColor = "#15803D";
+                        iconColor = "#16A34A";
+                        borderColor = "#BBF7D0";
                       } else if (isUserAnswer && !isCorrectOption) {
-                        borderColor = "#FCA5A5";
                         bgColor = "#FEF2F2";
                         textColor = "#DC2626";
+                        iconColor = "#DC2626";
+                        borderColor = "#FECACA";
                       }
 
                       return (
                         <div
                           key={opt.value}
-                          className="flex-1 flex flex-col items-center justify-center gap-2 px-4 py-3 rounded-lg"
+                          className="flex-1 flex flex-col items-center justify-center gap-3 px-5 py-5 sm:py-6 rounded-2xl"
                           style={{
-                            border: `2px solid ${borderColor}`,
                             backgroundColor: bgColor,
+                            border: `1px solid ${borderColor}`,
                           }}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2.5">
                             {isCorrectOption && (
-                              <CheckCircle className="h-4 w-4" style={{ color: "#16A34A" }} />
+                              <CheckCircle className="h-6 w-6" style={{ color: iconColor }} />
                             )}
                             {isUserAnswer && !isCorrectOption && (
-                              <AlertCircle className="h-4 w-4" style={{ color: "#DC2626" }} />
+                              <AlertCircle className="h-6 w-6" style={{ color: iconColor }} />
                             )}
-                            <span className="text-sm font-semibold" style={{ color: textColor }}>
+                            <span className="text-base sm:text-lg font-bold" style={{ color: textColor }}>
                               {opt.label}
                             </span>
                           </div>
                           {isUserAnswer && (
                             <span
-                              className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                              className="text-xs sm:text-sm px-2.5 py-1 rounded-full font-bold"
                               style={{
                                 backgroundColor: isCorrectOption ? "#D1FAE5" : "#FEE2E2",
                                 color: isCorrectOption ? "#065F46" : "#991B1B",
@@ -743,18 +761,18 @@ export default function ExerciseInline({
                 {/* Tampilkan jawaban essay (read-only) */}
                 {currentExercise.question_type === "essay" && (
                   <div
-                    className="px-4 py-3 rounded-lg"
+                    className="px-5 sm:px-7 py-5 sm:py-6 rounded-2xl"
                     style={{
                       backgroundColor: currentState.isCorrect ? "#F0FDF4" : "#FFFBEB",
-                      border: `1px solid ${currentState.isCorrect ? "#BBF7D0" : "#FDE68A"}`,
+                      border: "1px solid #E5E7EB",
                     }}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#6B7280" }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs sm:text-sm font-bold uppercase tracking-wide" style={{ color: "#6B7280" }}>
                         Jawabanmu:
                       </span>
                     </div>
-                    <p className="text-sm leading-relaxed" style={{ color: "#374151" }}>
+                    <p className="text-sm sm:text-base leading-relaxed" style={{ color: "#374151" }}>
                       {currentState.essayAnswer}
                     </p>
                   </div>
@@ -803,40 +821,48 @@ export default function ExerciseInline({
           {/* ── Navigasi Prev / Next ── */}
           {currentState.isSubmitted && (
             <div
-              className="px-5 py-3 flex items-center justify-between border-t"
-              style={{ borderColor: "#FEF3C7", backgroundColor: "#FFFBEB" }}
+              className="px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between gap-3 rounded-2xl"
+              style={{ backgroundColor: "#F9FAFB", border: "1px solid #E5E7EB" }}
             >
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
                 onClick={() => setCurrentQuestionIndex((i) => Math.max(0, i - 1))}
                 disabled={!canGoPrev}
-                className="flex items-center gap-1.5 text-sm font-medium"
-                style={{ color: canGoPrev ? "#4B5563" : "#D1D5DB" }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm sm:text-base transition-all duration-200"
+                style={{
+                  backgroundColor: canGoPrev ? '#FFFFFF' : 'transparent',
+                  color: canGoPrev ? '#4B5563' : '#D1D5DB',
+                  border: canGoPrev ? '1px solid #E5E7EB' : 'none',
+                  cursor: canGoPrev ? 'pointer' : 'not-allowed',
+                  opacity: canGoPrev ? 1 : 0.5,
+                }}
               >
-                <ChevronLeft className="h-4 w-4" />
-                Sebelumnya
-              </Button>
+                <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="hidden sm:inline">Sebelumnya</span>
+                <span className="sm:hidden">Prev</span>
+              </button>
 
               {currentQuestionIndex < totalQuestions - 1 ? (
-                <Button
-                  size="sm"
+                <button
                   onClick={() => setCurrentQuestionIndex((i) => i + 1)}
                   disabled={!canGoNext}
-                  className="flex items-center gap-1.5 text-sm font-semibold transition-all duration-200 hover:scale-[1.02]"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm sm:text-base transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-md"
                   style={{
-                    backgroundColor: canGoNext ? "#E8B824" : "#E5E7EB",
-                    color: canGoNext ? "#1A1A1A" : "#9CA3AF",
+                    background: canGoNext 
+                      ? 'linear-gradient(135deg, #E8B824 0%, #F5C518 100%)'
+                      : 'linear-gradient(135deg, #E5E7EB 0%, #D1D5DB 100%)',
+                    color: canGoNext ? '#1A1A1A' : '#9CA3AF',
+                    cursor: canGoNext ? 'pointer' : 'not-allowed',
                   }}
                 >
-                  Soal Berikutnya
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                  <span className="hidden sm:inline">Soal Berikutnya</span>
+                  <span className="sm:hidden">Next</span>
+                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+                </button>
               ) : (
-                <div className="flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg"
+                <div className="flex items-center gap-2 text-sm sm:text-base font-bold px-4 py-2 rounded-xl"
                   style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}>
-                  <CheckCircle className="h-4 w-4" />
-                  Selesai!
+                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span>Selesai!</span>
                 </div>
               )}
             </div>
