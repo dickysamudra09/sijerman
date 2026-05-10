@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { v4 as uuidv4 } from 'uuid'
 
-export default function TambahSoalPage() {
+function TambahSoalPageInner() {
   const searchParams = useSearchParams()
   const latihanSetId = searchParams.get('latihan_set_id')
   const [pertanyaan, setPertanyaan] = useState('')
@@ -76,4 +76,18 @@ export default function TambahSoalPage() {
       <button type="submit">Simpan Soal</button>
     </form>
   )
+}
+
+
+// Wrapper component with Suspense boundary
+export default function TambahSoalPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <TambahSoalPageInner />
+    </Suspense>
+  );
 }

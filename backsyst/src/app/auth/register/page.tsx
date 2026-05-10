@@ -20,7 +20,7 @@ interface RegisterForm {
   terms: boolean;
 }
 
-export default function RegisterPage() {
+function RegisterPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
@@ -635,5 +635,19 @@ export default function RegisterPage() {
     </div>
 
     </>
+  );
+}
+
+
+// Wrapper component with Suspense boundary
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <RegisterPageInner />
+    </Suspense>
   );
 }

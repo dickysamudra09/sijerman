@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { GraduationCap, BookOpen, FileText, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function ContentHubPage() {
+function ContentHubPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const classId = searchParams.get("classId");
@@ -88,5 +88,19 @@ export default function ContentHubPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+
+// Wrapper component with Suspense boundary
+export default function ContentHubPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <ContentHubPageInner />
+    </Suspense>
   );
 }

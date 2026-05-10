@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
-export default function KuisPage() {
+function KuisPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const classId = searchParams.get("classId");
@@ -33,5 +33,19 @@ export default function KuisPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+
+// Wrapper component with Suspense boundary
+export default function KuisPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <KuisPageInner />
+    </Suspense>
   );
 }
