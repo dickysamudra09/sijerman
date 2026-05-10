@@ -9,10 +9,11 @@ const supabaseAdmin = createClient(
 // PUT /api/exercise-attempts/[id]/complete - Complete an attempt
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const attemptId = params.id;
+    const { id } = await params;
+    const attemptId = id;
     const body = await request.json();
     const { timeSpentSeconds } = body;
 
