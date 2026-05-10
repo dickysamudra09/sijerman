@@ -5,16 +5,21 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export default function CourseDetailPage() {
-  const { id } = useParams()
+  const params = useParams()
+  const id = params.id as string
   const router = useRouter()
   const [latihanSet, setLatihanSet] = useState<any>(null)
   const [soalList, setSoalList] = useState<any[]>([])
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (id) {
+      fetchData()
+    }
+  }, [id])
 
   async function fetchData() {
+    if (!id) return;
+    
     const { data: setData } = await supabase
       .from('latihan_sets')
       .select()

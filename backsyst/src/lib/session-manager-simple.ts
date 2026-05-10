@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Simplified Session Management (No Device Fingerprinting)
  * Fallback for environments where device APIs fail

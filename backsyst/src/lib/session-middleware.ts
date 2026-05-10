@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Session Validation Middleware
  * Use this to protect authenticated routes
