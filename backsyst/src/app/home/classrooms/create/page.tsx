@@ -2,7 +2,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -39,7 +39,7 @@ interface CreateFormData {
   deadline: string;
 }
 
-export default function CreateContentPage() {
+function CreateContentPageInner() {
   const {
     register,
     handleSubmit,
@@ -685,3 +685,20 @@ export default function CreateContentPage() {
   );
 }
 
+// Wrapper component with Suspense boundary
+export default function CreateContentPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <Card className="bg-white shadow-lg border-0 rounded-xl p-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 text-lg">Memuat halaman...</p>
+          </div>
+        </Card>
+      </div>
+    }>
+      <CreateContentPageInner />
+    </Suspense>
+  );
+}
