@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, Fragment } from "react";
 import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,7 @@ interface RegisterForm {
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -141,8 +142,18 @@ export default function RegisterPage() {
 
       setSuccessMessage("Akun berhasil dibuat! Mengarahkan ke login...");
       
+      // Check if there's a redirect URL from query params (e.g., from course enrollment)
+      const redirectUrl = searchParams?.get('redirect');
+      
       setTimeout(() => {
-        router.push("/auth/login?registered=true");
+        if (redirectUrl && redirectUrl.startsWith('/')) {
+          // Security check: only allow internal redirects (starts with /)
+          // Pass redirect to login page so user goes to course after login
+          router.push(`/auth/login?registered=true&redirect=${encodeURIComponent(redirectUrl)}`);
+        } else {
+          // Default: redirect to login without course redirect
+          router.push("/auth/login?registered=true");
+        }
       }, 1500);
 
     } catch (error) {

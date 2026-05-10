@@ -122,9 +122,20 @@ export default function LoginPage() {
       console.log("Activity logging temporarily disabled");
 
       setIsLoading(false);
-      const role = userProfile?.role || "student";
-      console.log("Redirecting to dashboard for role:", role);
-      router.push(`/home/${role}`);
+      
+      // Check if there's a redirect URL from query params (e.g., from course enrollment)
+      const redirectUrl = searchParams?.get('redirect');
+      
+      if (redirectUrl && redirectUrl.startsWith('/')) {
+        // Security check: only allow internal redirects (starts with /)
+        console.log("Redirecting to:", redirectUrl);
+        router.push(redirectUrl);
+      } else {
+        // Default redirect based on user role
+        const role = userProfile?.role || "student";
+        console.log("Redirecting to dashboard for role:", role);
+        router.push(`/home/${role}`);
+      }
 
     } catch (error) {
       console.error("Unexpected error during login:", error);

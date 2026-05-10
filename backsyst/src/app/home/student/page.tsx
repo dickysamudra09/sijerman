@@ -631,13 +631,13 @@ function StudentMode({ onBack }: StudentModeProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
           <Card className="bg-white shadow-lg border-0 rounded-xl">
-            <CardContent className="flex items-center justify-center p-16">
+            <CardContent className="flex items-center justify-center p-12 sm:p-16">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600 text-lg">Memuat...</p>
+                <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600 text-base sm:text-lg">Memuat...</p>
               </div>
             </CardContent>
           </Card>
@@ -648,15 +648,15 @@ function StudentMode({ onBack }: StudentModeProps) {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
           <Card className="bg-white shadow-lg border-0 rounded-xl">
             <CardHeader>
-              <CardTitle className="text-red-600 text-xl">Error</CardTitle>
+              <CardTitle className="text-red-600 text-lg sm:text-xl">Error</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-red-600 mb-6">{error}</p>
-              <Button onClick={() => router.push("/auth/login")} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <p className="text-red-600 mb-4 sm:mb-6 text-sm sm:text-base">{error}</p>
+              <Button onClick={() => router.push("/auth/login")} className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto">
                 Ke Halaman Masuk
               </Button>
             </CardContent>
@@ -669,16 +669,16 @@ function StudentMode({ onBack }: StudentModeProps) {
   return (
     <div className="min-h-screen" style={{background: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(255,253,248,1) 100%)'}}>
       {/* Header dengan dark theme dan gold accent */}
-      <div className="text-[#FFFFFC] px-6 py-8 shadow-lg relative overflow-hidden" style={{ backgroundColor: '#1A1A1A', borderBottom: '4px solid #E8B824' }}>
+      <div className="text-[#FFFFFC] px-4 sm:px-6 py-6 sm:py-8 shadow-lg relative overflow-hidden" style={{ backgroundColor: '#1A1A1A', borderBottom: '4px solid #E8B824' }}>
         {/* Decorative Blobs */}
         <div className="absolute top-10 right-20 w-64 h-64 bg-gradient-to-br from-yellow-400 to-amber-300 rounded-full filter blur-3xl opacity-8 pointer-events-none" style={{opacity: 0.08}}></div>
         <div className="absolute bottom-0 left-10 w-56 h-56 bg-gradient-to-br from-amber-300 to-yellow-300 rounded-full filter blur-3xl opacity-6 pointer-events-none" style={{opacity: 0.06}}></div>
 
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl font-bold mb-1">Selamat Datang, {userName}!</h1>
-              <p className="text-sm" style={{ color: '#E8B824' }}>Kelola kelas dan materi pembelajaran Anda dengan mudah</p>
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            <div className="min-w-0 flex-1 mr-4">
+              <h1 className="text-xl sm:text-2xl font-bold mb-1 truncate">Selamat Datang, {userName}!</h1>
+              <p className="text-xs sm:text-sm line-clamp-2" style={{ color: '#E8B824' }}>Kelola kelas dan materi pembelajaran Anda dengan mudah</p>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
               <Button variant="ghost" size="icon" className="relative rounded-full transition-colors hover:opacity-80">
@@ -695,9 +695,9 @@ function StudentMode({ onBack }: StudentModeProps) {
           </div>
 
           {/* Stats Cards - Glasmorphic */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
             {/* Card 1 - Kelas yang diikuti */}
-            <div className="rounded-xl p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
+            <div className="rounded-xl p-4 sm:p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
               backgroundColor: 'rgba(255, 255, 252, 0.1)',
               borderColor: 'rgba(232, 184, 36, 0.2)',
               borderWidth: '1px'
@@ -709,10 +709,10 @@ function StudentMode({ onBack }: StudentModeProps) {
               e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
             }}>
               <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-gray-300 text-sm mb-3">Kelas yang Diikuti</p>
-                  <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.totalClassrooms}</p>
-                  <p className="text-gray-400 text-xs">Kelas aktif</p>
+                <div className="flex-1 min-w-0 mr-3">
+                  <p className="text-gray-300 text-xs sm:text-sm mb-2 sm:mb-3 whitespace-nowrap">Kelas yang Diikuti</p>
+                  <p className="text-3xl sm:text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.totalClassrooms}</p>
+                  <p className="text-gray-400 text-xs whitespace-nowrap">Kelas aktif</p>
                 </div>
                 <div className="p-3 rounded-lg transform transition-transform hover:scale-110" style={{backgroundColor: '#E8B824'}}>
                   <BookOpen className="h-6 w-6" style={{color: '#1E1E1E'}} />
@@ -721,7 +721,7 @@ function StudentMode({ onBack }: StudentModeProps) {
             </div>
 
             {/* Card 2 - Latihan Soal selesai */}
-            <div className="rounded-xl p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
+            <div className="rounded-xl p-4 sm:p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
               backgroundColor: 'rgba(255, 255, 252, 0.1)',
               borderColor: 'rgba(232, 184, 36, 0.2)',
               borderWidth: '1px'
@@ -733,10 +733,10 @@ function StudentMode({ onBack }: StudentModeProps) {
               e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
             }}>
               <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-gray-300 text-sm mb-3">Latihan Selesai</p>
-                  <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.completedExercises}</p>
-                  <p className="text-gray-400 text-xs">Total latihan</p>
+                <div className="flex-1 min-w-0 mr-3">
+                  <p className="text-gray-300 text-xs sm:text-sm mb-2 sm:mb-3 whitespace-nowrap">Latihan Selesai</p>
+                  <p className="text-3xl sm:text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.completedExercises}</p>
+                  <p className="text-gray-400 text-xs whitespace-nowrap">Total latihan</p>
                 </div>
                 <div className="p-3 rounded-lg transform transition-transform hover:scale-110" style={{backgroundColor: '#E8B824'}}>
                   <CheckCircle2 className="h-6 w-6" style={{color: '#1E1E1E'}} />
@@ -745,7 +745,7 @@ function StudentMode({ onBack }: StudentModeProps) {
             </div>
 
             {/* Card 3 - Rata-rata Nilai */}
-            <div className="rounded-xl p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
+            <div className="rounded-xl p-4 sm:p-6 transition-all duration-300 hover:shadow-lg cursor-pointer backdrop-blur-md" style={{
               backgroundColor: 'rgba(255, 255, 252, 0.1)',
               borderColor: 'rgba(232, 184, 36, 0.2)',
               borderWidth: '1px'
@@ -757,10 +757,10 @@ function StudentMode({ onBack }: StudentModeProps) {
               e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
             }}>
               <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-gray-300 text-sm mb-3">Rata-rata Nilai</p>
-                  <p className="text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.averageScore}%</p>
-                  <p className="text-gray-400 text-xs">Performa Anda</p>
+                <div className="flex-1 min-w-0 mr-3">
+                  <p className="text-gray-300 text-xs sm:text-sm mb-2 sm:mb-3 whitespace-nowrap">Rata-rata Nilai</p>
+                  <p className="text-3xl sm:text-4xl font-bold mb-1" style={{ color: '#FFFFFC' }}>{studentStats.averageScore}%</p>
+                  <p className="text-gray-400 text-xs whitespace-nowrap">Performa Anda</p>
                 </div>
                 <div className="p-3 rounded-lg transform transition-transform hover:scale-110" style={{backgroundColor: '#E8B824'}}>
                   <TrendingUp className="h-6 w-6" style={{color: '#1E1E1E'}} />
@@ -771,40 +771,42 @@ function StudentMode({ onBack }: StudentModeProps) {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 pt-8 pb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-12">
         {/* Section Title */}
         <div className="mb-8">
         </div>
 
         {/* Tabs */}
         <Tabs defaultValue="classrooms" className="w-full border-0">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-2xl font-bold mb-1" style={{ color: "#1A1A1A" }}>
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl sm:text-2xl font-bold mb-1 truncate" style={{ color: "#1A1A1A" }}>
                 Kelas Saya
               </h2>
-              <p className="text-sm" style={{ color: "#4A4A4A" }}>
+              <p className="text-xs sm:text-sm line-clamp-2" style={{ color: "#4A4A4A" }}>
                 Kelola dan ikuti perkembangan belajar kelas Anda
               </p>
             </div>
-            <TabsList className="bg-transparent border-0 p-0 shadow-none">
+            <TabsList className="bg-transparent border-0 p-0 shadow-none flex-shrink-0">
               <TabsTrigger 
                 value="classrooms" 
-                className="!bg-transparent !text-[#4A4A4A] !border-b-2 !rounded-none !px-4 !py-2 !font-semibold !transition-all data-[state=active]:!text-[#E8B824] data-[state=active]:!border-[#E8B824] data-[state=inactive]:!text-[#4A4A4A] data-[state=inactive]:!border-transparent"
+                className="!bg-transparent !text-[#4A4A4A] !border-b-2 !rounded-none !px-3 sm:!px-4 !py-2 !font-semibold !transition-all data-[state=active]:!text-[#E8B824] data-[state=active]:!border-[#E8B824] data-[state=inactive]:!text-[#4A4A4A] data-[state=inactive]:!border-transparent text-xs sm:text-sm"
               >
-                Kelas Terdaftar
+                <span className="hidden sm:inline">Kelas Terdaftar</span>
+                <span className="sm:hidden">Kelas</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="join" 
-                className="!bg-transparent !text-[#4A4A4A] !border-b-2 !rounded-none !px-4 !py-2 !font-semibold !transition-all data-[state=active]:!text-[#E8B824] data-[state=active]:!border-[#E8B824] data-[state=inactive]:!text-[#4A4A4A] data-[state=inactive]:!border-transparent"
+                className="!bg-transparent !text-[#4A4A4A] !border-b-2 !rounded-none !px-3 sm:!px-4 !py-2 !font-semibold !transition-all data-[state=active]:!text-[#E8B824] data-[state=active]:!border-[#E8B824] data-[state=inactive]:!text-[#4A4A4A] data-[state=inactive]:!border-transparent text-xs sm:text-sm"
               >
-                Bergabung Kelas
+                <span className="hidden sm:inline">Bergabung Kelas</span>
+                <span className="sm:hidden">Gabung</span>
               </TabsTrigger>
             </TabsList>
           </div>
           
-          <TabsContent value="classrooms" className="space-y-6 mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <TabsContent value="classrooms" className="space-y-4 sm:space-y-6 mt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {classrooms.length > 0 ? (
                 classrooms.map((classroom, index) => (
                   <Card 
@@ -831,8 +833,8 @@ function StudentMode({ onBack }: StudentModeProps) {
                     ></div>
                     
                     <CardHeader className="pb-3 flex-shrink-0">
-                      <div className="flex items-start justify-between mb-2 gap-2">
-                        <CardTitle className="text-lg font-bold text-ellipsis line-clamp-2 group-hover:text-yellow-600 transition-colors" style={{ color: "#1A1A1A" }}>
+                      <div className="flex items-start justify-between mb-2 gap-2 min-w-0">
+                        <CardTitle className="text-base sm:text-lg font-bold line-clamp-2 overflow-hidden min-w-0 group-hover:text-yellow-600 transition-colors" style={{ color: "#1A1A1A" }}>
                           {classroom.name}
                         </CardTitle>
                         <Badge 
@@ -846,7 +848,7 @@ function StudentMode({ onBack }: StudentModeProps) {
                           ✓ Aktif
                         </Badge>
                       </div>
-                      <CardDescription className="text-xs" style={{ color: "#4A4A4A" }}>
+                      <CardDescription className="text-xs line-clamp-2 overflow-hidden" style={{ color: "#4A4A4A" }}>
                         {classroom.description || "Belum ada deskripsi"}
                       </CardDescription>
                     </CardHeader>
@@ -858,9 +860,9 @@ function StudentMode({ onBack }: StudentModeProps) {
                         style={{ backgroundColor: 'rgba(232, 184, 36, 0.05)' }}
                       >
                         <BookOpen className="h-4 w-4 flex-shrink-0" style={{ color: '#E8B824' }} />
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="text-xs" style={{ color: "#999999" }}>Guru</p>
-                          <p className="font-semibold text-ellipsis truncate" style={{ color: "#1A1A1A" }}>
+                          <p className="font-semibold truncate" style={{ color: "#1A1A1A" }}>
                             {classroom.teacherName || "Tidak diketahui"}
                           </p>
                         </div>
@@ -874,10 +876,10 @@ function StudentMode({ onBack }: StudentModeProps) {
                         className="rounded-lg p-3 flex items-center justify-between mb-2 backdrop-blur-sm transition-all hover:shadow-md"
                         style={{ backgroundColor: 'rgba(232, 184, 36, 0.08)', borderColor: 'rgba(232, 184, 36, 0.3)', borderWidth: '1px' }}
                       >
-                        <div>
-                          <p className="text-xs" style={{ color: "#4A4A4A" }}>Kode Kelas</p>
+                        <div className="min-w-0 flex-1 mr-2">
+                          <p className="text-xs whitespace-nowrap" style={{ color: "#4A4A4A" }}>Kode Kelas</p>
                           <code 
-                            className="text-sm font-bold font-mono"
+                            className="text-sm font-bold font-mono truncate block max-w-[140px]"
                             style={{ color: "#E8B824" }}
                           >
                             {classroom.code}
@@ -887,7 +889,7 @@ function StudentMode({ onBack }: StudentModeProps) {
                           size="sm"
                           variant="ghost"
                           onClick={() => copyClassCode(classroom.code)}
-                          className="text-sm p-2 h-8 w-8 rounded-md transition-all hover:scale-110 hover:bg-yellow-50"
+                          className="text-sm p-2 h-8 w-8 rounded-md transition-all hover:scale-110 hover:bg-yellow-50 flex-shrink-0"
                           style={{ color: "#E8B824" }}
                         >
                           <Copy className="h-4 w-4" />
@@ -895,7 +897,7 @@ function StudentMode({ onBack }: StudentModeProps) {
                       </div>
 
                       <Button
-                        className="w-full font-semibold text-sm h-10 rounded-lg transition-all hover:shadow-lg duration-200 group-hover:shadow-lg"
+                        className="w-full font-semibold text-sm h-10 rounded-lg transition-all hover:shadow-lg duration-200 group-hover:shadow-lg whitespace-nowrap"
                         style={{
                           backgroundColor: '#E8B824', 
                           color: '#1A1A1A'
@@ -908,19 +910,19 @@ function StudentMode({ onBack }: StudentModeProps) {
                           e.currentTarget.style.transform = 'translateY(0)';
                         }}
                       >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Buka Kelas
+                        <Eye className="h-4 w-4 mr-2 flex-shrink-0" />
+                        <span className="truncate">Buka Kelas</span>
                       </Button>
                     </div>
                   </Card>
                 ))
               ) : (
-                <div className="col-span-full text-center py-12">
-                  <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-30" style={{ color: "#1A1A1A" }} />
-                  <p className="text-sm" style={{ color: "#4A4A4A" }}>
+                <div className="col-span-full text-center py-8 sm:py-12 px-4">
+                  <BookOpen className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 opacity-30" style={{ color: "#1A1A1A" }} />
+                  <p className="text-sm sm:text-base" style={{ color: "#4A4A4A" }}>
                     Anda belum bergabung dengan kelas apa pun.
                   </p>
-                  <p className="text-xs mt-1" style={{ color: "#999999" }}>
+                  <p className="text-xs sm:text-sm mt-1" style={{ color: "#999999" }}>
                     Gunakan tab "Bergabung Kelas" untuk mendaftar
                   </p>
                 </div>
@@ -939,23 +941,23 @@ function StudentMode({ onBack }: StudentModeProps) {
             >
               <CardHeader className="pb-4">
                 <CardTitle 
-                  className="flex items-center gap-3 text-lg"
+                  className="flex items-center gap-2 sm:gap-3 text-base sm:text-lg"
                   style={{ color: '#1A1A1A' }}
                 >
                   <div 
-                    className="p-2 rounded-lg"
+                    className="p-2 rounded-lg flex-shrink-0"
                     style={{ backgroundColor: 'rgba(232, 184, 36, 0.1)' }}
                   >
-                    <UserPlus className="h-5 w-5" style={{ color: '#E8B824' }} />
+                    <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: '#E8B824' }} />
                   </div>
-                  Bergabung ke Kelas Baru
+                  <span className="truncate">Bergabung ke Kelas Baru</span>
                 </CardTitle>
-                <CardDescription className="text-sm mt-2" style={{ color: '#4A4A4A' }}>
+                <CardDescription className="text-xs sm:text-sm mt-2" style={{ color: '#4A4A4A' }}>
                   Masukkan kode kelas yang diberikan oleh guru Anda untuk bergabung
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-2">
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Input
                     placeholder="Masukkan kode kelas..."
                     value={joinCode}
@@ -970,7 +972,7 @@ function StudentMode({ onBack }: StudentModeProps) {
                   <Button 
                     onClick={joinClass} 
                     disabled={!joinCode.trim() || isLoading}
-                    className="px-6 h-11 font-semibold text-sm rounded-lg transition-all hover:-translate-y-1 disabled:opacity-50"
+                    className="px-6 h-11 font-semibold text-sm rounded-lg transition-all hover:-translate-y-1 disabled:opacity-50 w-full sm:w-auto"
                     style={{
                       backgroundColor: '#E8B824',
                       color: '#1A1A1A'
@@ -986,29 +988,29 @@ function StudentMode({ onBack }: StudentModeProps) {
         </Tabs>
 
         <Dialog open={isJoinConfirmOpen} onOpenChange={setIsJoinConfirmOpen}>
-          <DialogContent className="rounded-2xl max-w-md" style={{ backgroundColor: '#FFFFFC', borderColor: 'rgba(232, 184, 36, 0.3)', borderWidth: '2px' }}>
+          <DialogContent className="rounded-2xl max-w-[calc(100vw-2rem)] sm:max-w-md mx-4" style={{ backgroundColor: '#FFFFFC', borderColor: 'rgba(232, 184, 36, 0.3)', borderWidth: '2px' }}>
             <DialogHeader>
-              <DialogTitle className="text-xl" style={{ color: '#1A1A1A' }}>Bergabung ke Kelas</DialogTitle>
-              <DialogDescription style={{ color: '#4A4A4A' }}>
+              <DialogTitle className="text-lg sm:text-xl" style={{ color: '#1A1A1A' }}>Bergabung ke Kelas</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm" style={{ color: '#4A4A4A' }}>
                 Konfirmasi detail kelas sebelum bergabung
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               {selectedClassToJoin && (
                 <>
-                  <div className="space-y-2 p-4 rounded-lg" style={{ backgroundColor: 'rgba(232, 184, 36, 0.05)' }}>
-                    <h3 className="font-semibold" style={{ color: '#1A1A1A' }}>📚 {selectedClassToJoin.name}</h3>
-                    <p className="text-sm" style={{ color: '#4A4A4A' }}>📝 {selectedClassToJoin.description}</p>
-                    <p className="text-sm" style={{ color: '#4A4A4A' }}>
+                  <div className="space-y-2 p-3 sm:p-4 rounded-lg" style={{ backgroundColor: 'rgba(232, 184, 36, 0.05)' }}>
+                    <h3 className="font-semibold text-sm sm:text-base break-words" style={{ color: '#1A1A1A' }}>📚 {selectedClassToJoin.name}</h3>
+                    <p className="text-xs sm:text-sm break-words" style={{ color: '#4A4A4A' }}>📝 {selectedClassToJoin.description}</p>
+                    <p className="text-xs sm:text-sm" style={{ color: '#4A4A4A' }}>
                       📅 {new Date(selectedClassToJoin.createdAt).toLocaleDateString('id-ID')}
                     </p>
-                    <p className="text-sm" style={{ color: '#4A4A4A' }}>👨‍🏫 {selectedClassToJoin.teacherName}</p>
+                    <p className="text-xs sm:text-sm truncate" style={{ color: '#4A4A4A' }}>👨‍🏫 {selectedClassToJoin.teacherName}</p>
                   </div>
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
                     <Button 
                       onClick={confirmJoinClass} 
                       disabled={isLoading} 
-                      className="flex-1 font-semibold transition-all hover:shadow-lg disabled:opacity-50"
+                      className="flex-1 font-semibold text-sm transition-all hover:shadow-lg disabled:opacity-50 order-1 sm:order-1"
                       style={{
                         backgroundColor: '#E8B824',
                         color: '#1A1A1A'
@@ -1022,7 +1024,7 @@ function StudentMode({ onBack }: StudentModeProps) {
                     <Button 
                       variant="outline" 
                       onClick={() => setIsJoinConfirmOpen(false)} 
-                      className="flex-1 font-semibold transition-all hover:shadow-md"
+                      className="flex-1 font-semibold text-sm transition-all hover:shadow-md order-2 sm:order-2"
                       style={{
                         borderColor: 'rgba(232, 184, 36, 0.5)',
                         color: '#E8B824'

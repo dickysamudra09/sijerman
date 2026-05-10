@@ -162,10 +162,148 @@ export default function CourseDetailPage() {
   const [allExercisesCompleted, setAllExercisesCompleted] = useState(false);
   const [hasExercises, setHasExercises] = useState(false); // Default: unlocked (no exercises assumed)
 
+  // ✨ NEW: Exercise retry system state
+  const [currentAttemptId, setCurrentAttemptId] = useState<string | null>(null);
+  const [isStartingExercise, setIsStartingExercise] = useState(false);
+  const [currentExerciseData, setCurrentExerciseData] = useState<{
+    exerciseId: string;
+    exerciseTitle: string;
+  } | null>(null);
+  const [exerciseIsPassed, setExerciseIsPassed] = useState(false); // ✨ NEW: Track if user has passed
+
   // Debug: Log feedbackMap changes
   useEffect(() => {
     console.log('[DEBUG] feedbackMap updated:', Object.keys(feedbackMap));
   }, [feedbackMap]);
+
+  // ✨ NEW: Function to start new exercise attempt
+  const startExerciseAttempt = async (exerciseId: string, lessonId: string) => {
+    if (!user) return null;
+    
+    try {
+      setIsStartingExercise(true);
+      
+      console.log('[EXERCISE-RETRY] Starting attempt:', { exerciseId, lessonId, userId: user.id });
+      
+      const response = await fetch('/api/exercise-attempts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          courseExerciseId: exerciseId,
+          lessonId: lessonId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('[EXERCISE-RETRY] API Error:', response.status, errorData);
+        throw new Error(`Failed to start exercise attempt: ${response.status} - ${errorData}`);
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        setCurrentAttemptId(result.data.id);
+        console.log('[EXERCISE-RETRY] Started new attempt:', result.data.attempt_number);
+        return result.data.id;
+      } else {
+        throw new Error(result.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Error starting exercise attempt:', error);
+      // Show user-friendly error message
+      alert('Gagal memulai latihan. Pastikan database sudah di-setup dengan benar.');
+      return null;
+    } finally {
+      setIsStartingExercise(false);
+    }
+  };
+
+  // ✨ NEW: Function to complete exercise attempt
+  const completeExerciseAttempt = async (attemptId: string, timeSpentSeconds?: number) => {
+    try {
+      const response = await fetch(`/api/exercise-attempts/${attemptId}/complete`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          timeSpentSeconds,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to complete exercise attempt');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        console.log('[EXERCISE-RETRY] Completed attempt:', result.data);
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Error completing exercise attempt:', error);
+      return null;
+    }
+  };
+
+  // ✨ NEW: Function to fetch exercise data for current lesson
+  const fetchCurrentExerciseData = async (lessonId: string) => {
+    try {
+      const { data: exercisesData, error: exercisesError } = await supabase
+        .from("course_exercises")
+        .select("id, title")
+        .eq("lesson_id", lessonId)
+        .eq("is_active", true)
+        .order("exercise_number", { ascending: true })
+        .limit(1);
+
+      if (exercisesError) throw exercisesError;
+      
+      if (exercisesData && exercisesData.length > 0) {
+        const exercise = exercisesData[0];
+        setCurrentExerciseData({
+          exerciseId: exercise.id,
+          exerciseTitle: exercise.title || 'Latihan Soal'
+        });
+        
+        // ✨ NEW: Fetch exercise summary to check if passed
+        if (user) {
+          const summaryResponse = await fetch(
+            `/api/exercise-attempts/summary?exerciseId=${exercise.id}&userId=${user.id}`
+          );
+          
+          if (summaryResponse.ok) {
+            const summaryResult = await summaryResponse.json();
+            if (summaryResult.success && summaryResult.data) {
+              setExerciseIsPassed(summaryResult.data.is_passed || false);
+            } else {
+              setExerciseIsPassed(false);
+            }
+          } else {
+            setExerciseIsPassed(false);
+          }
+        }
+        
+        return exercise;
+      } else {
+        setCurrentExerciseData(null);
+        setExerciseIsPassed(false);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error fetching exercise data:', error);
+      setCurrentExerciseData(null);
+      setExerciseIsPassed(false);
+      return null;
+    }
+  };
+
+
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -824,6 +962,63 @@ export default function CourseDetailPage() {
   const currentLesson = lessons[selectedLessonIndex];
   const currentMaterial = materials.find(m => m.id === selectedMaterialId);
 
+  // ✨ NEW: Function to handle exercise completion
+  const handleExerciseComplete = async (attemptId: string) => {
+    try {
+      console.log('[EXERCISE-RETRY] Completing attempt:', attemptId);
+      
+      const completedAttempt = await completeExerciseAttempt(attemptId);
+      if (completedAttempt) {
+        console.log('[EXERCISE-RETRY] Attempt completed:', completedAttempt);
+        
+        // Reset current attempt to show history card again
+        setCurrentAttemptId(null);
+        
+        // Refresh exercise data to update history
+        if (currentLesson) {
+          fetchCurrentExerciseData(currentLesson.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error completing exercise:', error);
+    }
+  };
+
+  // ✨ NEW: Fetch exercise data when lesson changes
+  useEffect(() => {
+    if (currentLesson) {
+      fetchCurrentExerciseData(currentLesson.id);
+    }
+  }, [currentLesson]);
+
+  // ✨ NEW: Function to handle starting exercise from history card
+  const handleStartExercise = async () => {
+    if (!currentExerciseData || !currentLesson || !user) return;
+    
+    try {
+      const attemptId = await startExerciseAttempt(
+        currentExerciseData.exerciseId, 
+        currentLesson.id
+      );
+      
+      if (attemptId) {
+        // Set the current attempt ID to show exercises
+        setCurrentAttemptId(attemptId);
+        
+        // Scroll to exercise section
+        setTimeout(() => {
+          window.scrollTo({ 
+            top: document.body.scrollHeight, 
+            behavior: 'smooth' 
+          });
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error starting exercise:', error);
+      // Handle error - maybe show a toast or alert
+    }
+  };
+
   if (loading) {
     return (
       <div
@@ -872,6 +1067,8 @@ export default function CourseDetailPage() {
         setSelectedLessonIndex(selectedLessonIndex + 1);
         setAllExercisesCompleted(false); // Reset for next lesson
         setHasExercises(false); // Reset to unlocked, will be locked if exercises exist
+        setCurrentAttemptId(null); // ✨ NEW: Reset attempt when changing lessons
+        setExerciseIsPassed(false); // ✨ NEW: Reset passed status
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };
@@ -881,6 +1078,8 @@ export default function CourseDetailPage() {
         setSelectedLessonIndex(selectedLessonIndex - 1);
         setAllExercisesCompleted(false); // Reset for previous lesson
         setHasExercises(false); // Reset to unlocked, will be locked if exercises exist
+        setCurrentAttemptId(null); // ✨ NEW: Reset attempt when changing lessons
+        setExerciseIsPassed(false); // ✨ NEW: Reset passed status
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };
@@ -889,6 +1088,8 @@ export default function CourseDetailPage() {
       setSelectedLessonIndex(index);
       setAllExercisesCompleted(false); // Reset when switching lessons
       setHasExercises(false); // Reset to unlocked, will be locked if exercises exist
+      setCurrentAttemptId(null); // ✨ NEW: Reset attempt when changing lessons
+      setExerciseIsPassed(false); // ✨ NEW: Reset passed status
     };
 
     const handleComplete = () => {
@@ -931,26 +1132,47 @@ export default function CourseDetailPage() {
         hasPrevious={selectedLessonIndex > 0}
         allExercisesCompleted={allExercisesCompleted}
         hasExercises={hasExercises}
+        // ✨ NEW: Exercise retry system props
+        exerciseId={currentExerciseData?.exerciseId}
+        exerciseTitle={currentExerciseData?.exerciseTitle}
+        userId={user.id}
+        onStartExercise={handleStartExercise}
+        isStartingExercise={isStartingExercise} // ✨ NEW: Pass loading state
+        currentAttemptId={currentAttemptId} // ✨ NEW: Pass current attempt ID
+        hasHistoryCard={!!currentExerciseData && !currentAttemptId} // ✨ NEW: Lock navigation when history card shows
+        exerciseIsPassed={exerciseIsPassed} // ✨ NEW: Pass if user has passed
       >
-        <ExerciseInline
-          lessonId={currentLesson.id}
-          courseId={courseId}
-          userId={user.id}
-          lessonContent={currentLesson.content}
-          feedbackMap={feedbackMap}
-          onFeedbackGenerated={(exerciseId: string, feedback: any) => {
-            setFeedbackMap(prev => ({
-              ...prev,
-              [exerciseId]: feedback
-            }));
-          }}
-          onAllExercisesCompleted={(completed) => {
-            setAllExercisesCompleted(completed);
-          }}
-          onHasExercises={(hasEx) => {
-            setHasExercises(hasEx);
-          }}
-        />
+        {/* Only show ExerciseInline if user has started an attempt */}
+        {currentAttemptId ? (
+          <ExerciseInline
+            lessonId={currentLesson.id}
+            courseId={courseId}
+            userId={user.id}
+            lessonContent={currentLesson.content}
+            feedbackMap={feedbackMap}
+            onFeedbackGenerated={(exerciseId: string, feedback: any) => {
+              setFeedbackMap(prev => ({
+                ...prev,
+                [exerciseId]: feedback
+              }));
+            }}
+            onAllExercisesCompleted={(completed) => {
+              setAllExercisesCompleted(completed);
+            }}
+            onHasExercises={(hasEx) => {
+              setHasExercises(hasEx);
+            }}
+            attemptId={currentAttemptId} // ✨ NEW: Pass current attempt ID
+            onExerciseComplete={handleExerciseComplete} // ✨ NEW: Handle exercise completion
+          />
+        ) : currentExerciseData ? (
+          // ✨ UPDATED: Show placeholder ONLY if lesson has exercise
+          <div className="text-center py-8">
+            <p className="text-gray-500 text-sm">
+              Klik "Mulai Latihan" di atas untuk memulai mengerjakan soal
+            </p>
+          </div>
+        ) : null}
       </ImmersiveCourseView>
     );
   }
@@ -987,4 +1209,4 @@ export default function CourseDetailPage() {
       </div>
     </div>
   );
-}
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -58,6 +58,8 @@ export interface AIFeedbackInlineProps {
   questionType: "multiple_choice" | "true_false" | "essay";
   existingFeedback?: AIFeedback | null;
   onFeedbackGenerated?: (feedback: AIFeedback) => void;
+  attemptId?: string | null; // NEW: Current attempt ID for retry system
+  onFeedbackLoaded?: () => void; // ✨ NEW: Callback when feedback is loaded/generated
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -302,6 +304,8 @@ export default function AIFeedbackInline({
   lessonContent,
   existingFeedback,
   onFeedbackGenerated,
+  attemptId, // NEW: Current attempt ID
+  onFeedbackLoaded, // ✨ NEW: Callback when feedback is loaded
 }: AIFeedbackInlineProps) {
   const [state, setState] = useState<FeedbackState>({
     feedback: null,
@@ -310,6 +314,9 @@ export default function AIFeedbackInline({
     isExpanded: true,
     hasGenerated: false,
   });
+
+  // ✨ NEW: Ref for auto-scroll
+  const feedbackRef = React.useRef<HTMLDivElement>(null);
 
   // ── Load existing feedback OR generate new feedback ───────────────────────
 
@@ -324,6 +331,22 @@ export default function AIFeedbackInline({
         isExpanded: true,
         hasGenerated: true,
       });
+      
+      // ✨ NEW: Notify parent that feedback is loaded
+      if (onFeedbackLoaded) {
+        onFeedbackLoaded();
+      }
+      
+      // ✨ NEW: Auto-scroll to feedback
+      setTimeout(() => {
+        if (feedbackRef.current) {
+          feedbackRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'nearest' 
+          });
+        }
+      }, 100);
+      
       return;
     }
 
@@ -393,7 +416,7 @@ export default function AIFeedbackInline({
       const payload = {
         studentAnswerId,
         questionId: questionId || exerciseId,
-        attemptId: courseId,
+        attemptId: attemptId || courseId, // ✨ NEW: Use actual attemptId, fallback to courseId for backward compatibility
         selectedOptionId: selectedOptionId || null,
         lessonContent,
         questionType,
@@ -440,6 +463,21 @@ export default function AIFeedbackInline({
           isExpanded: true,
         }));
         if (onFeedbackGenerated) onFeedbackGenerated(result.data);
+        
+        // ✨ NEW: Notify parent that feedback is loaded
+        if (onFeedbackLoaded) {
+          onFeedbackLoaded();
+        }
+        
+        // ✨ NEW: Auto-scroll to feedback after generation
+        setTimeout(() => {
+          if (feedbackRef.current) {
+            feedbackRef.current.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'nearest' 
+            });
+          }
+        }, 100);
       } else {
         throw new Error("Feedback tidak lengkap dari AI");
       }
@@ -508,7 +546,7 @@ export default function AIFeedbackInline({
   // ✨ NEW: Render structured feedback if available
   if (structuredFeedback) {
     return (
-      <div className="mt-6 max-w-4xl mx-auto">
+      <div ref={feedbackRef} className="mt-6 max-w-4xl mx-auto">
         {/* Header toggle */}
         <button
           onClick={() => setState((prev) => ({ ...prev, isExpanded: !prev.isExpanded }))}
@@ -561,7 +599,7 @@ export default function AIFeedbackInline({
   // ── Render feedback yang sudah di-generate ───────────────────────────────
 
   return (
-    <div className="mt-6 max-w-4xl mx-auto">
+    <div ref={feedbackRef} className="mt-6 max-w-4xl mx-auto">
       {/* Header toggle */}
       <button
         onClick={() => setState((prev) => ({ ...prev, isExpanded: !prev.isExpanded }))}

@@ -153,8 +153,8 @@ export default function CourseSyllabusPage() {
   // Handle enrollment
   const handleEnroll = async () => {
     if (!user) {
-      // Redirect to login
-      router.push('/auth/login');
+      // Redirect to login with return URL so user comes back to course after login
+      router.push(`/auth/login?redirect=/open-courses/${courseId}`);
       return;
     }
 

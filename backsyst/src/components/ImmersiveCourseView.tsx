@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, CheckCircle, Lock, LogOut } from "lucide-react";
 import { MinimalTopBar } from "./MinimalTopBar";
 import { CollapsibleTextSection } from "./CollapsibleTextSection";
+import ExerciseHistoryCard from "./ExerciseHistoryCard";
 
 interface Lesson {
   id: string;
@@ -32,6 +33,15 @@ interface ImmersiveCourseViewProps {
   children: React.ReactNode;
   allExercisesCompleted?: boolean;
   hasExercises?: boolean; // If false, don't lock navigation
+  // NEW: Exercise retry system props
+  exerciseId?: string;
+  exerciseTitle?: string;
+  userId?: string;
+  onStartExercise?: () => void;
+  isStartingExercise?: boolean; // NEW: Loading state when starting exercise
+  currentAttemptId?: string | null; // NEW: Current attempt ID to hide history card
+  hasHistoryCard?: boolean; // NEW: Lock navigation when history card shows
+  exerciseIsPassed?: boolean; // ✨ NEW: If true, unlock navigation even with history card
 }
 
 export function ImmersiveCourseView({
@@ -51,15 +61,25 @@ export function ImmersiveCourseView({
   hasPrevious = false,
   allExercisesCompleted = false,
   hasExercises = false, // Default to false (unlocked by default)
+  // NEW: Exercise retry system props
+  exerciseId,
+  exerciseTitle,
+  userId,
+  onStartExercise,
+  isStartingExercise = false, // NEW: Loading state
+  currentAttemptId = null, // NEW: Current attempt ID
+  hasHistoryCard = false, // NEW: Lock navigation when history card shows
+  exerciseIsPassed = false, // ✨ NEW: If true, unlock navigation even with history card
   children,
 }: ImmersiveCourseViewProps) {
   const router = useRouter();
   const [showTextModal, setShowTextModal] = useState(false);
   const [showLessonMenu, setShowLessonMenu] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false); // ✨ NEW: Exit confirmation modal
 
   // NEW: Block body scroll when menu is open
   useEffect(() => {
-    if (showLessonMenu || showTextModal) {
+    if (showLessonMenu || showTextModal || showExitModal) {
       // Prevent body scroll
       document.body.style.overflow = 'hidden';
     } else {
@@ -71,10 +91,19 @@ export function ImmersiveCourseView({
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showLessonMenu, showTextModal]);
+  }, [showLessonMenu, showTextModal, showExitModal]);
 
   const handleExit = () => {
+    setShowExitModal(true); // ✨ NEW: Show confirmation modal instead of direct exit
+  };
+  
+  const confirmExit = () => {
+    setShowExitModal(false);
     router.push('/open-courses'); // Navigate back to course list
+  };
+  
+  const cancelExit = () => {
+    setShowExitModal(false);
   };
 
   const handleShowText = () => {
@@ -148,8 +177,22 @@ export function ImmersiveCourseView({
             />
           )}
 
-          {/* Divider */}
-          <div className="h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent my-6" />
+          {/* Exercise History Card - Show only if we have exercise data AND no active attempt */}
+          {exerciseId && exerciseTitle && userId && onStartExercise && !currentAttemptId && (
+            <ExerciseHistoryCard
+              exerciseId={exerciseId}
+              exerciseTitle={exerciseTitle}
+              userId={userId}
+              onStartExercise={onStartExercise}
+              isStarting={isStartingExercise} // ✨ NEW: Pass loading state
+              className="my-6"
+            />
+          )}
+
+          {/* Divider - Only show if we have both content and exercises */}
+          {lessonContent && exerciseId && (
+            <div className="h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent my-6" />
+          )}
 
           {/* Exercise Content */}
           <div>
@@ -165,14 +208,14 @@ export function ImmersiveCourseView({
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={onPrevious}
-              disabled={hasExercises && !allExercisesCompleted}
+              disabled={((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed))}
               className="flex-1 py-3 md:py-3.5 px-4 md:px-6 rounded-xl font-medium flex items-center justify-center gap-2 transition-all"
               style={{
-                backgroundColor: (hasExercises && !allExercisesCompleted) ? '#F9FAFB' : '#F3F4F6',
-                color: (hasExercises && !allExercisesCompleted) ? '#D1D5DB' : '#1A1A1A',
+                backgroundColor: ((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? '#F9FAFB' : '#F3F4F6',
+                color: ((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? '#D1D5DB' : '#1A1A1A',
                 border: '2px solid #E5E7EB',
-                cursor: (hasExercises && !allExercisesCompleted) ? 'not-allowed' : 'pointer',
-                opacity: (hasExercises && !allExercisesCompleted) ? 0.5 : 1,
+                cursor: ((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? 'not-allowed' : 'pointer',
+                opacity: ((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? 0.5 : 1,
               }}
             >
               <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
@@ -184,51 +227,53 @@ export function ImmersiveCourseView({
 
           {hasNext ? (
             <motion.button
-              whileTap={(hasExercises && !allExercisesCompleted) ? {} : { scale: 0.95 }}
-              onClick={(hasExercises && !allExercisesCompleted) ? undefined : onNext}
-              disabled={hasExercises && !allExercisesCompleted}
+              whileTap={((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? {} : { scale: 0.95 }}
+              onClick={((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? undefined : onNext}
+              disabled={(hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)}
               className="flex-1 py-3 md:py-3.5 px-4 md:px-6 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg relative hover:shadow-xl"
               style={{
-                background: (hasExercises && !allExercisesCompleted)
+                background: ((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed))
                   ? 'linear-gradient(135deg, #E5E7EB 0%, #D1D5DB 100%)'
                   : 'linear-gradient(135deg, #E8B824 0%, #F5C518 100%)',
-                color: (hasExercises && !allExercisesCompleted) ? '#9CA3AF' : '#1A1A1A',
-                cursor: (hasExercises && !allExercisesCompleted) ? 'not-allowed' : 'pointer',
+                color: ((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? '#9CA3AF' : '#1A1A1A',
+                cursor: ((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? 'not-allowed' : 'pointer',
               }}
             >
-              {(hasExercises && !allExercisesCompleted) && (
+              {((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) && (
                 <Lock className="h-4 w-4 md:h-5 md:w-5" />
               )}
               <span className="text-sm md:text-base">
-                {(hasExercises && !allExercisesCompleted) ? 'Selesaikan Soal' : 'Selanjutnya'}
+                {(hasHistoryCard && !exerciseIsPassed) ? 'Mulai Latihan Dulu' : 
+                 (hasExercises && !allExercisesCompleted) ? 'Selesaikan Soal' : 'Selanjutnya'}
               </span>
-              {(!hasExercises || allExercisesCompleted) && <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />}
+              {(!hasExercises || allExercisesCompleted) && (!hasHistoryCard || exerciseIsPassed) && <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />}
             </motion.button>
           ) : (
             <motion.button
-              whileTap={(hasExercises && !allExercisesCompleted) ? {} : { scale: 0.95 }}
-              onClick={(hasExercises && !allExercisesCompleted) ? undefined : () => {
+              whileTap={((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? {} : { scale: 0.95 }}
+              onClick={((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? undefined : () => {
                 // Mark last lesson as completed before exiting
                 if (onComplete) {
                   onComplete();
                 }
                 router.push('/open-courses');
               }}
-              disabled={hasExercises && !allExercisesCompleted}
+              disabled={(hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)}
               className="flex-1 py-3 md:py-3.5 px-4 md:px-6 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg relative hover:shadow-xl"
               style={{
-                background: (hasExercises && !allExercisesCompleted)
+                background: ((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed))
                   ? 'linear-gradient(135deg, #E5E7EB 0%, #D1D5DB 100%)'
                   : 'linear-gradient(135deg, #16A34A 0%, #22C55E 100%)',
-                color: (hasExercises && !allExercisesCompleted) ? '#9CA3AF' : '#FFFFFF',
-                cursor: (hasExercises && !allExercisesCompleted) ? 'not-allowed' : 'pointer',
+                color: ((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? '#9CA3AF' : '#FFFFFF',
+                cursor: ((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) ? 'not-allowed' : 'pointer',
               }}
             >
-              {(hasExercises && !allExercisesCompleted) && (
+              {((hasExercises && !allExercisesCompleted) || (hasHistoryCard && !exerciseIsPassed)) && (
                 <Lock className="h-4 w-4 md:h-5 md:w-5" />
               )}
               <span className="text-sm md:text-base">
-                {(hasExercises && !allExercisesCompleted) ? 'Selesaikan Soal' : 'Selesai! 🎉'}
+                {(hasHistoryCard && !exerciseIsPassed) ? 'Mulai Latihan Dulu' :
+                 (hasExercises && !allExercisesCompleted) ? 'Selesaikan Soal' : 'Selesai! 🎉'}
               </span>
             </motion.button>
           )}
@@ -359,6 +404,90 @@ export function ImmersiveCourseView({
           </div>
         </div>
       )}
+
+      {/* ✨ NEW: Exit Confirmation Modal */}
+      <AnimatePresence>
+        {showExitModal && (
+          <>
+            {/* Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/50"
+              onClick={cancelExit}
+              style={{ touchAction: 'none' }}
+            />
+
+            {/* Modal - Centered */}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed inset-0 z-50 flex items-center justify-center px-4"
+              style={{ touchAction: 'none' }}
+            >
+              <div 
+                className="bg-white rounded-2xl max-w-md w-full shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="px-6 py-5 border-b border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: '#FEF3C7' }}
+                    >
+                      <LogOut className="h-6 w-6" style={{ color: '#D97706' }} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold" style={{ color: '#1A1A1A' }}>
+                        Keluar dari Kursus?
+                      </h3>
+                      <p className="text-sm" style={{ color: '#6B7280' }}>
+                        Progress kamu akan tersimpan
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="px-6 py-5">
+                  <p className="text-sm leading-relaxed" style={{ color: '#4B5563' }}>
+                    Kamu yakin ingin keluar dari kursus ini? Semua progress yang sudah kamu kerjakan akan tersimpan dan bisa dilanjutkan kapan saja.
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="px-6 py-4 bg-gray-50 rounded-b-2xl flex gap-3">
+                  <button
+                    onClick={cancelExit}
+                    className="flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                    style={{
+                      backgroundColor: '#F3F4F6',
+                      color: '#1A1A1A',
+                      border: '2px solid #E5E7EB',
+                    }}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    onClick={confirmExit}
+                    className="flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-md"
+                    style={{
+                      background: 'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)',
+                      color: '#FFFFFF',
+                    }}
+                  >
+                    Ya, Keluar
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

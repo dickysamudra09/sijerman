@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Trophy,
+  Lock,
 } from "lucide-react";
 import AIFeedbackInline from "@/components/AIFeedbackInline";
 
@@ -60,6 +61,8 @@ interface ExerciseInlineProps {
   onFeedbackGenerated: (exerciseId: string, feedback: any) => void;
   onAllExercisesCompleted?: (completed: boolean) => void;
   onHasExercises?: (hasExercises: boolean) => void; // NEW: Notify if lesson has exercises
+  attemptId?: string | null; // NEW: Current attempt ID for retry system
+  onExerciseComplete?: (attemptId: string) => void; // NEW: Callback when exercise is completed
 }
 
 const defaultQuestionState = (): QuestionState => ({
@@ -83,6 +86,8 @@ export default function ExerciseInline({
   onFeedbackGenerated,
   onAllExercisesCompleted,
   onHasExercises,
+  attemptId, // NEW: Current attempt ID
+  onExerciseComplete, // NEW: Callback when exercise is completed
 }: ExerciseInlineProps) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [questionStates, setQuestionStates] = useState<Record<string, QuestionState>>({});
@@ -92,6 +97,9 @@ export default function ExerciseInline({
 
   // One-by-one navigation state
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  
+  // ✨ NEW: Track if AI feedback has loaded for current question
+  const [feedbackLoadedMap, setFeedbackLoadedMap] = useState<Record<string, boolean>>({});
 
   // ── Fetch exercises + questions + options ────────────────────────────────
 
@@ -133,55 +141,75 @@ export default function ExerciseInline({
           setFetchedLessonContent(lessonContent || '');
         }
 
-        // 2. Fetch semua exercises untuk lesson ini
+        // ✨ OPTIMIZED: Fetch exercises with nested questions and options in 1 query!
+        console.time('[ExerciseInline] Fetch exercises with joins');
         const { data: exercisesData, error: exercisesError } = await supabase
           .from("course_exercises")
-          .select("id, title, exercise_number")
+          .select(`
+            id, 
+            title, 
+            exercise_number,
+            course_questions (
+              id,
+              pertanyaan,
+              question_type,
+              points,
+              perintah,
+              jawaban,
+              jawaban_benar,
+              order_index,
+              course_options (
+                id,
+                jawaban,
+                is_correct,
+                order_index
+              )
+            )
+          `)
           .eq("lesson_id", lessonId)
           .eq("is_active", true)
-          .order("exercise_number", { ascending: true });
+          .order("exercise_number", { ascending: true })
+          .order("order_index", { foreignTable: "course_questions", ascending: true })
+          .order("order_index", { foreignTable: "course_questions.course_options", ascending: true });
+        
+        console.timeEnd('[ExerciseInline] Fetch exercises with joins');
 
         // Check if component is still mounted
         if (!isMounted) return;
 
-        if (exercisesError) throw exercisesError;
+        if (exercisesError) {
+          console.error('[ExerciseInline] Fetch error:', exercisesError);
+          throw exercisesError;
+        }
+        
         if (!exercisesData || exercisesData.length === 0) {
+          console.log('[ExerciseInline] No exercises found for lesson:', lessonId);
           setExercises([]);
           setIsLoading(false);
           return;
         }
 
-        // 3. Per exercise, fetch questions + options
+        // ✨ OPTIMIZED: Process nested data (no more loops with queries!)
         const allExercises: Exercise[] = [];
         const initialStates: Record<string, QuestionState> = {};
 
         for (const exerciseRow of exercisesData) {
-          const { data: questionsData, error: questionsError } = await supabase
-            .from("course_questions")
-            .select(
-              "id, pertanyaan, question_type, points, perintah, jawaban, jawaban_benar, order_index"
-            )
-            .eq("exercise_id", exerciseRow.id)
-            .order("order_index", { ascending: true });
-
-          if (questionsError) {
-            console.warn("Questions fetch error:", exerciseRow.id, questionsError);
+          const questions = exerciseRow.course_questions || [];
+          
+          if (questions.length === 0) {
+            console.warn('[ExerciseInline] Exercise has no questions:', exerciseRow.id);
             continue;
           }
-          if (!questionsData || questionsData.length === 0) continue;
 
-          for (const question of questionsData) {
-            const { data: optionsData } = await supabase
-              .from("course_options")
-              .select("id, jawaban, is_correct, order_index")
-              .eq("question_id", question.id)
-              .order("order_index", { ascending: true });
+          for (const question of questions) {
+            const options = question.course_options || [];
 
+            // Validate multiple choice questions have options
             if (
               question.question_type === "multiple_choice" &&
-              (!optionsData || optionsData.length === 0)
+              options.length === 0
             ) {
-              console.warn("MC question has no options, skipping:", question.id);
+              console.warn('[ExerciseInline] MC question has no options, skipping:', question.id);
               continue;
             }
 
@@ -213,7 +241,12 @@ export default function ExerciseInline({
               question_type: question.question_type || "multiple_choice",
               points: question.points || 10,
               explanation: question.perintah || "",
-              options: optionsData || [],
+              options: options.map(opt => ({
+                id: opt.id,
+                jawaban: opt.jawaban,
+                is_correct: opt.is_correct,
+                order_index: opt.order_index,
+              })),
               // Store additional fields for true_false questions
               jawaban_benar: question.question_type === "true_false" ? question.jawaban_benar : undefined,
               perintah: question.question_type === "true_false" ? question.perintah : undefined,
@@ -320,6 +353,11 @@ export default function ExerciseInline({
         answered_at: new Date().toISOString(),
       };
 
+      // ✨ NEW: Add attempt_id if available (for retry system)
+      if (attemptId) {
+        answerData.attempt_id = attemptId;
+      }
+
       if (qState.selectedOptionId && exercise.question_type === "multiple_choice") {
         answerData.selected_option_id = qState.selectedOptionId;
       }
@@ -330,11 +368,16 @@ export default function ExerciseInline({
         answerData.text_answer = qState.essayAnswer.trim();
       }
 
-      const { error: saveError } = await supabase
+      const { data: savedAnswer, error: saveError } = await supabase
         .from("course_student_answers")
-        .insert([answerData]);
+        .insert([answerData])
+        .select()
+        .single();
 
       if (saveError) throw saveError;
+
+      // ✨ NEW: Store studentAnswerId for AI feedback (if needed)
+      const studentAnswerId = savedAnswer?.id;
 
       updateQuestion(exercise.id, {
         isSubmitted: true,
@@ -369,10 +412,20 @@ export default function ExerciseInline({
     if (onAllExercisesCompleted) {
       onAllExercisesCompleted(allDone);
     }
-  }, [allDone, onAllExercisesCompleted]);
+    
+    // ✨ NEW: Complete attempt when all exercises are done
+    if (allDone && attemptId && onExerciseComplete) {
+      onExerciseComplete(attemptId);
+    }
+  }, [allDone, onAllExercisesCompleted, attemptId, onExerciseComplete]);
 
+  // ✨ NEW: Check if current question's feedback has loaded
+  const currentFeedbackLoaded = currentExercise ? feedbackLoadedMap[currentExercise.id] || false : false;
+  
   const canGoNext =
-    currentState?.isSubmitted && currentQuestionIndex < totalQuestions - 1;
+    currentState?.isSubmitted && 
+    currentQuestionIndex < totalQuestions - 1 &&
+    currentFeedbackLoaded; // ✨ NEW: Only allow next if feedback has loaded
   const canGoPrev = currentQuestionIndex > 0;
 
   // ── Loading / Error / Empty ──────────────────────────────────────────────
@@ -811,6 +864,15 @@ export default function ExerciseInline({
                         console.log('[DEBUG] Feedback generated for:', uniqueExerciseKey);
                         onFeedbackGenerated(uniqueExerciseKey, feedback); // Save with full ID!
                       }}
+                      attemptId={attemptId} // ✨ NEW: Pass attemptId for retry system
+                      onFeedbackLoaded={() => {
+                        // ✨ NEW: Mark feedback as loaded for this question
+                        console.log('[DEBUG] Feedback loaded for:', uniqueExerciseKey);
+                        setFeedbackLoadedMap(prev => ({
+                          ...prev,
+                          [uniqueExerciseKey]: true
+                        }));
+                      }}
                     />
                   );
                 })()}
@@ -842,22 +904,40 @@ export default function ExerciseInline({
               </button>
 
               {currentQuestionIndex < totalQuestions - 1 ? (
-                <button
-                  onClick={() => setCurrentQuestionIndex((i) => i + 1)}
-                  disabled={!canGoNext}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm sm:text-base transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-md"
-                  style={{
-                    background: canGoNext 
-                      ? 'linear-gradient(135deg, #E8B824 0%, #F5C518 100%)'
-                      : 'linear-gradient(135deg, #E5E7EB 0%, #D1D5DB 100%)',
-                    color: canGoNext ? '#1A1A1A' : '#9CA3AF',
-                    cursor: canGoNext ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  <span className="hidden sm:inline">Soal Berikutnya</span>
-                  <span className="sm:hidden">Next</span>
-                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-                </button>
+                <div className="flex flex-col items-end gap-1">
+                  <button
+                    onClick={() => {
+                      if (canGoNext) {
+                        setCurrentQuestionIndex((i) => i + 1);
+                      }
+                    }}
+                    disabled={!canGoNext}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm sm:text-base transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-md"
+                    style={{
+                      background: canGoNext 
+                        ? 'linear-gradient(135deg, #E8B824 0%, #F5C518 100%)'
+                        : 'linear-gradient(135deg, #E5E7EB 0%, #D1D5DB 100%)',
+                      color: canGoNext ? '#1A1A1A' : '#9CA3AF',
+                      cursor: canGoNext ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    {!currentFeedbackLoaded && currentState.isSubmitted && (
+                      <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {!currentFeedbackLoaded && currentState.isSubmitted ? 'Tunggu Feedback AI' : 'Soal Berikutnya'}
+                    </span>
+                    <span className="sm:hidden">
+                      {!currentFeedbackLoaded && currentState.isSubmitted ? 'Tunggu AI' : 'Next'}
+                    </span>
+                    {canGoNext && <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  </button>
+                  {!currentFeedbackLoaded && currentState.isSubmitted && (
+                    <span className="text-xs text-gray-500 px-2">
+                      ⏳ Menunggu analisis AI...
+                    </span>
+                  )}
+                </div>
               ) : (
                 <div className="flex items-center gap-2 text-sm sm:text-base font-bold px-4 py-2 rounded-xl"
                   style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}>

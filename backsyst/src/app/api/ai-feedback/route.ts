@@ -1372,13 +1372,14 @@ export async function POST(request: Request): Promise<Response> {
 
     let feedback: any = null;
     try {
-      const { data: attemptExists } = await supabaseAdmin
-        .from('exercise_attempts')
-        .select('id')
-        .eq('id', attemptId)
-        .maybeSingle();
+      // ✨ TEMPORARY: Skip attempt validation for now
+      // const { data: attemptExists } = await supabaseAdmin
+      //   .from('exercise_attempts')
+      //   .select('id')
+      //   .eq('id', attemptId)
+      //   .maybeSingle();
 
-      if (attemptExists) {
+      // if (attemptExists) {
         const { data: savedFeedback, error: saveError } = await supabaseAdmin
           .from('ai_feedback')
           .insert([{
@@ -1400,9 +1401,9 @@ export async function POST(request: Request): Promise<Response> {
         } else {
           feedback = savedFeedback;
         }
-      } else {
-        console.log('[OPEN-COURSE] Skipping ai_feedback insert — attemptId is not a valid exercise_attempts row.');
-      }
+      // } else {
+      //   console.log('[OPEN-COURSE] Skipping ai_feedback insert — attemptId is not a valid exercise_attempts row.');
+      // }
     } catch (dbErr) {
       console.error('Error checking attempt existence:', dbErr);
     }

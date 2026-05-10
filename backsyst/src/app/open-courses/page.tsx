@@ -38,85 +38,85 @@ export default function OpenCoursesPage() {
   const [showSidebar, setShowSidebar] = useState(false); // Sidebar hidden by default on mobile
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    checkAuth();
-  }, []);
-
-  useEffect(() => {
-    const fetchCourses = async () => {
+    const fetchData = async () => {
+      console.time("⏱️ Total fetch time");
+      
       try {
-        const { data, error } = await supabase
-          .from("courses")
-          .select(
-            `
-            id,
-            title,
-            description,
-            teacher_id,
-            is_paid,
-            created_at
-          `
-          )
-          .eq("class_type", "open")
-          .order("created_at", { ascending: false });
+        // OPTIMIZATION 1: Parallel queries with Promise.all
+        console.time("⏱️ Parallel queries");
+        const [authResult, coursesResult] = await Promise.all([
+          supabase.auth.getUser(),
+          // OPTIMIZATION 2: Use Supabase join to fetch teacher data in 1 query
+          supabase
+            .from("courses")
+            .select(`
+              id,
+              title,
+              description,
+              teacher_id,
+              is_paid,
+              created_at,
+              teacher:users!teacher_id(id, name, email)
+            `)
+            .eq("class_type", "open")
+            .order("created_at", { ascending: false })
+        ]);
+        console.timeEnd("⏱️ Parallel queries");
 
-        if (error) throw error;
+        const currentUser = authResult.data.user;
+        setUser(currentUser);
 
-        if (data && data.length > 0) {
-          const teacherIds = [...new Set(data.map((c) => c.teacher_id))];
+        if (coursesResult.error) throw coursesResult.error;
 
-          const { data: allUsers } = await supabase
-            .from("users")
-            .select("id, name, email");
+        const coursesData = coursesResult.data || [];
 
-          const teachersData = allUsers?.filter((u) => teacherIds.includes(u.id)) || [];
-
-          let coursesWithTeachers = data.map((course) => ({
-            ...course,
-            teacher: teachersData.find((t) => t.id === course.teacher_id),
-            isEnrolled: false,
-          }));
-
-          if (user) {
-            const { data: enrollments, error: enrollError } = await supabase
+        if (coursesData.length > 0) {
+          // OPTIMIZATION 3: Fetch enrollments in parallel if user exists
+          let enrolledCourseIds = new Set<string>();
+          
+          if (currentUser) {
+            console.time("⏱️ Fetch enrollments");
+            const { data: enrollments } = await supabase
               .from("course_enrollments")
               .select("course_id")
-              .eq("user_id", user.id);
-
-            console.log("Enrollment data:", enrollments);
-            console.log("Enrollment error:", enrollError);
-            console.log("Current user ID:", user.id);
+              .eq("user_id", currentUser.id);
+            console.timeEnd("⏱️ Fetch enrollments");
 
             if (enrollments) {
-              const enrolledCourseIds = new Set(enrollments.map((e) => e.course_id));
-              console.log("Enrolled course IDs:", enrolledCourseIds);
-              coursesWithTeachers = coursesWithTeachers.map((course) => ({
-                ...course,
-                isEnrolled: enrolledCourseIds.has(course.id),
-              }));
+              enrolledCourseIds = new Set(enrollments.map((e) => e.course_id));
+              console.log("✅ Enrolled course IDs:", enrolledCourseIds);
             }
           }
 
-          setCourses(coursesWithTeachers || []);
-          setFilteredCourses(coursesWithTeachers || []);
+          // Map courses with enrollment status
+          // Note: Supabase join returns teacher as array, we take first element
+          const coursesWithEnrollment: Course[] = coursesData.map((course: any) => ({
+            id: course.id,
+            title: course.title,
+            description: course.description,
+            teacher_id: course.teacher_id,
+            is_paid: course.is_paid,
+            created_at: course.created_at,
+            teacher: Array.isArray(course.teacher) ? course.teacher[0] : course.teacher,
+            isEnrolled: enrolledCourseIds.has(course.id),
+          }));
+
+          setCourses(coursesWithEnrollment);
+          setFilteredCourses(coursesWithEnrollment);
         } else {
-          setCourses(data || []);
-          setFilteredCourses(data || []);
+          setCourses([]);
+          setFilteredCourses([]);
         }
       } catch (error) {
-        console.error("Error fetching courses:", error);
+        console.error("❌ Error fetching data:", error);
       } finally {
         setLoading(false);
+        console.timeEnd("⏱️ Total fetch time");
       }
     };
 
-    fetchCourses();
-  }, [user]);
+    fetchData();
+  }, []); // Run once on mount
 
   useEffect(() => {
     let filtered = courses;
@@ -485,11 +485,58 @@ export default function OpenCoursesPage() {
             {/* Content Kanan */}
             <div className={`flex-1 min-w-0 transition-all duration-300 ${showSidebar ? 'md:ml-0' : 'md:ml-0'}`}>
               {loading ? (
-            <div className="flex items-center justify-center py-12 md:py-20">
-              <div
-                className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2"
-                style={{ borderColor: "#E8B824" }}
-              ></div>
+            <div className="space-y-4">
+              {/* Loading Skeleton */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div
+                    key={i}
+                    className="rounded-xl overflow-hidden border animate-pulse"
+                    style={{ backgroundColor: "#FAFAF7", borderColor: "#E0DDD0" }}
+                  >
+                    {/* Image skeleton */}
+                    <div className="h-40 md:h-48 bg-gradient-to-br from-gray-200 to-gray-300"></div>
+                    
+                    {/* Content skeleton */}
+                    <div className="p-3 md:p-4 space-y-3">
+                      {/* Tag skeleton */}
+                      <div className="h-6 w-24 bg-gray-200 rounded-full"></div>
+                      
+                      {/* Title skeleton */}
+                      <div className="space-y-2">
+                        <div className="h-5 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-5 bg-gray-200 rounded w-1/2"></div>
+                      </div>
+                      
+                      {/* Description skeleton */}
+                      <div className="space-y-2">
+                        <div className="h-3 bg-gray-200 rounded"></div>
+                        <div className="h-3 bg-gray-200 rounded"></div>
+                        <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                      </div>
+                      
+                      {/* Teacher skeleton */}
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-gray-100">
+                        <div className="h-8 w-8 rounded-full bg-gray-200"></div>
+                        <div className="flex-1 space-y-2">
+                          <div className="h-3 bg-gray-200 rounded w-16"></div>
+                          <div className="h-3 bg-gray-200 rounded w-24"></div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Button skeleton */}
+                    <div className="p-3 md:p-4 pt-2 border-t" style={{ borderColor: "#E0DDD0" }}>
+                      <div className="h-10 bg-gray-200 rounded-lg"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="text-center py-4">
+                <p className="text-sm animate-pulse" style={{ color: "#92400E" }}>
+                  Memuat kursus...
+                </p>
+              </div>
             </div>
           ) : filteredCourses.length === 0 ? (
             <div className="text-center py-12 md:py-20">

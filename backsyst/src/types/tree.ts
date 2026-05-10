@@ -107,3 +107,42 @@ export interface StructuredAIFeedback {
   explanation: string | null; // 50-70 words: reason + evidence + trick in narrative (null if correct)
   tips: string; // 40-50 words: actionable advice
 }
+
+// Exercise Retry System Interfaces
+export interface ExerciseAttempt {
+  id: string;
+  user_id: string;
+  course_exercise_id: string;
+  lesson_id: string;
+  attempt_number: number;
+  total_score: number;
+  max_possible_score: number;
+  percentage: number;
+  is_completed: boolean;
+  is_passed: boolean;
+  is_best_attempt: boolean;
+  started_at: string;
+  completed_at?: string;
+  time_spent_seconds?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExerciseHistory {
+  exercise_id: string;
+  exercise_title: string;
+  attempts: ExerciseAttempt[];
+  best_attempt?: ExerciseAttempt;
+  total_attempts: number;
+  has_passed_once: boolean;
+  can_retry: boolean; // always true for unlimited retries
+}
+
+export interface ExerciseAttemptSummary {
+  has_attempts: boolean;
+  is_passed: boolean;
+  best_score: number;
+  total_attempts: number;
+  last_attempt_date?: string;
+  can_retry: boolean;
+}
