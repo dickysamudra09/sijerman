@@ -97,3 +97,13 @@ export type TreeNode =
   | ExerciseNode
   | MaterialSectionNode
   | MaterialNode;
+
+// Structured AI Feedback Interface (Narrative Format)
+export interface StructuredAIFeedback {
+  correct: boolean;
+  verdict: string; // 30-40 words: motivational message
+  userAnswer: string;
+  correctAnswer: string;
+  explanation: string | null; // 50-70 words: reason + evidence + trick in narrative (null if correct)
+  tips: string; // 40-50 words: actionable advice
+}

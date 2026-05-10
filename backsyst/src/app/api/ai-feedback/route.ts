@@ -6,6 +6,7 @@ import {
 } from './fallback-analyzer';
 import {
   buildOptimizedPrompt,
+  buildStructuredPrompt,
   formatPromptForAPI,
   validatePromptConfig
 } from './prompt-engineering';
@@ -208,7 +209,19 @@ async function callGroqAPIWithValidationAndRetry(
         // Found JSON structure
         try {
           const parsed = JSON.parse(jsonMatch[0]);
-          feedbackText = parsed.feedback_text || '';
+          
+          // ✨ NEW: Check if it's structured feedback (has 'correct' field)
+          if (parsed.correct !== undefined) {
+            // This is structured JSON feedback - return as-is
+            console.log(`Attempt ${currentAttempt}: Structured JSON feedback detected`);
+            feedbackText = JSON.stringify(parsed); // Keep as JSON string for now
+          } else if (parsed.feedback_text) {
+            // Old format with feedback_text wrapper
+            feedbackText = parsed.feedback_text;
+          } else {
+            // Unknown JSON format, use raw
+            feedbackText = cleanContent;
+          }
         } catch (jsonError) {
           // JSON parsing failed, treat entire response as feedback text
           console.log(`Attempt ${currentAttempt}: JSON parsing failed, using raw response`);
@@ -228,6 +241,23 @@ async function callGroqAPIWithValidationAndRetry(
       console.log(`Attempt ${currentAttempt}: Feedback too short or empty (${feedbackText.length} chars)`);
       currentAttempt++;
       continue;
+    }
+
+    // ✨ NEW: If it's structured JSON, skip validation and return immediately
+    try {
+      const parsed = JSON.parse(feedbackText);
+      if (parsed.correct !== undefined) {
+        console.log(`✓ Structured JSON feedback validated`);
+        return {
+          content: feedbackText,
+          validated: true,
+          attempts: currentAttempt,
+          finalScore: 100, // Structured JSON is always valid
+          issues: []
+        };
+      }
+    } catch (e) {
+      // Not JSON or invalid JSON, continue with normal validation
     }
 
     const validation = validateFeedback(
@@ -558,13 +588,13 @@ async function generateAIFeedbackWithGroq(
     );
     const relevantReferences = convertToReferenceMaterials(referenceMatches);
 
-    const promptConfig = buildOptimizedPrompt(
+    // ✨ USE STRUCTURED PROMPT for JSON response
+    const promptConfig = buildStructuredPrompt(
       question.question_type,
       question.question_text,
       studentAnswerText,
       correctAnswerText,
       isCorrect,
-      undefined,
       lessonContent
     );
 
@@ -743,13 +773,13 @@ async function generateAIFeedback(
     );
     const relevantReferences = convertToReferenceMaterials(referenceMatches);
 
-    const promptConfig = buildOptimizedPrompt(
+    // ✨ USE STRUCTURED PROMPT for JSON response
+    const promptConfig = buildStructuredPrompt(
       question.question_type,
       question.question_text,
       studentAnswerText,
       correctAnswerText,
       isCorrect,
-      undefined,
       lessonContent
     );
 
@@ -1197,11 +1227,16 @@ export async function POST(request: Request): Promise<Response> {
         const instruction = (questionData as any).instruction || '';
         const answerStatement = (questionData as any).answer_statement || questionData.question_text;
         
-        // Student answer
-        if (!selectedOption && textAnswer) {
+        // Student answer - prioritize selectedOption, then textAnswer, then default
+        if (selectedOption) {
+          studentAnswerText = selectedOption.option_text;
+        } else if (textAnswer) {
           studentAnswerText = textAnswer === 'true' ? 'Richtig (R)' : 'Falsch (F)';
+        } else if (selectedOptionId === 'true' || selectedOptionId === 'false') {
+          // Handle boolean string IDs
+          studentAnswerText = selectedOptionId === 'true' ? 'Richtig (R)' : 'Falsch (F)';
         } else {
-          studentAnswerText = selectedOption?.option_text || 'Tidak ada jawaban';
+          studentAnswerText = 'Tidak ada jawaban';
         }
         
         // Correct answer based on jawaban_benar boolean
@@ -1217,7 +1252,10 @@ export async function POST(request: Request): Promise<Response> {
           answerStatement,
           correctAnswerBoolean,
           studentAnswer: studentAnswerText,
-          correctAnswer: correctAnswerText
+          correctAnswer: correctAnswerText,
+          selectedOptionId,
+          textAnswer,
+          hasSelectedOption: !!selectedOption
         });
         
         // Create modified question data with full context
@@ -1227,13 +1265,13 @@ export async function POST(request: Request): Promise<Response> {
         };
         
         // Call AI with instruction and statement separately for better context
-        const promptConfig = buildOptimizedPrompt(
+        // ✨ USE STRUCTURED PROMPT for JSON response
+        const promptConfig = buildStructuredPrompt(
           'true_false',
           fullQuestionText,
           studentAnswerText,
           correctAnswerText,
           finalIsCorrect,
-          undefined,
           lessonContent,
           instruction,
           answerStatement

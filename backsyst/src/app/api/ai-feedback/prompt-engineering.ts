@@ -387,3 +387,85 @@ export function validatePromptConfig(config: PromptConfig): {
     errors
   };
 }
+
+// ✨ NEW: Narrative Structured JSON Prompt (Target: 1,500 tokens)
+const STRUCTURED_SYSTEM_PROMPT = `Kamu tutor bahasa Jerman yang ramah dan supportive untuk siswa A1-A2.
+
+WAJIB return JSON dengan struktur ini:
+{
+  "correct": boolean,
+  "verdict": "pesan motivasi natural seperti tutor berbicara (30-40 kata)",
+  "userAnswer": "WAJIB isi dengan jawaban siswa yang sebenarnya (copy exact dari input)",
+  "correctAnswer": "WAJIB isi dengan jawaban benar (copy exact dari input)",
+  "explanation": "penjelasan lengkap mengapa salah/benar dengan bukti dari teks, ditulis seperti tutor menjelaskan secara lisan (50-70 kata, null jika benar)",
+  "tips": "saran actionable yang membantu, ditulis seperti tutor memberikan nasihat (40-50 kata)"
+}
+
+Aturan konten:
+- Bahasa Indonesia yang hangat, ramah, dan natural seperti tutor berbicara langsung
+- Gunakan kata-kata seperti "Ayo kita lihat...", "Coba perhatikan...", "Kamu hampir benar..."
+- PENTING: userAnswer dan correctAnswer HARUS diisi dengan nilai exact dari input (jangan kosong!)
+- Jika BENAR: explanation = null, fokus pada penguatan di verdict dan tips
+- Jika SALAH: explanation berisi alasan + bukti konkret dari teks + trik sederhana dalam satu narasi mengalir
+- Kutip kalimat lengkap dari teks sebagai bukti: "Di teks tertulis: '[kalimat lengkap]'"
+- Tips selalu ada (untuk penguatan jika benar, atau perbaikan jika salah)
+- Hindari format bullet point, tulis dalam paragraf mengalir
+- HARUS valid JSON!
+
+Contoh verdict yang baik:
+✓ "Tepat sekali! Kamu berhasil memahami teks dengan baik. Jawabanmu menunjukkan bahwa kamu benar-benar membaca dengan teliti dan menemukan informasi yang tepat."
+✗ "Hampir benar! Jangan khawatir, ini kesempatan bagus untuk belajar lebih dalam. Dengan sedikit latihan lagi, kamu pasti bisa menguasai ini."
+
+Contoh explanation yang baik (jika salah):
+"Ayo kita lihat buktinya di teks bersama-sama. Di teks tertulis: 'Rania kommt aus Jakarta und wohnt jetzt in Malang.' Dari kalimat ini kita bisa melihat bahwa Rania memang berasal dari Jakarta dan sekarang tinggal di Malang. Trik sederhananya: cari kata kunci 'kommt aus' untuk asal dan 'wohnt' untuk tempat tinggal sekarang."
+
+Contoh tips yang baik:
+"Coba baca teks dengan lebih teliti dan cari bukti konkret untuk setiap pernyataan. Perhatikan kata-kata kunci seperti 'kommt aus', 'wohnt', 'ist', dan 'hat' yang sering memberikan informasi penting. Ingat, membaca pemahaman butuh latihan - kamu pasti bisa!"`;
+
+
+export function buildStructuredPrompt(
+  questionType: string,
+  questionText: string,
+  studentAnswer: string,
+  correctAnswer: string,
+  isCorrect: boolean,
+  lessonContent?: string,
+  instruction?: string,
+  statement?: string
+): PromptConfig {
+  // Truncate lesson content to max 1000 chars untuk save tokens
+  const cleanLesson = lessonContent
+    ? lessonContent.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 1000)
+    : '';
+
+  const lessonSection = cleanLesson
+    ? `KONTEKS TEKS:\n${cleanLesson}\n\n`
+    : '';
+
+  // Build question based on type
+  let fullQuestion = questionText;
+  if (questionType === 'true_false' && instruction && statement) {
+    fullQuestion = `${instruction}\nPernyataan: ${statement}`;
+  }
+
+  const userPrompt = `${lessonSection}SOAL: ${fullQuestion}
+
+JAWABAN SISWA: ${studentAnswer}
+JAWABAN BENAR: ${correctAnswer}
+
+PENTING: 
+- Field "userAnswer" HARUS diisi dengan jawaban siswa yang sebenarnya: "${studentAnswer}"
+- Field "correctAnswer" HARUS diisi dengan jawaban yang benar: "${correctAnswer}"
+- Jangan kosongkan field userAnswer!
+
+Evaluasi dan return JSON sesuai format!`;
+
+  return {
+    model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+    temperature: 0.2,
+    maxTokens: 500, // Reduced for structured response
+    topP: 0.9,
+    systemMessage: STRUCTURED_SYSTEM_PROMPT,
+    userPrompt
+  };
+}

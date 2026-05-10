@@ -198,13 +198,33 @@ export function ExerciseBuilderModal({
 
     setIsLoading(true);
     try {
+      // ✨ AUTO-DETECT exercise_type based on question_type
+      // If all questions are true_false, set exercise_type to 'true_false'
+      // If all questions are multiple_choice, set exercise_type to 'multiple_choice'
+      // If mixed, use the first question's type
+      const questionTypes = questions.map(q => q.question_type);
+      const allTrueFalse = questionTypes.every(type => type === 'true_false');
+      const allMultipleChoice = questionTypes.every(type => type === 'multiple_choice');
+      
+      let autoDetectedExerciseType: 'multiple_choice' | 'true_false';
+      if (allTrueFalse) {
+        autoDetectedExerciseType = 'true_false';
+      } else if (allMultipleChoice) {
+        autoDetectedExerciseType = 'multiple_choice';
+      } else {
+        // Mixed types - use first question's type
+        autoDetectedExerciseType = questionTypes[0] || 'multiple_choice';
+      }
+      
+      console.log('[ExerciseBuilder] Auto-detected exercise_type:', autoDetectedExerciseType, 'from questions:', questionTypes);
+      
       // Transform data to match lesson-based course_exercises schema
       const transformedData = {
         title: exerciseTitle, // Direct field mapping
         description: exerciseDescription, // Direct field mapping
         lesson_id: selectedLessonId, // Lesson-based field
         exercise_number: selectedExerciseNumber, // Exercise 1 or 2
-        exercise_type: selectedExerciseType, // Exercise type
+        exercise_type: autoDetectedExerciseType, // ✨ AUTO-DETECTED from questions
         is_active: true,
         course_questions: questions.map((q, index) => ({
           exercise_id: null, // Will be set after exercise is created

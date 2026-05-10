@@ -17,6 +17,8 @@ import {
   ThumbsUp,
   Sparkles,
 } from "lucide-react";
+import { StructuredFeedbackCard } from "./StructuredFeedbackCard";
+import type { StructuredAIFeedback } from "@/types/tree";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -492,7 +494,64 @@ export default function AIFeedbackInline({
 
   if (!state.feedback) return null;
 
-  // ── Parse sections ───────────────────────────────────────────────────────
+  // ✨ NEW: Check if feedback is structured JSON
+  let structuredFeedback: StructuredAIFeedback | null = null;
+  try {
+    const parsed = JSON.parse(state.feedback.feedback_text);
+    if (parsed.correct !== undefined && parsed.verdict && parsed.tips && parsed.explanation !== undefined) {
+      structuredFeedback = parsed as StructuredAIFeedback;
+    }
+  } catch (e) {
+    // Not JSON, continue with normal rendering
+  }
+
+  // ✨ NEW: Render structured feedback if available
+  if (structuredFeedback) {
+    return (
+      <div className="mt-6 max-w-4xl mx-auto">
+        {/* Header toggle */}
+        <button
+          onClick={() => setState((prev) => ({ ...prev, isExpanded: !prev.isExpanded }))}
+          className="w-full flex items-center justify-between px-5 sm:px-6 py-4 transition-colors duration-150 hover:bg-gray-50"
+          style={{ 
+            backgroundColor: "#F9FAFB",
+            borderRadius: "16px",
+            border: "1px solid #E5E7EB",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <Brain className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" style={{ color: "#E8B824" }} />
+            <span className="text-sm sm:text-base font-bold" style={{ color: "#1A1A1A" }}>
+              Analisis AI
+            </span>
+            <span
+              className="text-xs sm:text-sm px-2.5 py-1 rounded-full font-bold"
+              style={{
+                backgroundColor: structuredFeedback.correct ? "#D1FAE5" : "#FEF3C7",
+                color: structuredFeedback.correct ? "#065F46" : "#92400E",
+              }}
+            >
+              {structuredFeedback.correct ? "✓ Tepat" : "💪 Hampir!"}
+            </span>
+          </div>
+          {state.isExpanded ? (
+            <ChevronUp className="h-5 w-5 flex-shrink-0" style={{ color: "#9CA3AF" }} />
+          ) : (
+            <ChevronDown className="h-5 w-5 flex-shrink-0" style={{ color: "#9CA3AF" }} />
+          )}
+        </button>
+
+        {/* Structured Feedback Content */}
+        {state.isExpanded && (
+          <div className="mt-4">
+            <StructuredFeedbackCard feedback={structuredFeedback} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Parse sections (for old format) ──────────────────────────────────────
 
   const sections = parseFeedbackSections(state.feedback.feedback_text);
   
