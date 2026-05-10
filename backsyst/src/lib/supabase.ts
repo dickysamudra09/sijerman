@@ -12,11 +12,12 @@ export function getSupabase() {
   return supabaseInstance;
 }
 
-// Deprecated: Use getSupabase() instead
-// This is kept for backward compatibility but should be replaced
-export const supabase = {
-  get auth() { return getSupabase().auth; },
-  get from() { return getSupabase().from.bind(getSupabase()); },
-  get storage() { return getSupabase().storage; },
-  get rpc() { return getSupabase().rpc.bind(getSupabase()); },
-};
+// For backward compatibility - export as object that calls getSupabase() when accessed
+// This ensures no initialization happens at module load time
+export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+  get(target, prop) {
+    const client = getSupabase();
+    const value = (client as any)[prop];
+    return typeof value === 'function' ? value.bind(client) : value;
+  }
+});
