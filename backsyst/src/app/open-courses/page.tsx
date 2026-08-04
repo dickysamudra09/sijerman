@@ -22,6 +22,59 @@ interface Course {
   isEnrolled?: boolean;
 }
 
+// Helper function to get contextual thumbnail based on course content
+const getCourseThumbnail = (course: Course): string => {
+  const courseId = course.id;
+  const title = course.title?.toLowerCase() || '';
+  const description = course.description?.toLowerCase() || '';
+  
+  // Manual mapping for specific course IDs
+  const courseImageMap: { [key: string]: string } = {
+    '0b3b98eb-6b6c-4059-ae42-7de17fe2f0d8': 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=800&h=600&fit=crop', // Kennenlernen - person waving hello / self introduction
+    '4cca89b0-8e23-4f73-9f0c-fe9edfcf7ec9': 'https://images.unsplash.com/photo-1511895426328-dc8714191300?w=800&h=600&fit=crop', // Familie - family photo
+  };
+  
+  // Check if there's a manual mapping first
+  if (courseImageMap[courseId]) {
+    return courseImageMap[courseId];
+  }
+  
+  // Fallback: Smart keyword detection
+  if (title.includes('kennen') || description.includes('kennen') || title.includes('introduction')) {
+    return 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=800&h=600&fit=crop'; // Person waving hello / introduction
+  }
+  if (title.includes('familie') || title.includes('family') || description.includes('familie')) {
+    return 'https://images.unsplash.com/photo-1511895426328-dc8714191300?w=800&h=600&fit=crop'; // Family
+  }
+  if (title.includes('essen') || title.includes('food') || title.includes('restaurant')) {
+    return 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop'; // Food/restaurant
+  }
+  if (title.includes('reise') || title.includes('travel') || title.includes('urlaub')) {
+    return 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&h=600&fit=crop'; // Travel
+  }
+  if (title.includes('arbeit') || title.includes('work') || title.includes('beruf')) {
+    return 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?w=800&h=600&fit=crop'; // Work/office
+  }
+  if (title.includes('wohnen') || title.includes('haus') || title.includes('home')) {
+    return 'https://images.unsplash.com/photo-1513584684374-8bab748fbf90?w=800&h=600&fit=crop'; // Home/living
+  }
+  if (title.includes('schule') || title.includes('school') || title.includes('lernen')) {
+    return 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=600&fit=crop'; // School/education
+  }
+  if (title.includes('stadt') || title.includes('city') || description.includes('stadt')) {
+    return 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=800&h=600&fit=crop'; // City
+  }
+  if (title.includes('einkaufen') || title.includes('shopping') || title.includes('markt')) {
+    return 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=600&fit=crop'; // Shopping
+  }
+  if (title.includes('gesundheit') || title.includes('health') || title.includes('arzt')) {
+    return 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=800&h=600&fit=crop'; // Health/medical
+  }
+  
+  // Ultimate fallback: Generic German learning image
+  return `https://picsum.photos/seed/${courseId}/800/600`;
+};
+
 export default function OpenCoursesPage() {
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
@@ -48,6 +101,7 @@ export default function OpenCoursesPage() {
         const [authResult, coursesResult] = await Promise.all([
           supabase.auth.getUser(),
           // OPTIMIZATION 2: Use Supabase join to fetch teacher data in 1 query
+          // Fetch oldest courses first (ascending order by created_at)
           supabase
             .from("courses")
             .select(`
@@ -60,7 +114,7 @@ export default function OpenCoursesPage() {
               teacher:users!teacher_id(id, name, email)
             `)
             .eq("class_type", "open")
-            .order("created_at", { ascending: false })
+            .order("created_at", { ascending: true })
         ]);
         console.timeEnd("⏱️ Parallel queries");
 
@@ -144,8 +198,9 @@ export default function OpenCoursesPage() {
     }
 
     if (sortBy === "terbaru") {
+      // Keep oldest first (ascending order by created_at)
       filtered = filtered.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
     } else if (sortBy === "populer") {
       filtered = filtered.sort((a, b) => b.title.localeCompare(a.title));
@@ -496,7 +551,10 @@ export default function OpenCoursesPage() {
                     style={{ backgroundColor: "#FAFAF7", borderColor: "#E0DDD0" }}
                   >
                     {/* Image skeleton */}
-                    <div className="h-40 md:h-48 bg-gradient-to-br from-gray-200 to-gray-300"></div>
+                    <div className="h-40 md:h-48 bg-gradient-to-br from-gray-200 via-gray-300 to-gray-200 animate-pulse relative overflow-hidden">
+                      {/* Shimmer effect */}
+                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                    </div>
                     
                     {/* Content skeleton */}
                     <div className="p-3 md:p-4 space-y-3">
@@ -562,26 +620,44 @@ export default function OpenCoursesPage() {
                     style={{ backgroundColor: "#FAFAF7", borderColor: "#E0DDD0" }}
                   >
                     {/* Image/Thumbnail Area */}
-                    <div className="h-40 md:h-48 relative overflow-hidden bg-gradient-to-br from-amber-100 via-yellow-100 to-orange-100 flex items-center justify-center">
+                    <div className="h-40 md:h-48 relative overflow-hidden">
+                      {/* Course Thumbnail Image - Contextual based on course topic */}
+                      <img 
+                        src={getCourseThumbnail(course)}
+                        alt={course.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to gradient if image fails to load
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.classList.remove('hidden');
+                        }}
+                      />
+                      
+                      {/* Fallback Gradient (hidden by default) */}
+                      <div className="hidden absolute inset-0 bg-gradient-to-br from-amber-100 via-yellow-100 to-orange-100 flex items-center justify-center">
+                        <div className="flex flex-col items-center justify-center text-center p-4">
+                          <BookOpen className="h-12 w-12 md:h-16 md:w-16 mb-2" style={{ color: "#D97706", opacity: 0.7 }} />
+                          <p className="font-bold text-base md:text-lg drop-shadow-lg" style={{ color: "#78350F" }}>Kursus</p>
+                          <p className="text-sm drop-shadow-lg" style={{ color: "#92400E", opacity: 0.9 }}>Terbuka</p>
+                        </div>
+                      </div>
+                      
+                      {/* Dark Overlay for Better Badge Contrast */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+                      
                       {/* Status Badges - Left/Right */}
-                      <div className="absolute top-2 md:top-3 left-2 md:left-3 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs font-bold text-white bg-red-500">
+                      <div className="absolute top-2 md:top-3 left-2 md:left-3 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs font-bold text-white bg-red-500 shadow-lg">
                         FREE
                       </div>
                       
                       {/* Enrolled Badge - Right */}
                       {course.isEnrolled && (
-                        <div className="absolute top-2 md:top-3 right-2 md:right-3 flex items-center gap-1 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs font-bold text-white bg-green-500">
+                        <div className="absolute top-2 md:top-3 right-2 md:right-3 flex items-center gap-1 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs font-bold text-white bg-green-500 shadow-lg">
                           <CheckCircle2 className="h-3 w-3" />
                           Terdaftar
                         </div>
                       )}
-                      
-                      {/* Default Placeholder with Text */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
-                        <BookOpen className="h-12 w-12 md:h-16 md:w-16 mb-2" style={{ color: "#D97706", opacity: 0.7 }} />
-                        <p className="font-bold text-base md:text-lg drop-shadow-lg" style={{ color: "#78350F" }}>Kursus</p>
-                        <p className="text-sm drop-shadow-lg" style={{ color: "#92400E", opacity: 0.9 }}>Terbuka</p>
-                      </div>
                     </div>
 
                     {/* Card Content */}

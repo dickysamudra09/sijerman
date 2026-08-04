@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
-import { AlertCircle, Eye, EyeOff, ArrowLeft, CheckCircle } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, ArrowLeft, CheckCircle, UserPlus, LogIn, Search, FileText, MousePointerClick, PenTool, Sparkles, BarChart3 } from "lucide-react";
 import { createSession, enforceSessionLimit, logSessionActivity } from "@/lib/session-manager";
 import { createSessionSimple } from "@/lib/session-manager-simple";
 import { getUserIP } from "@/lib/get-ip";
@@ -450,29 +450,119 @@ function LoginPageInner() {
         </div>
         
         {/* Content */}
-        <div className="relative z-10 text-center text-white max-w-md">
-          <div className="mb-8">
-            <img src="/img/1.png" alt="Si Jerman" className="h-24 w-auto mx-auto mb-6" />
+        <div className="relative z-10 text-white max-w-lg px-4">
+          {/* Logo with Title - Center */}
+          <div className="mb-8 text-center">
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <img src="/img/1.png" alt="Si Jerman" className="h-12 w-auto" />
+              <div className="text-left">
+                <div className="text-xl font-bold" style={{color: '#E8B824'}}>Si Jerman</div>
+                <p className="text-xs uppercase tracking-wider" style={{color: '#FFFFFC', letterSpacing: '0.05em'}}>Learning Platform</p>
+              </div>
+            </div>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4 leading-tight">
-            Selamat Datang di <br />
-            <span style={{color: '#E8B824'}}>Si Jerman</span>
-          </h2>
-          <p className="text-base text-gray-300 mb-8 leading-relaxed">
-            Platform pembelajaran Bahasa Jerman terlengkap dengan AI, kuis interaktif, forum diskusi, dan banyak lagi.
-          </p>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 text-gray-200">
-              <div className="w-2 h-2 rounded-full" style={{backgroundColor: '#E8B824'}}></div>
-              <span>Latihan soal dengan analisis AI</span>
-            </div>
-            <div className="flex items-center gap-3 text-gray-200">
-              <div className="w-2 h-2 rounded-full" style={{backgroundColor: '#E8B824'}}></div>
-              <span>Kuis interaktif dan multiplayer</span>
-            </div>
-            <div className="flex items-center gap-3 text-gray-200">
-              <div className="w-2 h-2 rounded-full" style={{backgroundColor: '#E8B824'}}></div>
-              <span>Dashboard tracking progress</span>
+
+          {/* Vertical Timeline - Alur Penggunaan (8 Steps) - Center */}
+          <div className="relative text-center">
+            <h3 className="text-xl font-bold mb-2" style={{color: '#E8B824'}}>
+              Alur Penggunaan Open Course
+            </h3>
+            <p className="text-sm text-gray-400 mb-10">
+              Ikuti 8 langkah untuk memulai pembelajaran Bahasa Jerman
+            </p>
+            
+            {/* Timeline container - Center aligned with adjusted positioning */}
+            <div className="inline-block text-left relative">
+              {/* Vertical line */}
+              <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-700"></div>
+              
+              {/* Step 1: Daftar akun */}
+              <div className="relative mb-6 flex items-start gap-3">
+                <div className="relative z-10 flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: '#3B82F6', boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.2)'}}>
+                  <UserPlus className="h-5 w-5 text-white" />
+                </div>
+                <div className="pt-1.5">
+                  <h4 className="font-semibold text-base mb-0.5 text-white">Daftar akun</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">Buat akun baru dengan email</p>
+                </div>
+              </div>
+              
+              {/* Step 2: Masuk akun */}
+              <div className="relative mb-6 flex items-start gap-3">
+                <div className="relative z-10 flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: '#06B6D4', boxShadow: '0 0 0 3px rgba(6, 182, 212, 0.2)'}}>
+                  <LogIn className="h-5 w-5 text-white" />
+                </div>
+                <div className="pt-1.5">
+                  <h4 className="font-semibold text-base mb-0.5 text-white">Masuk akun</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">Login ke sistem platform</p>
+                </div>
+              </div>
+              
+              {/* Step 3: Melihat daftar open course */}
+              <div className="relative mb-6 flex items-start gap-3">
+                <div className="relative z-10 flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: '#10B981', boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.2)'}}>
+                  <Search className="h-5 w-5 text-white" />
+                </div>
+                <div className="pt-1.5">
+                  <h4 className="font-semibold text-base mb-0.5 text-white">Melihat daftar open course</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">Browse kursus yang tersedia</p>
+                </div>
+              </div>
+              
+              {/* Step 4: Melihat silabus kursus */}
+              <div className="relative mb-6 flex items-start gap-3">
+                <div className="relative z-10 flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: '#14B8A6', boxShadow: '0 0 0 3px rgba(20, 184, 166, 0.2)'}}>
+                  <FileText className="h-5 w-5 text-white" />
+                </div>
+                <div className="pt-1.5">
+                  <h4 className="font-semibold text-base mb-0.5 text-white">Melihat silabus kursus</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">Baca detail materi kursus</p>
+                </div>
+              </div>
+              
+              {/* Step 5: Mengakses detail kursus */}
+              <div className="relative mb-6 flex items-start gap-3">
+                <div className="relative z-10 flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: '#F59E0B', boxShadow: '0 0 0 3px rgba(245, 158, 11, 0.2)'}}>
+                  <MousePointerClick className="h-5 w-5 text-white" />
+                </div>
+                <div className="pt-1.5">
+                  <h4 className="font-semibold text-base mb-0.5 text-white">Mengakses detail kursus</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">Buka halaman kursus</p>
+                </div>
+              </div>
+              
+              {/* Step 6: Mengerjakan latihan soal */}
+              <div className="relative mb-6 flex items-start gap-3">
+                <div className="relative z-10 flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: '#F97316', boxShadow: '0 0 0 3px rgba(249, 115, 22, 0.2)'}}>
+                  <PenTool className="h-5 w-5 text-white" />
+                </div>
+                <div className="pt-1.5">
+                  <h4 className="font-semibold text-base mb-0.5 text-white">Mengerjakan latihan soal</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">Kerjakan exercise pembelajaran</p>
+                </div>
+              </div>
+              
+              {/* Step 7: Menerima AI Feedback */}
+              <div className="relative mb-6 flex items-start gap-3">
+                <div className="relative z-10 flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: '#8B5CF6', boxShadow: '0 0 0 3px rgba(139, 92, 246, 0.2)'}}>
+                  <Sparkles className="h-5 w-5 text-white" />
+                </div>
+                <div className="pt-1.5">
+                  <h4 className="font-semibold text-base mb-0.5 text-white">Menerima AI Feedback</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">Dapat penilaian otomatis dari AI</p>
+                </div>
+              </div>
+              
+              {/* Step 8: Melihat progress belajar */}
+              <div className="relative flex items-start gap-3">
+                <div className="relative z-10 flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: '#EC4899', boxShadow: '0 0 0 3px rgba(236, 72, 153, 0.2)'}}>
+                  <BarChart3 className="h-5 w-5 text-white" />
+                </div>
+                <div className="pt-1.5">
+                  <h4 className="font-semibold text-base mb-0.5 text-white">Melihat progress belajar</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">Tracking kemajuan pembelajaran</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
